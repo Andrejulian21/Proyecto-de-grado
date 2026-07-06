@@ -121,9 +121,14 @@ class AuthController extends Controller
             return response()->json(['error' => 'invalid_credentials'], 401);
         }
 
-        // Success — reset counters, issue token, audit, return.
+        // Success — reset counters, purge prior sessions, issue token,
+        // audit, return.
         $user->clearFailedLogin();
         $user->update(['last_activity_at' => now()]);
+
+        // Single-session enforcement (T-021): delete any existing
+        // Sanctum tokens for this user before issuing the new one.
+        $user->tokens()->delete();
 
         /** @var NewAccessToken $accessToken */
         $accessToken = $user->createToken('external-evaluator', ['*'], now()->addMinutes(15));

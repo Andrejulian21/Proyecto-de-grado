@@ -35,7 +35,18 @@ Route::post('/auth/externo/login', [AuthController::class, 'loginExterno'])
 
 // -- authenticated routes -------------------------------------------
 
-Route::middleware('auth:sanctum')->group(function () {
+// Authenticated API routes are guarded by:
+//   - auth:sanctum           (Sanctum cookie/bearer token)
+//   - single_session         (T-021, belt-and-suspenders)
+//   - activity               (T-022, 8h inactivity timeout)
+//   - ensure_password_changed (T-017, forces external evaluators to
+//     change their temporary password)
+Route::middleware([
+    'auth:sanctum',
+    'single_session',
+    'activity',
+    'ensure_password_changed',
+])->group(function () {
     Route::get('/auth/user', [AuthController::class, 'sessionCheck'])
         ->name('auth.user');
 

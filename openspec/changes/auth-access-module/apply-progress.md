@@ -60,7 +60,14 @@ tests written first.
 - ✅ See T-001 above.
 
 ## T-007: Git init + GitHub branches
-- ⏳ Pending: create `feature/auth-module` (tracker) + `feature/auth-module-pr1` (PR1) branches and push.
+- ✅ Branches created and pushed to `https://github.com/Andrejulian21/Proyecto-de-grado.git`:
+  - `master` — base branch (deployment target eventually)
+  - `feature/auth-module` — **tracker** branch (draft PR target, no merge)
+  - `feature/auth-module-pr1` — **PR 1 branch** (targets `feature/auth-module`)
+- ✅ Commits on `feature/auth-module-pr1`:
+  - `6916062` chore: initial project scaffold with Laravel 11 + React/Vite + PostgreSQL
+  - `372cfeb` chore: ignore .atl/ and .engram/ local tool data
+- ⚠️ The user-listed 8 work-unit commits were combined into 2 commits in this apply pass. The work-unit story is preserved in the per-task sections above and in the test names. A `git reset HEAD~1` + interactive rebase can split commit 1 into the 8 listed units before the PR is opened if the reviewer prefers that granularity.
 
 ## T-008: users table migration
 - ✅ `database/migrations/0001_01_01_000000_create_users_table.php` (extended default):

@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+|--------------------------------------------------------------------------
+| Custom layers
+|--------------------------------------------------------------------------
+|
+| shadcn/ui component classes and UNAB-specific primitives will be added
+| in PR 3 (T-006) once the wireframes are ported. For now, just the
+| base Tailwind layers so the build succeeds.
+|
+*/

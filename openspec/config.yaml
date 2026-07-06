@@ -1,0 +1,49 @@
+# SDD Configuration — Sistema Centralizado de Proyectos de Grado
+# Generated: 2026-07-06
+# Mode: hybrid (openspec + engram)
+
+context: >
+  Greenfield web application for UNAB Systems Engineering degree.
+  Monorepo with Laravel 11 backend (API REST), React+Vite+TS frontend,
+  FastAPI microservice for AI (embeddings + Azure OpenAI orchestration),
+  PostgreSQL 16 with pgvector, Redis 7, Docker Compose on a single Azure VM.
+  36 user stories, 40 functional reqs, 17 non-functional reqs.
+  2 developers, 12-sprint plan (~123 days).
+
+strict_tdd: true
+
+testing:
+  runner_php: vendor/bin/pest
+  runner_python: pytest
+  runner_e2e: npx playwright test
+  layers:
+    unit_php: true
+    unit_python: true
+    integration_php: true
+    integration_python: true
+    e2e: true
+  coverage_php: vendor/bin/pest --coverage
+  coverage_python: pytest --cov
+  coverage_e2e: npx playwright test --reporter=html
+  linter_php: vendor/bin/pint
+  linter_python: ruff check
+  type_checker_python: mypy
+  formatter_php: vendor/bin/pint
+  formatter_python: ruff format
+  formatter_ts: npx prettier --check
+
+phases:
+  propose:
+    gates: [scope_defined, stack_aligned, hu_traced]
+  spec:
+    gates: [rf_traced, acceptance_criteria_covered, rnf_respected]
+  design:
+    gates: [architecture_aligned, data_model_consistent, ai_pipeline_defined]
+  tasks:
+    max_scope: 3_days_per_task
+  apply:
+    strategy: tdd
+  verify:
+    gates: [tests_pass, lint_clean, coverage_met]
+  archive:
+    update_config: true

@@ -1,0 +1,55 @@
+/.phpunit.cache
+/node_modules
+/public/build
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
+/vendor
+.env
+.env.backup
+.env.production
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+auth.json
+npm-debug.log
+yarn-error.log
+/.fleet
+/.idea
+/.vscode
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Coverage / test reports
+/coverage
+/coverage.xml
+/.nyc_output
+
+# Sail / Docker local overrides
+/docker-compose.override.yml
+/.docker
+
+# Logs
+*.log
+/storage/logs/*
+!/storage/logs/.gitkeep
+
+# Frontend build artifacts
+/public/build/
+/resources/js/.tsbuildinfo
+
+# Playwright / E2E
+/test-results/
+/playwright-report/
+/playwright/.cache/
+
+# OS / editor
+.DS_Store
+*.swp
+*.swo
+*~

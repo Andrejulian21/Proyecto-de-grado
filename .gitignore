@@ -52,6 +52,10 @@ $RECYCLE.BIN/
 /.atl/
 /.engram/
 
+# Local test artifacts (TDD evidence files)
+/test-*.txt
+/baseline.txt
+
 # OS / editor
 .DS_Store
 *.swp

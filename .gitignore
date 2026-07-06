@@ -48,6 +48,10 @@ $RECYCLE.BIN/
 /playwright-report/
 /playwright/.cache/
 
+# Local agent / tool data (similar to .idea / .vscode)
+/.atl/
+/.engram/
+
 # OS / editor
 .DS_Store
 *.swp

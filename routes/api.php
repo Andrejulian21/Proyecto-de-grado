@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Admin\UserController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -44,3 +45,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout'])
         ->name('auth.logout');
 });
+
+// -- admin (coordinador-only) routes ---------------------------------
+
+Route::middleware(['auth:sanctum', 'role:Coordinador'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+        Route::post('/evaluadores', [UserController::class, 'storeExternal'])
+            ->name('evaluadores.store');
+    });

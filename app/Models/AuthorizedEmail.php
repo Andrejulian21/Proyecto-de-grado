@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\UserRole;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * @property int $id
  * @property string $email
- * @property string $role            // UserRole backing value
+ * @property UserRole $role
  * @property int|null $created_by
  * @property \Illuminate\Support\Carbon $created_at
  * @property \Illuminate\Support\Carbon $updated_at
@@ -31,6 +32,16 @@ class AuthorizedEmail extends Model
         'role',
         'created_by',
     ];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'role' => UserRole::class,
+        ];
+    }
 
     /**
      * The coordinador (User) who added this email to the whitelist.

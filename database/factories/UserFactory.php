@@ -38,6 +38,9 @@ class UserFactory extends Factory
             'avatar' => null,
             'last_activity_at' => null,
             'totp_secret' => null,
+            'password_changed_at' => now(), // internal users don't need to change
+            'failed_attempts' => 0,
+            'locked_until' => null,
             'remember_token' => Str::random(10),
         ];
     }
@@ -79,6 +82,9 @@ class UserFactory extends Factory
             'role' => UserRole::EvaluadorExterno->value,
             'es_externo' => true,
             'google_id' => null,
+            // External evaluators start with `password_changed_at = null`
+            // so the first login forces a password change.
+            'password_changed_at' => null,
         ]);
     }
 }

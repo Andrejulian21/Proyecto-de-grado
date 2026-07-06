@@ -11,28 +11,43 @@ use Illuminate\Http\Request;
 /**
  * Persists an AuditEvent to the immutable `audit_logs` table.
  *
- * The request is injected explicitly by the EventServiceProvider
- * (T-013) using `Request::capture()` so the listener never depends
- * on the global `request()` helper — that makes the listener fully
- * testable without booting a full HTTP context.
+ * Resolves the current HTTP request from the container at write time.
+ * When no HTTP request is active (artisan command, queue worker), the
+ * IP and user-agent columns fall back to null.
  */
 class WriteAuditLog
 {
     /**
-     * Handle the event. Reads IP / user-agent from the captured
-     * request and writes a new row. INSERT is the only operation
-     * allowed on the audit_logs table (see AuditLog model for
-     * the immutability guards).
+     * Handle the event.
      */
-    public function handle(AuditEvent $event, Request $request): void
+    public function handle(AuditEvent $event): void
     {
+        $request = $this->resolveRequest();
+
         AuditLog::create([
             'user_id' => $event->user?->id,
             'action' => $event->action,
             'description' => $event->description,
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent(),
+            'ip_address' => $request?->ip(),
+            'user_agent' => $request?->userAgent(),
             'metadata' => $event->meta,
         ]);
+    }
+
+    /**
+     * Return the current request if one is bound, otherwise null.
+     * We avoid instantiating a new Request when none is active so
+     * background jobs and artisan commands get null IP/UA.
+     */
+    private function resolveRequest(): ?Request
+    {
+        if (app()->bound('request')) {
+            $request = app('request');
+            if ($request instanceof Request) {
+                return $request;
+            }
+        }
+
+        return null;
     }
 }

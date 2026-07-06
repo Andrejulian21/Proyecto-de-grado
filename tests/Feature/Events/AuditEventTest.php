@@ -56,6 +56,8 @@ it('WriteAuditLog persists a row from the event using request context', function
         'REMOTE_ADDR' => '203.0.113.5',
         'HTTP_USER_AGENT' => 'Mozilla/5.0 (Pest)',
     ]);
+    $this->app->instance('request', $request);
+
     $event = new AuditEvent(
         user: $user,
         action: 'login.success',
@@ -63,7 +65,7 @@ it('WriteAuditLog persists a row from the event using request context', function
         meta: ['channel' => 'google'],
     );
 
-    (new WriteAuditLog())->handle($event, $request);
+    (new WriteAuditLog())->handle($event);
 
     $row = AuditLog::query()->latest('id')->first();
 
@@ -79,13 +81,15 @@ it('WriteAuditLog persists a row from the event using request context', function
 
 it('WriteAuditLog accepts a null user and still writes the row', function () {
     $request = Request::create('/api/x', 'GET');
+    $this->app->instance('request', $request);
+
     $event = new AuditEvent(
         user: null,
         action: 'access.denied',
         description: 'unauthenticated request',
     );
 
-    (new WriteAuditLog())->handle($event, $request);
+    (new WriteAuditLog())->handle($event);
 
     $row = AuditLog::query()->where('action', 'access.denied')->first();
 

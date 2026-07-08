@@ -1,6 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
+use App\Providers\AppServiceProvider;
+use App\Providers\AuthServiceProvider;
+use App\Providers\EventServiceProvider;
+
 return [
-    App\Providers\AppServiceProvider::class,
-    App\Providers\EventServiceProvider::class,
+    AppServiceProvider::class,
+    AuthServiceProvider::class,
+    EventServiceProvider::class,
 ];

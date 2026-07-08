@@ -10,16 +10,16 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * 8-hour inactivity timeout (T-022).
+ * 1-hour inactivity timeout (T-022).
  *
  * On every authenticated request:
  *   1. Read the user's `last_activity_at`.
- *   2. If it is set and older than 8 hours, delete the current
+ *   2. If it is set and older than 1 hour, delete the current
  *      Sanctum token, dispatch `logout.timeout`, return 401
  *      `{error: "session.timeout", code: "session.timeout"}`.
  *   3. Otherwise update `last_activity_at` to now() and pass through.
  *
- * The 8h window matches the spec (`SESSION_LIFETIME=480` minutes in
+ * The 1h window matches the spec (`SESSION_LIFETIME=60` minutes in
  * the env file). The middleware is the source of truth — the
  * `SESSION_LIFETIME` env value is the coarse backup.
  */
@@ -28,7 +28,7 @@ class ActivityMiddleware
     /**
      * Maximum inactivity window in minutes.
      */
-    private const INACTIVITY_MINUTES = 8 * 60;
+    private const INACTIVITY_MINUTES = 1 * 60;
 
     /**
      * Handle the request.
@@ -50,7 +50,7 @@ class ActivityMiddleware
             AuditEvent::dispatch(
                 $user,
                 'logout.timeout',
-                '8-hour inactivity timeout',
+                '1-hour inactivity timeout',
             );
 
             return response()->json(['error' => 'session.timeout'], 401);

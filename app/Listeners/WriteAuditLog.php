@@ -43,6 +43,7 @@ class WriteAuditLog
     {
         if (app()->bound('request')) {
             $request = app('request');
+
             if ($request instanceof Request) {
                 return $request;
             }

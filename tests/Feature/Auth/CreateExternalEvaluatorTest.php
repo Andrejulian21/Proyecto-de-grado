@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Enums\UserRole;
-use App\Events\AuditEvent;
 use App\Models\AuditLog;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;

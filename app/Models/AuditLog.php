@@ -32,7 +32,7 @@ use LogicException;
  * @property string|null $ip_address
  * @property string|null $user_agent
  * @property array<string, mixed>|null $metadata
- * @property \Illuminate\Support\Carbon $created_at
+ * @property Carbon $created_at
  */
 class AuditLog extends Model
 {
@@ -100,6 +100,7 @@ class AuditLog extends Model
         if ($from !== null) {
             $query->where('created_at', '>=', $from);
         }
+
         if ($to !== null) {
             $query->where('created_at', '<', $to);
         }

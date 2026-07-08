@@ -1,11 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 use App\Enums\UserRole;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * Whitelist entry: an email authorized to log in via Google OAuth and the
@@ -17,8 +20,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $email
  * @property UserRole $role
  * @property int|null $created_by
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
  */
 class AuthorizedEmail extends Model
 {

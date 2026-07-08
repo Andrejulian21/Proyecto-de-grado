@@ -17,7 +17,6 @@ uses(RefreshDatabase::class);
  * (e.g. `role:Coordinador,Director`). It blocks users with a
  * different role, returns 403, and writes an audit log.
  */
-
 beforeEach(function () {
     // Test-only ping endpoints used to exercise the middleware
     // without coupling to the real admin route bodies.

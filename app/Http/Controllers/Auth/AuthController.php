@@ -104,6 +104,7 @@ class AuthController extends Controller
 
         // 3. Triple validation.
         $rejectionReason = $this->validateOAuth($email, $hd);
+
         if ($rejectionReason !== null) {
             AuditEvent::dispatch(
                 null,
@@ -179,6 +180,7 @@ class AuthController extends Controller
         if ($hd === null || $hd === '') {
             return 'hd_missing';
         }
+
         if ($hd !== self::UNAB_HOSTED_DOMAIN) {
             return 'domain_mismatch';
         }

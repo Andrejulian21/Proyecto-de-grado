@@ -20,8 +20,7 @@ class LoginAttemptPolicy
         private readonly int $maxAttempts = 3,
         private readonly int $windowMinutes = 10,
         private readonly int $lockMinutes = 15,
-    ) {
-    }
+    ) {}
 
     public function maxAttempts(): int
     {

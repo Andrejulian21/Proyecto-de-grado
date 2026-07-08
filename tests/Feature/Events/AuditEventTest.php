@@ -65,7 +65,7 @@ it('WriteAuditLog persists a row from the event using request context', function
         meta: ['channel' => 'google'],
     );
 
-    (new WriteAuditLog())->handle($event);
+    (new WriteAuditLog)->handle($event);
 
     $row = AuditLog::query()->latest('id')->first();
 
@@ -89,7 +89,7 @@ it('WriteAuditLog accepts a null user and still writes the row', function () {
         description: 'unauthenticated request',
     );
 
-    (new WriteAuditLog())->handle($event);
+    (new WriteAuditLog)->handle($event);
 
     $row = AuditLog::query()->where('action', 'access.denied')->first();
 

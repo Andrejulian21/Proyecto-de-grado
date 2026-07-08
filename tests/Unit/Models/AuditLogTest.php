@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Models\AuditLog;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 
 uses(RefreshDatabase::class);
 
@@ -53,28 +54,28 @@ it('refuses to update an existing audit log row', function () {
     $row->description = 'tampered';
 
     expect(fn () => $row->save())
-        ->toThrow(\LogicException::class, 'audit_logs is append-only');
+        ->toThrow(LogicException::class, 'audit_logs is append-only');
 });
 
 it('refuses to delete an existing audit log row', function () {
     $row = AuditLog::create(['action' => 'login.success']);
 
     expect(fn () => $row->delete())
-        ->toThrow(\LogicException::class, 'audit_logs is append-only');
+        ->toThrow(LogicException::class, 'audit_logs is append-only');
 });
 
 it('refuses mass update via the query builder', function () {
     AuditLog::create(['action' => 'login.success']);
 
     expect(fn () => AuditLog::query()->update(['description' => 'x']))
-        ->toThrow(\LogicException::class, 'audit_logs is append-only');
+        ->toThrow(LogicException::class, 'audit_logs is append-only');
 });
 
 it('refuses mass delete via the query builder', function () {
     AuditLog::create(['action' => 'login.success']);
 
     expect(fn () => AuditLog::query()->delete())
-        ->toThrow(\LogicException::class, 'audit_logs is append-only');
+        ->toThrow(LogicException::class, 'audit_logs is append-only');
 });
 
 it('scopes logs by user_id', function () {
@@ -130,9 +131,9 @@ it('orders logs by created_at descending by default', function () {
  * Eloquent's automatic timestamp handling so the test can pin the
  * row to a specific point in time.
  */
-function insertAuditLogWithTimestamp(string $action, \Illuminate\Support\Carbon $createdAt): AuditLog
+function insertAuditLogWithTimestamp(string $action, Carbon $createdAt): AuditLog
 {
-    $row = new AuditLog();
+    $row = new AuditLog;
     $row->setRawAttributes([
         'action' => $action,
         'created_at' => $createdAt,

@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Auth\AuthController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -65,4 +66,20 @@ Route::middleware(['auth:sanctum', 'role:Coordinador'])
     ->group(function () {
         Route::post('/evaluadores', [UserController::class, 'storeExternal'])
             ->name('evaluadores.store');
+
+        // Whitelist CRUD (T-020).
+        Route::get('/whitelist', [UserController::class, 'index'])
+            ->name('whitelist.index');
+        Route::post('/whitelist', [UserController::class, 'store'])
+            ->name('whitelist.store');
+        Route::put('/whitelist/{id}', [UserController::class, 'update'])
+            ->whereNumber('id')
+            ->name('whitelist.update');
+        Route::delete('/whitelist/{id}', [UserController::class, 'destroy'])
+            ->whereNumber('id')
+            ->name('whitelist.destroy');
+
+        // Audit log viewer (T-024).
+        Route::get('/audit-logs', [AuditLogController::class, 'index'])
+            ->name('audit-logs.index');
     });

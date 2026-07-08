@@ -8,6 +8,7 @@ use App\Models\AuthorizedEmail;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\InvalidStateException;
 use Laravel\Socialite\Two\User as SocialiteUser;
 
 uses(RefreshDatabase::class);
@@ -37,12 +38,10 @@ beforeEach(function () {
 
 /**
  * Build a fake Socialite user with the given Google claims.
- *
- * @return SocialiteUser
  */
 function fakeGoogleUser(array $attrs = []): SocialiteUser
 {
-    $user = new SocialiteUser();
+    $user = new SocialiteUser;
     $user->id = $attrs['id'] ?? 'google-'.uniqid();
     $user->nickname = $attrs['nickname'] ?? 'maria';
     $user->name = $attrs['name'] ?? 'Maria Test';
@@ -221,7 +220,7 @@ it('returns to /login with cancel message when Google returns an error', functio
 
 it('catches Socialite exceptions and redirects to /login with retry message', function () {
     Socialite::shouldReceive('driver->user')->andThrow(
-        new \Laravel\Socialite\Two\InvalidStateException('invalid_state')
+        new InvalidStateException('invalid_state')
     );
 
     $response = $this->get('/auth/callback');

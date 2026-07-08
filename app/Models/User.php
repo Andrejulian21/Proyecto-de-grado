@@ -1,12 +1,16 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
+use App\Auth\LoginAttemptPolicy;
 use App\Enums\UserRole;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Carbon;
 use Laravel\Sanctum\HasApiTokens;
 
 /**
@@ -18,7 +22,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property bool $es_externo
  * @property string|null $google_id
  * @property string|null $avatar
- * @property \Illuminate\Support\Carbon|null $last_activity_at
+ * @property Carbon|null $last_activity_at
  * @property string|null $totp_secret
  * @property string|null $remember_token
  */
@@ -133,7 +137,7 @@ class User extends Authenticatable
      */
     public function registerFailedLogin(): void
     {
-        $policy = app(\App\Auth\LoginAttemptPolicy::class);
+        $policy = app(LoginAttemptPolicy::class);
         $this->failed_attempts = ($this->failed_attempts ?? 0) + 1;
 
         if ($this->failed_attempts >= $policy->maxAttempts()) {

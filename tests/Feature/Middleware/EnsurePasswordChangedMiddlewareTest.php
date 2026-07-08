@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Middleware\EnsurePasswordChanged;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -17,12 +18,11 @@ uses(RefreshDatabase::class);
  * `POST /api/auth/change-password`. The middleware runs AFTER
  * `auth:sanctum` so the user is resolved before the check.
  */
-
 beforeEach(function () {
-    Route::middleware(['auth:sanctum', \App\Http\Middleware\EnsurePasswordChanged::class])
+    Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])
         ->get('/api/_protected', fn () => response()->json(['ok' => true]));
 
-    Route::middleware(['auth:sanctum', \App\Http\Middleware\EnsurePasswordChanged::class])
+    Route::middleware(['auth:sanctum', EnsurePasswordChanged::class])
         ->post('/api/auth/change-password', fn () => response()->json(['ok' => true]))
         ->name('auth.change_password');
 });

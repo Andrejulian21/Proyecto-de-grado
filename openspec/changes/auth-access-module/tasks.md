@@ -38,7 +38,7 @@ Chain strategy: pending
 - **Depends on**: None
 
 #### T-002: Install and configure Laravel Sanctum (cookie SPA mode)
-- **Description**: `composer require laravel/sanctum`. Publish config. Set `stateful` domains in `config/sanctum.php` for the SPA origin (localhost:5173 or app URL). Enable `EXPIRATION` and `prefix` for SPA routes. Configure `.env` with `SESSION_DRIVER=redis` and `SESSION_LIFETIME=480`.
+- **Description**: `composer require laravel/sanctum`. Publish config. Set `stateful` domains in `config/sanctum.php` for the SPA origin (localhost:5173 or app URL). Enable `EXPIRATION` and `prefix` for SPA routes. Configure `.env` with `SESSION_DRIVER=redis` and `SESSION_LIFETIME=60`.
 - **Files**: `config/sanctum.php`, `.env`, `app/Http/Kernel.php` (ensure `EnsureFrontendRequestsAreStateful` in api middleware group)
 - **Acceptance**: Sanctum cookie auth works with `POST /api/login` and `GET /api/user`. CSRF token endpoint returns 204.
 - **Effort**: 1.5h
@@ -206,9 +206,9 @@ Chain strategy: pending
 - **Depends on**: T-002
 
 #### T-022: Implement inactivity timeout middleware
-- **Description**: `ActivityMiddleware` — on every authenticated request: check `now() - last_activity_at > 8 hours`. If timed out: delete token, return 401 with code `session.timeout`, write AuditEvent `logout.timeout`. If active: update `last_activity_at` to now(). Register as global middleware in `api` group.
+- **Description**: `ActivityMiddleware` — on every authenticated request: check `now() - last_activity_at > 1 hour`. If timed out: delete token, return 401 with code `session.timeout`, write AuditEvent `logout.timeout`. If active: update `last_activity_at` to now(). Register as global middleware in `api` group.
 - **Files**: `app/Http/Middleware/ActivityMiddleware.php`, `app/Http/Kernel.php`
-- **Acceptance**: User logged in at 09:00. Request at 17:01 → 401 timeout. User makes request at 14:00 → 200, `last_activity_at` updated. Next timeout at 22:00.
+- **Acceptance**: User logged in at 09:00. Request at 10:01 → 401 timeout. User makes request at 09:45 → 200, `last_activity_at` updated. Next timeout at 10:45.
 - **Effort**: 1.5h
 - **Depends on**: T-012, T-015
 

@@ -43,6 +43,5 @@ class AuditEvent
         public readonly string $action,
         public readonly string $description,
         public readonly array $meta = [],
-    ) {
-    }
+    ) {}
 }

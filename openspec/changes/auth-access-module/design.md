@@ -13,7 +13,7 @@ Laravel 11 backend with Sanctum cookie-based SPA auth. Two login paths: Google O
 | Session store | Redis vs DB file | Redis = fast expiry, single-session enforcement; DB = simpler infra | Redis (matches stack) |
 | External evaluator auth | Same User table vs separate | Same table = unified session/audit; separate = cleaner isolation | Same table with `es_externo` flag |
 | Audit log writes | Events+Listeners vs direct DB | Events = decoupled, testable; direct = simpler | Events+Listeners |
-| Inactivity timeout | Middleware timestamp vs Laravel `SESSION_LIFETIME` | Middleware = precise per-request check; env = coarse but simple | Both: `SESSION_LIFETIME=480` + middleware |
+| Inactivity timeout | Middleware timestamp vs Laravel `SESSION_LIFETIME` | Middleware = precise per-request check; env = coarse but simple | Both: `SESSION_LIFETIME=60` + middleware |
 | Whitelist enforcement | DB table vs env array | DB = coordinator CRUD, auditable; env = restart required | `authorized_emails` table |
 
 ## Data Flow
@@ -62,7 +62,7 @@ Browser ──→ Vite/React SPA
 | `database/migrations/xxxx_02_create_authorized_emails_table.php` | Create | Whitelist |
 | `database/migrations/xxxx_03_create_audit_logs_table.php` | Create | Immutable log |
 | `config/sanctum.php` | Modify | Stateful domains, cookie settings |
-| `.env.example` | Modify | `SESSION_LIFETIME=480`, `SESSION_DRIVER=redis` |
+| `.env.example` | Modify | `SESSION_LIFETIME=60`, `SESSION_DRIVER=redis` |
 | `resources/js/pages/auth/LoginInstitucional.tsx` | Create | Port `login-institucional.html` wireframe |
 | `resources/js/pages/auth/LoginExterno.tsx` | Create | Port `login-evaluadores-externos.html` wireframe |
 | `resources/js/pages/coordinador/GestionUsuarios.tsx` | Create | Whitelist CRUD UI |

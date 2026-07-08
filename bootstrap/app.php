@@ -1,5 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
+use App\Http\Middleware\ActivityMiddleware;
+use App\Http\Middleware\EnsurePasswordChanged;
+use App\Http\Middleware\RoleMiddleware;
+use App\Http\Middleware\SingleSessionMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -12,6 +18,12 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    ->withEvents(discover: false) // Listeners are registered explicitly
+                                 // in App\Providers\EventServiceProvider
+                                 // to avoid double-registration (the
+                                 // framework's EventServiceProvider
+                                 // would otherwise auto-discover and
+                                 // also bind WriteAuditLog@handle).
     ->withMiddleware(function (Middleware $middleware) {
         // Sanctum cookie-based SPA auth: stateful requests from the
         // configured SANCTUM_STATEFUL_DOMAINS get session + CSRF.
@@ -19,10 +31,18 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->statefulApi();
 
         $middleware->api(prepend: [
-            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+            EnsureFrontendRequestsAreStateful::class,
         ]);
 
         $middleware->throttleApi();
+
+        // Route middleware aliases (T-017, T-018, T-021, T-022).
+        $middleware->alias([
+            'role' => RoleMiddleware::class,
+            'ensure_password_changed' => EnsurePasswordChanged::class,
+            'single_session' => SingleSessionMiddleware::class,
+            'activity' => ActivityMiddleware::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

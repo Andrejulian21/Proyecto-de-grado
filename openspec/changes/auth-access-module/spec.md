@@ -192,9 +192,9 @@ The system MUST provide a separate `/login/externo` page with email + password a
 
 ## Domain: `session` — Session Lifecycle
 
-### Requirement: Single Active Session with 8-Hour Inactivity Timeout
+### Requirement: Single Active Session with 1-Hour Inactivity Timeout
 
-The system MUST enforce a single active session per user (new login invalidates previous server-side session) and MUST log out the user after 8 hours of inactivity. The session SHALL be stored server-side in the database (Redis-backed).
+The system MUST enforce a single active session per user (new login invalidates previous server-side session) and MUST log out the user after 1 hour of inactivity. The session SHALL be stored server-side in the database (Redis-backed).
 
 #### Scenario: New login invalidates previous session
 - **GIVEN** Luis is logged in on Device A (Sanctum cookie present)
@@ -203,20 +203,20 @@ The system MUST enforce a single active session per user (new login invalidates 
 - **AND** Device A's next API call returns `401 Unauthorized`
 - **AND** Device A is redirected to `/login` with message "Su sesión fue cerrada desde otro dispositivo"
 
-#### Scenario: 8-hour inactivity timeout
+#### Scenario: 1-hour inactivity timeout
 - **GIVEN** Maria logged in at 09:00
-- **AND** no API request has been made for 8 hours (timestamp `last_activity`)
-- **WHEN** she sends any API request at 17:01
-- **THEN** the middleware detects `now() - last_activity > 8h`
+- **AND** no API request has been made for 1 hour (timestamp `last_activity`)
+- **WHEN** she sends any API request at 10:01
+- **THEN** the middleware detects `now() - last_activity > 1h`
 - **AND** invalidates the session
 - **AND** returns `401 Unauthorized` with code `session.timeout`
 - **AND** writes `audit_logs` entry: `action=logout.timeout`
 
-#### Scenario: Activity resets the 8-hour clock
+#### Scenario: Activity resets the 1-hour clock
 - **GIVEN** Maria logged in at 09:00
-- **WHEN** she makes an API request at 14:00 (5 hours later)
-- **THEN** `last_activity` is updated to 14:00
-- **AND** the timeout is now 22:00 (8h after 14:00)
+- **WHEN** she makes an API request at 09:45 (45 minutes later)
+- **THEN** `last_activity` is updated to 09:45
+- **AND** the timeout is now 10:45 (1h after 09:45)
 
 #### Scenario: Explicit logout
 - **GIVEN** Luis is authenticated
@@ -229,7 +229,7 @@ The system MUST enforce a single active session per user (new login invalidates 
 #### Scenario: Browser crash or tab close
 - **GIVEN** Maria closed her browser without logging out
 - **WHEN** she returns and opens the app
-- **THEN** if `last_activity` < 8h ago, the Sanctum cookie is still valid
+- **THEN** if `last_activity` < 1h ago, the Sanctum cookie is still valid
 - **AND** the SPA resumes her session without re-login
 
 #### Scenario: Multiple browser tabs share one session

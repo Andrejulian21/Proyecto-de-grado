@@ -1,12 +1,16 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
+use App\Auth\LoginAttemptPolicy;
 use App\Enums\UserRole;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Carbon;
 use Laravel\Sanctum\HasApiTokens;
 
 /**
@@ -18,7 +22,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property bool $es_externo
  * @property string|null $google_id
  * @property string|null $avatar
- * @property \Illuminate\Support\Carbon|null $last_activity_at
+ * @property Carbon|null $last_activity_at
  * @property string|null $totp_secret
  * @property string|null $remember_token
  */
@@ -28,8 +32,8 @@ class User extends Authenticatable
 
     /**
      * Mass-assignable fields. The auth-access-module adds role, es_externo,
-     * google_id, avatar, last_activity_at, and totp_secret to the default
-     * name/email/password trio.
+     * google_id, avatar, last_activity_at, totp_secret, password_changed_at,
+     * failed_attempts, and locked_until to the default name/email/password trio.
      *
      * @var list<string>
      */
@@ -43,6 +47,9 @@ class User extends Authenticatable
         'avatar',
         'last_activity_at',
         'totp_secret',
+        'password_changed_at',
+        'failed_attempts',
+        'locked_until',
     ];
 
     /**
@@ -72,6 +79,8 @@ class User extends Authenticatable
             'role' => UserRole::class,
             'es_externo' => 'boolean',
             'last_activity_at' => 'datetime',
+            'password_changed_at' => 'datetime',
+            'locked_until' => 'datetime',
         ];
     }
 
@@ -94,5 +103,59 @@ class User extends Authenticatable
     public function authorizedEmailsCreated(): HasMany
     {
         return $this->hasMany(AuthorizedEmail::class, 'created_by');
+    }
+
+    // -- external-evaluator helpers (T-016, T-017) -----------------------
+
+    /**
+     * True when the lockout window is still in the future. Coordinators
+     * are never locked (T-016 scenario "Reject external login with
+     * wrong password" only applies to credential-based accounts).
+     */
+    public function isLocked(): bool
+    {
+        return $this->locked_until !== null
+            && $this->locked_until->isFuture();
+    }
+
+    /**
+     * True when the user has never set their own password (the
+     * coordinator-issued temporary password is still in place).
+     * Triggers the forced password change on first successful login.
+     */
+    public function mustChangePassword(): bool
+    {
+        return $this->password_changed_at === null
+            && $this->es_externo === true;
+    }
+
+    /**
+     * Increment the failed-attempts counter. After
+     * `LoginAttemptPolicy::MAX_ATTEMPTS` failures in the last
+     * `LoginAttemptPolicy::WINDOW_MINUTES` minutes, the account is
+     * locked for `LoginAttemptPolicy::LOCK_MINUTES` minutes.
+     */
+    public function registerFailedLogin(): void
+    {
+        $policy = app(LoginAttemptPolicy::class);
+        $this->failed_attempts = ($this->failed_attempts ?? 0) + 1;
+
+        if ($this->failed_attempts >= $policy->maxAttempts()) {
+            $this->locked_until = now()->addMinutes($policy->lockMinutes());
+            $this->failed_attempts = 0;
+        }
+
+        $this->save();
+    }
+
+    /**
+     * Reset the failed-attempts counter and the lockout window.
+     * Called on every successful credential login.
+     */
+    public function clearFailedLogin(): void
+    {
+        $this->failed_attempts = 0;
+        $this->locked_until = null;
+        $this->save();
     }
 }

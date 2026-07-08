@@ -58,7 +58,7 @@ None — greenfield project.
 
 **Single session:** On login, `Session::where('user_id', $user->id)->delete()` before creating new session. Middleware validates session_id on each request.
 
-**8h timeout:** `SESSION_LIFETIME=480` in `.env` + custom middleware that checks `last_activity` timestamp and force-logout if gap > 8h.
+**1h timeout:** `SESSION_LIFETIME=60` in `.env` + custom middleware that checks `last_activity` timestamp and force-logout if gap > 1h.
 
 **Sanctum:** Cookie-based SPA authentication. `sanctum.php` config with `stateful` domains. CSRF via Sanctum's built-in token.
 

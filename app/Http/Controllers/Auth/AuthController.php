@@ -4,35 +4,42 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Auth;
 
+use App\Enums\UserRole;
+use App\Events\AuditEvent;
+use App\Http\Controllers\Controller;
+use App\Models\AuthorizedEmail;
+use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Routing\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\NewAccessToken;
 use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\User as SocialiteUser;
+use Throwable;
 
 /**
- * Authentication controller stub.
+ * Authentication controller (PR 2).
  *
- * The full triple validation (hd claim + email suffix + whitelist) and
- * the external evaluator credential flow land in PR 2 (T-014, T-016).
- * For PR 1 — Foundation — this controller only proves the routes resolve
- * and Socialite is wired up. The redirect points to a placeholder login
- * page until the React UI ships in PR 3.
- *
- * @see /openspec/changes/auth-access-module/tasks.md — T-014, T-016
+ * Routes:
+ *   - GET  /auth/redirect              → redirectToGoogle (PR 1 stub)
+ *   - GET  /auth/callback              → handleGoogleCallback (T-014)
+ *   - POST /api/auth/externo/login     → loginExterno (T-016)
+ *   - POST /api/auth/change-password   → changePassword (T-017)
+ *   - POST /api/auth/logout            → logout (T-023)
+ *   - GET  /api/auth/user              → sessionCheck (T-023)
  */
 class AuthController extends Controller
 {
     /**
+     * The UNAB Google Workspace hosted domain. Must match the `hd`
+     * claim returned by Google and the email suffix.
+     */
+    private const UNAB_HOSTED_DOMAIN = 'unab.edu.co';
+
+    /**
      * Initiate the Google OAuth dance.
-     *
-     * In production: Socialite::driver('google')
-     *     ->scopes(['openid', 'profile', 'email'])
-     *     ->with(['hd' => 'unab.edu.co'])
-     *     ->redirect();
-     *
-     * For PR 1, we issue the redirect so the route resolves. The
-     * `redirect()` call works only when GOOGLE_CLIENT_ID is set; if the
-     * placeholder env is empty, we fall back to a friendly message so
-     * the foundation work doesn't hard-fail.
      */
     public function redirectToGoogle(): RedirectResponse
     {
@@ -45,21 +52,329 @@ class AuthController extends Controller
     }
 
     /**
-     * Handle the Google OAuth callback. Full implementation in PR 2 (T-014):
-     *  1. Validate the Socialite user.
-     *  2. Check `hd === unab.edu.co` (when present).
-     *  3. Check the email ends in @unab.edu.co.
-     *  4. Check the whitelist (authorized_emails).
-     *  5. findOrCreate User, assign role from whitelist.
-     *  6. Delete prior Sanctum tokens (single-session).
-     *  7. Dispatch AuditEvent('login.success' | 'login.rejected').
-     *  8. Redirect to /dashboard/{role}.
+     * Handle the Google OAuth callback. Triple validation (T-014,
+     * `auth-oauth` domain):
+     *
+     *   1. `hd` claim (when present) MUST equal unab.edu.co.
+     *   2. Email MUST end with @unab.edu.co (case-insensitive).
+     *   3. Email MUST be in the `authorized_emails` whitelist.
+     *
+     * On success: findOrCreate User, sync role from whitelist, purge
+     * prior Sanctum tokens, create a fresh token, write `login.success`
+     * audit, redirect to `/dashboard/{role}`.
+     *
+     * On failure: write a `login.rejected` audit event with the
+     * reason (domain_mismatch / not_whitelisted / hd_missing), redirect
+     * to /login. The same response is used for all rejection reasons
+     * so we don't leak which check failed.
      */
-    public function handleGoogleCallback(): RedirectResponse
+    public function handleGoogleCallback(Request $request): RedirectResponse
     {
-        // PR 2 implementation. PR 1 returns a placeholder so the route
-        // resolves and the test suite can exercise the wiring.
-        return redirect('/login')
-            ->with('status', 'OAuth callback pendiente. Implementación completa en PR 2 (T-014).');
+        // 1. User denied the consent screen.
+        if ($request->has('error')) {
+            AuditEvent::dispatch(
+                null,
+                'login.cancelled',
+                'Google OAuth cancelled by user',
+                ['google_error' => $request->string('error')->toString()],
+            );
+
+            return redirect('/login?error='.urlencode($request->string('error')->toString()));
+        }
+
+        // 2. Exchange the auth code for a user object. Wrap in
+        // try/catch so network/5xx/invalid_state errors don't bubble
+        // up as 500s.
+        try {
+            /** @var SocialiteUser $googleUser */
+            $googleUser = Socialite::driver('google')->user();
+        } catch (Throwable $e) {
+            AuditEvent::dispatch(
+                null,
+                'login.error',
+                'Google OAuth exchange failed: '.get_class($e),
+                ['exception' => get_class($e), 'message' => $e->getMessage()],
+            );
+
+            return redirect('/login?error=oauth_error');
+        }
+
+        $email = strtolower(trim((string) $googleUser->getEmail()));
+        $hd = $this->extractHostedDomain($googleUser);
+
+        // 3. Triple validation.
+        $rejectionReason = $this->validateOAuth($email, $hd);
+
+        if ($rejectionReason !== null) {
+            AuditEvent::dispatch(
+                null,
+                'login.rejected',
+                $rejectionReason,
+                [
+                    'channel' => 'google',
+                    'email' => $email,
+                    'hd' => $hd,
+                ],
+            );
+
+            return redirect('/login?error=access_denied');
+        }
+
+        // 4. findOrCreate the user, sync the role from the whitelist.
+        $whitelistEntry = AuthorizedEmail::query()->where('email', $email)->first();
+
+        $user = User::query()->updateOrCreate(
+            ['email' => $email],
+            [
+                'name' => $googleUser->getName() ?: $googleUser->getNickname() ?: $email,
+                'google_id' => $googleUser->getId(),
+                'avatar' => $googleUser->getAvatar(),
+                'role' => $whitelistEntry->role->value,
+                'es_externo' => false,
+            ],
+        );
+
+        // 5. Single-session enforcement: purge prior Sanctum tokens
+        // before issuing the new one (T-021).
+        $user->tokens()->delete();
+        $user->update(['last_activity_at' => now()]);
+
+        // 6. Issue a fresh Sanctum token.
+        /** @var NewAccessToken $accessToken */
+        $accessToken = $user->createToken('google-oauth');
+
+        // 7. Audit success.
+        AuditEvent::dispatch(
+            $user,
+            'login.success',
+            'Google OAuth institutional login',
+            [
+                'channel' => 'google',
+                'role' => $user->role->value,
+            ],
+        );
+
+        // 8. Redirect to the role dashboard. The SPA reads the
+        // Sanctum cookie set by the response and renders the right
+        // page from there.
+        $dashboard = $this->dashboardForRole($user->role);
+
+        return redirect($dashboard);
+    }
+
+    /**
+     * Apply the triple validation. Returns a string code on failure
+     * (one of `domain_mismatch`, `not_whitelisted`, `hd_missing`) or
+     * `null` on success.
+     */
+    private function validateOAuth(string $email, ?string $hd): ?string
+    {
+        // Suffix check (case-insensitive).
+        if (! str_ends_with($email, '@'.self::UNAB_HOSTED_DOMAIN)) {
+            return 'domain_mismatch';
+        }
+
+        // `hd` claim check — must be present AND equal unab.edu.co.
+        // When hd is missing entirely, that's a separate failure
+        // code so coordinators can spot the case in the audit log.
+        if ($hd === null || $hd === '') {
+            return 'hd_missing';
+        }
+
+        if ($hd !== self::UNAB_HOSTED_DOMAIN) {
+            return 'domain_mismatch';
+        }
+
+        // Whitelist check.
+        if (! AuthorizedEmail::query()->where('email', $email)->exists()) {
+            return 'not_whitelisted';
+        }
+
+        return null;
+    }
+
+    /**
+     * Extract the hosted-domain claim from a Socialite user. The `hd`
+     * field is a custom claim that lives in the original `user` array
+     * Google returned (the Socialite wrapper exposes it as a public
+     * property in some versions and as an entry in `user['hd']` in
+     * others — we try both).
+     */
+    private function extractHostedDomain(SocialiteUser $googleUser): ?string
+    {
+        if (isset($googleUser->user['hd']) && $googleUser->user['hd'] !== '') {
+            return (string) $googleUser->user['hd'];
+        }
+
+        $hd = $googleUser->user['hd'] ?? null;
+
+        return $hd !== null ? (string) $hd : null;
+    }
+
+    /**
+     * Return the role-keyed dashboard path for the SPA to render.
+     */
+    private function dashboardForRole(UserRole $role): string
+    {
+        return match ($role) {
+            UserRole::Estudiante => '/dashboard/estudiante',
+            UserRole::Director => '/dashboard/director',
+            UserRole::Coordinador => '/dashboard/coordinador',
+            UserRole::EvaluadorExterno => '/dashboard/evaluador-externo',
+        };
+    }
+
+    /**
+     * External evaluator credential login (T-016, `auth-external` domain).
+     */
+    public function loginExterno(Request $request): JsonResponse
+    {
+        $payload = $request->validate([
+            'email' => ['required', 'string', 'email'],
+            'password' => ['required', 'string'],
+        ]);
+
+        $user = User::query()
+            ->where('email', $payload['email'])
+            ->first();
+
+        if (! $user || ! $user->es_externo) {
+            AuditEvent::dispatch(
+                $user,
+                'login.rejected',
+                'invalid_credentials',
+                ['channel' => 'external', 'reason' => 'not_external_evaluator'],
+            );
+
+            if ($user && ! $user->es_externo) {
+                return response()->json(['error' => 'not_external_evaluator'], 403);
+            }
+
+            return response()->json(['error' => 'invalid_credentials'], 401);
+        }
+
+        if ($user->isLocked()) {
+            AuditEvent::dispatch(
+                $user,
+                'login.rejected',
+                'account_locked',
+                ['channel' => 'external', 'locked_until' => $user->locked_until?->toIso8601String()],
+            );
+
+            return response()->json(['error' => 'account_locked'], 423);
+        }
+
+        if (! Hash::check($payload['password'], $user->password)) {
+            $user->registerFailedLogin();
+
+            AuditEvent::dispatch(
+                $user,
+                'login.rejected',
+                'invalid_credentials',
+                ['channel' => 'external', 'failed_attempts' => $user->failed_attempts],
+            );
+
+            return response()->json(['error' => 'invalid_credentials'], 401);
+        }
+
+        $user->clearFailedLogin();
+        $user->update(['last_activity_at' => now()]);
+        $user->tokens()->delete();
+
+        /** @var NewAccessToken $accessToken */
+        $accessToken = $user->createToken('external-evaluator', ['*'], now()->addMinutes(15));
+
+        AuditEvent::dispatch(
+            $user,
+            'login.success',
+            'external evaluator credential login',
+            ['channel' => 'external'],
+        );
+
+        return response()->json([
+            'token' => $accessToken->plainTextToken,
+            'user' => [
+                'id' => $user->id,
+                'email' => $user->email,
+                'name' => $user->name,
+                'role' => $user->role->value,
+                'es_externo' => $user->es_externo,
+            ],
+            'must_change_password' => $user->mustChangePassword(),
+        ]);
+    }
+
+    /**
+     * Change the authenticated user's password (T-017).
+     */
+    public function changePassword(Request $request): JsonResponse
+    {
+        $payload = $request->validate([
+            'current_password' => ['required', 'string'],
+            'new_password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $user = $request->user();
+
+        if (! $user || ! Hash::check($payload['current_password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => 'La contraseña actual es incorrecta.',
+            ]);
+        }
+
+        $user->password = $payload['new_password'];
+        $user->password_changed_at = now();
+        $user->save();
+
+        AuditEvent::dispatch(
+            $user,
+            'password.changed',
+            'external evaluator changed their password',
+            ['channel' => 'external'],
+        );
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * Logout the current user (T-023).
+     */
+    public function logout(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if ($user) {
+            $user->currentAccessToken()?->delete();
+
+            AuditEvent::dispatch(
+                $user,
+                'logout.user_initiated',
+                'user initiated logout',
+            );
+        }
+
+        return response()->json(null, 204);
+    }
+
+    /**
+     * Return the current authenticated user (T-023 sessionCheck).
+     */
+    public function sessionCheck(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (! $user) {
+            return response()->json(['error' => 'unauthenticated'], 401);
+        }
+
+        return response()->json([
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => $user->role->value,
+            'es_externo' => $user->es_externo,
+            'avatar' => $user->avatar,
+            'must_change_password' => $user->mustChangePassword(),
+        ]);
     }
 }

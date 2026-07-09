@@ -11,6 +11,10 @@ class RecursoInformativo extends Model
 {
     protected $table = 'recursos_informativos';
 
+    protected $attributes = [
+        'access_count' => 0,
+    ];
+
     protected $fillable = [
         'author_id',
         'title',

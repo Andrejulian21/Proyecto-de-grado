@@ -103,6 +103,17 @@ Route::middleware([
     Route::get('/evaluaciones/{entrega_id}/consolidado', [\App\Http\Controllers\Api\EvaluacionController::class, 'consolidado'])
         ->whereNumber('entrega_id')
         ->name('evaluaciones.consolidado');
+
+    // Anuncios — todos los roles pueden ver (T-020)
+    Route::get('/anuncios', [\App\Http\Controllers\Api\AnuncioController::class, 'index'])
+        ->name('anuncios.index');
+
+    // Recursos — todos los roles pueden ver (T-021)
+    Route::get('/recursos', [\App\Http\Controllers\Api\RecursoController::class, 'index'])
+        ->name('recursos.index');
+    Route::get('/recursos/{recurso}', [\App\Http\Controllers\Api\RecursoController::class, 'show'])
+        ->whereNumber('recurso')
+        ->name('recursos.show');
 });
 
 // -- admin (coordinador-only) routes ---------------------------------
@@ -162,6 +173,22 @@ Route::middleware(['auth:sanctum', 'role:Coordinador'])
         // Reporte consolidado (T-018).
         Route::get('/reportes/consolidado', [\App\Http\Controllers\Admin\ReporteController::class, 'consolidado'])
             ->name('reportes.consolidado');
+
+        // Anuncios CRUD (T-020) — solo coordinador
+        Route::post('/anuncios', [\App\Http\Controllers\Api\AnuncioController::class, 'store'])
+            ->name('anuncios.store');
+        Route::put('/anuncios/{anuncio}', [\App\Http\Controllers\Api\AnuncioController::class, 'update'])
+            ->name('anuncios.update');
+        Route::delete('/anuncios/{anuncio}', [\App\Http\Controllers\Api\AnuncioController::class, 'destroy'])
+            ->name('anuncios.destroy');
+
+        // Recursos CRUD (T-021) — solo coordinador
+        Route::post('/recursos', [\App\Http\Controllers\Api\RecursoController::class, 'store'])
+            ->name('recursos.store');
+        Route::put('/recursos/{recurso}', [\App\Http\Controllers\Api\RecursoController::class, 'update'])
+            ->name('recursos.update');
+        Route::delete('/recursos/{recurso}', [\App\Http\Controllers\Api\RecursoController::class, 'destroy'])
+            ->name('recursos.destroy');
     });
 
 // Entregas — accessible by all authenticated roles (controller handles RBAC)

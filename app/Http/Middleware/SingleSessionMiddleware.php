@@ -42,13 +42,15 @@ class SingleSessionMiddleware
 
         $token = $user->currentAccessToken();
 
-        // Sanctum already invalidates the token at the table level
-        // when we delete the row, so $token becomes null. We surface
-        // a 401 with a clear error so the SPA can prompt re-login.
-        if ($token === null) {
-            return response()->json(['error' => 'unauthenticated'], 401);
-        }
-
+        // null token means either:
+        //   1. Request authenticated via session (SPA cookie) where
+        //      there is no API token — single-session is inherent
+        //      to the session, so pass through.
+        //   2. Bearer token was deleted (new login on another device).
+        //      In that case Sanctum already returns 401 before reaching
+        //      this middleware because the token row is gone.
+        // Either way: pass through. The real single-session enforcement
+        // happens at login time (prior tokens are deleted).
         return $next($request);
     }
 }

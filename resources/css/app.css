@@ -1,14 +1,12 @@
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/*
-|--------------------------------------------------------------------------
-| Custom layers
-|--------------------------------------------------------------------------
-|
-| shadcn/ui component classes and UNAB-specific primitives will be added
-| in PR 3 (T-006) once the wireframes are ported. For now, just the
-| base Tailwind layers so the build succeeds.
-|
-*/
+@layer base {
+    body {
+        @apply bg-[#fafaf9] text-[#1c1917] antialiased;
+        font-family: 'Open Sans', system-ui, -apple-system, sans-serif;
+    }
+}

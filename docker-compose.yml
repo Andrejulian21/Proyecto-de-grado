@@ -1,0 +1,32 @@
+services:
+    pgsql:
+        image: 'postgres:16-alpine'
+        container_name: proyecto-pgsql
+        ports:
+            - '5432:5432'
+        environment:
+            POSTGRES_DB: proyecto_grado
+            POSTGRES_USER: sail
+            POSTGRES_PASSWORD: password
+        volumes:
+            - 'sail-pgsql:/var/lib/postgresql/data'
+        healthcheck:
+            test: ["CMD", "pg_isready", "-q", "-d", "proyecto_grado", "-U", "sail"]
+            retries: 3
+            timeout: 5s
+
+    redis:
+        image: 'redis:alpine'
+        container_name: proyecto-redis
+        ports:
+            - '6379:6379'
+        volumes:
+            - 'sail-redis:/data'
+        healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            retries: 3
+            timeout: 5s
+
+volumes:
+    sail-pgsql:
+    sail-redis:

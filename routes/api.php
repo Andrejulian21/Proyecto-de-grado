@@ -64,6 +64,15 @@ Route::middleware(['auth:sanctum', 'role:Coordinador'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
+        Route::get('/usuarios', [UserController::class, 'usuarios'])
+            ->name('usuarios.index');
+        Route::put('/usuarios/{id}', [UserController::class, 'updateUsuario'])
+            ->whereNumber('id')
+            ->name('usuarios.update');
+        Route::delete('/usuarios/{id}', [UserController::class, 'destroyUsuario'])
+            ->whereNumber('id')
+            ->name('usuarios.destroy');
+
         Route::post('/evaluadores', [UserController::class, 'storeExternal'])
             ->name('evaluadores.store');
 

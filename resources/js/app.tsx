@@ -1,30 +1,74 @@
-/**
- * Root React component.
- *
- * PR 1 — Foundation: minimal placeholder that proves the React + Vite
- * pipeline is wired up. The full login pages, role-based routing, and
- * shadcn/ui shell arrive in PR 3.
- */
-export function App(): JSX.Element {
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from '@/hooks/useAuth';
+import { AppShell } from '@/components/layout/AppShell';
+import LoginInstitucional from '@/pages/auth/LoginInstitucional';
+import LoginExterno from '@/pages/auth/LoginExterno';
+import GestionUsuarios from '@/pages/coordinador/GestionUsuarios';
+import AuditLog from '@/pages/coordinador/AuditLog';
+import DashboardRouter from '@/pages/DashboardRouter';
+import EstudianteDashboard from '@/pages/dashboard/EstudianteDashboard';
+import DirectorDashboard from '@/pages/dashboard/DirectorDashboard';
+import CoordinadorDashboard from '@/pages/dashboard/CoordinadorDashboard';
+import EvaluadorDashboard from '@/pages/dashboard/EvaluadorDashboard';
+import { Loader2 } from 'lucide-react';
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+    const { isAuthenticated, isLoading } = useAuth();
+
+    if (isLoading) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-surface-alt">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    }
+
+    if (!isAuthenticated) {
+        return <Navigate to="/login" replace />;
+    }
+
+    return <>{children}</>;
+}
+
+function App() {
     return (
-        <main className="mx-auto max-w-2xl px-4 py-12 font-sans text-slate-900">
-            <h1 className="text-3xl font-bold text-primary">
-                Sistema Centralizado de Proyectos de Grado
-            </h1>
-            <p className="mt-4 text-slate-600">
-                Frontend React + Vite + Tailwind listo. Las páginas de inicio
-                de sesión, dashboards y CRUD de whitelist se montan en
-                <span className="ml-1 rounded bg-slate-100 px-1.5 py-0.5 font-mono text-sm">
-                    PR 3
-                </span>
-                .
-            </p>
-            <p className="mt-6 text-sm text-slate-500">
-                PR 1 (Foundation) cubre migraciones, Sanctum, Socialite, Pest y
-                esta shell. PR 2 implementa el backend de auth (OAuth +
-                triple validación + RBAC + audit log). PR 3 trae las páginas.
-            </p>
-        </main>
+        <Routes>
+            <Route path="/login" element={<LoginInstitucional />} />
+            <Route path="/login/externo" element={<LoginExterno />} />
+
+            <Route
+                path="/*"
+                element={
+                    <ProtectedRoute>
+                        <AppShell>
+                            <Routes>
+                                <Route path="/" element={<DashboardRouter />} />
+                                <Route path="/dashboard/estudiante" element={<EstudianteDashboard />} />
+                                <Route path="/dashboard/director" element={<DirectorDashboard />} />
+                                <Route path="/dashboard/coordinador" element={<CoordinadorDashboard />} />
+                                <Route path="/dashboard/evaluador-externo" element={<EvaluadorDashboard />} />
+                                <Route path="/coordinador/usuarios" element={<GestionUsuarios />} />
+                                <Route path="/coordinador/audit-log" element={<AuditLog />} />
+                                <Route path="*" element={<Navigate to="/" replace />} />
+                            </Routes>
+                        </AppShell>
+                    </ProtectedRoute>
+                }
+            />
+        </Routes>
+    );
+}
+
+const root = document.getElementById('app');
+
+if (root) {
+    createRoot(root).render(
+        <BrowserRouter>
+            <AuthProvider>
+                <App />
+            </AuthProvider>
+        </BrowserRouter>,
     );
 }
 

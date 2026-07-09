@@ -12,6 +12,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\NewAccessToken;
@@ -48,7 +49,9 @@ class AuthController extends Controller
                 ->with('status', 'Google OAuth no está configurado. Completa GOOGLE_CLIENT_ID en .env para activar el login institucional.');
         }
 
-        return Socialite::driver('google')->redirect();
+        return Socialite::driver('google')
+            ->with(['hd' => self::UNAB_HOSTED_DOMAIN, 'prompt' => 'select_account'])
+            ->redirect();
     }
 
     /**
@@ -142,6 +145,9 @@ class AuthController extends Controller
         // 6. Issue a fresh Sanctum token.
         /** @var NewAccessToken $accessToken */
         $accessToken = $user->createToken('google-oauth');
+
+        // 6b. Log the user into the session (Sanctum SPA cookie auth).
+        Auth::login($user, remember: false);
 
         // 7. Audit success.
         AuditEvent::dispatch(
@@ -281,6 +287,10 @@ class AuthController extends Controller
         $user->update(['last_activity_at' => now()]);
         $user->tokens()->delete();
 
+        // Log into the session so the SPA can read /api/auth/user
+        // via Sanctum cookie-based auth.
+        Auth::login($user, remember: false);
+
         /** @var NewAccessToken $accessToken */
         $accessToken = $user->createToken('external-evaluator', ['*'], now()->addMinutes(15));
 
@@ -352,6 +362,13 @@ class AuthController extends Controller
                 'user initiated logout',
             );
         }
+
+        // Log out of the session (Sanctum SPA cookie auth).
+        Auth::logout();
+
+        // Invalidate the session and regenerate the CSRF token.
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
 
         return response()->json(null, 204);
     }

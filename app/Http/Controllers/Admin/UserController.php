@@ -28,6 +28,80 @@ use Illuminate\Validation\Rule;
 class UserController extends Controller
 {
     /**
+     * GET /api/admin/usuarios
+     *
+     * Returns a paginated list of all users (from the users table)
+     * with optional search by name or email.
+     */
+    public function usuarios(Request $request): JsonResponse
+    {
+        $perPage = min((int) $request->query('per_page', 50), 200);
+        $search = $request->query('search');
+
+        $query = User::query()->orderByDesc('id');
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('email', 'like', "%{$search}%")
+                  ->orWhere('name', 'like', "%{$search}%");
+            });
+        }
+
+        return response()->json($query->paginate($perPage));
+    }
+
+    /**
+     * PUT /api/admin/usuarios/{id}
+     *
+     * Updates a user's role. Only Coordinador can do this.
+     */
+    public function updateUsuario(Request $request, int $id): JsonResponse
+    {
+        $payload = $request->validate([
+            'role' => [
+                'required',
+                'string',
+                Rule::in(array_map(fn (UserRole $r) => $r->value, UserRole::cases())),
+            ],
+        ]);
+
+        $user = User::findOrFail($id);
+        $oldRole = $user->role->value;
+        $user->role = $payload['role'];
+        $user->save();
+
+        AuditEvent::dispatch(
+            $request->user(),
+            'role.changed',
+            "{$oldRole}→{$user->role->value}",
+            ['subject_id' => $user->id, 'new_role' => $user->role->value],
+        );
+
+        return response()->json(['id' => $user->id, 'role' => $user->role->value]);
+    }
+
+    /**
+     * DELETE /api/admin/usuarios/{id}
+     *
+     * Soft-delete or remove a user from the system.
+     */
+    public function destroyUsuario(Request $request, int $id): JsonResponse
+    {
+        $user = User::findOrFail($id);
+        $email = $user->email;
+        $user->delete();
+
+        AuditEvent::dispatch(
+            $request->user(),
+            'user.deleted',
+            "Deleted user {$email}",
+            ['deleted_user_id' => $id],
+        );
+
+        return response()->json(['message' => 'Usuario eliminado']);
+    }
+
+    /**
      * Allowed internal roles for whitelist entries.
      *
      * EvaluadorExterno accounts are not added to the whitelist —
@@ -131,6 +205,7 @@ class UserController extends Controller
                 'ends_with:@unab.edu.co',
                 'unique:authorized_emails,email',
             ],
+            'name' => ['nullable', 'string', 'max:255'],
             'role' => [
                 'required',
                 'string',
@@ -140,6 +215,7 @@ class UserController extends Controller
 
         $entry = AuthorizedEmail::create([
             'email' => strtolower($payload['email']),
+            'name' => $payload['name'] ?? null,
             'role' => $payload['role'],
             'created_by' => $request->user()?->id,
         ]);

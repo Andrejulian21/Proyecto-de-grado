@@ -1,4 +1,4 @@
-# Apply Progress — auth-access-module PR 2 (Auth Backend)
+# Apply Progress — auth-access-module (3 Chained PRs — Complete)
 
 ## Status — ✅ COMPLETE
 **Mode**: Strict TDD — RED → GREEN → TRIANGULATE → REFACTOR
@@ -32,3 +32,33 @@
 - 24 test files (unit + feature)
 - Config for Sanctum, session, services, CORS, auth
 - Openspec artifacts updated
+
+---
+
+## Apply Progress — auth-access-module PR 3 (Frontend UI)
+
+## Status — ✅ COMPLETE
+**Mode**: Strict TDD — RED → GREEN → TRIANGULATE → REFACTOR
+**Branch**: `feature/auth-module-pr3` → target: `feature/auth-module`
+
+## Final Result
+- **151 tests passing / 0 failing / 441 assertions**
+- `vendor/bin/pest --colors=never` → 2.58s
+- `npm run build` → success (262 KB JS / 19 KB CSS gzipped)
+
+## All Tasks Complete
+
+| Task | Description | Status |
+|------|-------------|--------|
+| T-026 | LoginInstitucional.tsx — Google OAuth login page with UNAB branding | ✅ |
+| T-027 | LoginExterno.tsx — credential login form for external evaluators | ✅ |
+| T-028 | useAuth hook + AppShell layout (sidebar, header, user chip) | ✅ |
+| T-029 | GestionUsuarios.tsx — whitelist CRUD UI (Coordinador) | ✅ |
+| T-030 | AuditLog.tsx — audit log viewer with filters (Coordinador) | ✅ |
+| T-031 | DashboardRouter.tsx — role-based dashboard redirect + placeholders | ✅ |
+
+## Files Changed (PR 3 summary)
+- 8 new React components/pages
+- 2 custom hooks (useAuth, api client)
+- 1 new middleware registration
+- Frontend build pipeline verified

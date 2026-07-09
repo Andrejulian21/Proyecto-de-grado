@@ -45,6 +45,11 @@ class Entrega extends Model
         return $this->hasMany(VersionDocumento::class, 'entrega_id');
     }
 
+    public function evaluaciones(): HasMany
+    {
+        return $this->hasMany(Evaluacion::class, 'entrega_id');
+    }
+
     public function scopePorFase(Builder $query, string $phase): Builder
     {
         return $query->where('phase', $phase);

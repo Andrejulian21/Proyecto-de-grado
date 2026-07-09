@@ -63,10 +63,10 @@ class Proyecto extends Model
             ->withTimestamps();
     }
 
-    // public function entregas(): HasMany
-    // {
-    //     return $this->hasMany(Entrega::class);
-    // }
+    public function entregas(): HasMany
+    {
+        return $this->hasMany(Entrega::class);
+    }
 
     public function bitacoras(): HasMany
     {

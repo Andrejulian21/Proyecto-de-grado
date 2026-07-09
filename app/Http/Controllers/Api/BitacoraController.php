@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Enums\EstadoFirma;
 use App\Http\Controllers\Controller;
 use App\Models\Bitacora;
+use App\Models\Notificacion;
 use App\Models\Proyecto;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -154,6 +155,18 @@ class BitacoraController extends Controller
                 'student_signed_at' => now(),
             ]);
 
+            // T-022: Notificar al director
+            if ($proyecto->director_id) {
+                Notificacion::create([
+                    'user_id' => $proyecto->director_id,
+                    'sender_id' => $user->id,
+                    'type' => 'bitacora.firmada_estudiante',
+                    'title' => "Bitácora firmada por estudiante",
+                    'content' => "El estudiante ha firmado la bitácora '{$bitacora->topic}'.",
+                    'sent_at' => now(),
+                ]);
+            }
+
             return response()->json(['data' => $bitacora->fresh()]);
         }
 
@@ -171,6 +184,19 @@ class BitacoraController extends Controller
 
             // T-013: detect suspicious rapid signatures (director signs >3 in 5 min)
             $this->detectarFirmasSospechosas($proyecto, $user);
+
+            // T-022: Notificar a los estudiantes del proyecto
+            $estudiantes = $proyecto->estudiantes()->pluck('user_id');
+            foreach ($estudiantes as $estudianteId) {
+                Notificacion::create([
+                    'user_id' => $estudianteId,
+                    'sender_id' => $user->id,
+                    'type' => 'bitacora.completada',
+                    'title' => "Bitácora completada por director",
+                    'content' => "El director ha completado la firma de la bitácora '{$bitacora->topic}'.",
+                    'sent_at' => now(),
+                ]);
+            }
 
             return response()->json(['data' => $bitacora->fresh()]);
         }

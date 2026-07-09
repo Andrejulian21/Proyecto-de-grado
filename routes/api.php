@@ -114,6 +114,14 @@ Route::middleware([
     Route::get('/recursos/{recurso}', [\App\Http\Controllers\Api\RecursoController::class, 'show'])
         ->whereNumber('recurso')
         ->name('recursos.show');
+
+    // Notificaciones (T-022)
+    Route::get('/notificaciones', [\App\Http\Controllers\Api\NotificacionController::class, 'index'])
+        ->name('notificaciones.index');
+    Route::get('/notificaciones/no-leidas', [\App\Http\Controllers\Api\NotificacionController::class, 'noLeidas'])
+        ->name('notificaciones.no-leidas');
+    Route::put('/notificaciones/{notificacion}/leer', [\App\Http\Controllers\Api\NotificacionController::class, 'marcarLeida'])
+        ->name('notificaciones.leer');
 });
 
 // -- admin (coordinador-only) routes ---------------------------------

@@ -9,6 +9,7 @@ use App\Enums\FaseProyecto;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Entrega;
+use App\Models\Notificacion;
 use App\Models\Proyecto;
 use App\Models\VersionDocumento;
 use Illuminate\Http\JsonResponse;
@@ -93,7 +94,19 @@ class EntregaController extends Controller
             'status' => EstadoEntrega::Creada->value,
         ]);
 
-        $entrega->load('proyecto:id,code,title');
+        $entrega->load('proyecto:id,code,title,director_id');
+
+        // T-022: Notificar al director del proyecto
+        if ($entrega->proyecto->director_id) {
+            Notificacion::create([
+                'user_id' => $entrega->proyecto->director_id,
+                'sender_id' => $request->user()->id,
+                'type' => 'entrega.creada',
+                'title' => "Nueva entrega: {$entrega->title}",
+                'content' => "Se ha creado una nueva entrega para el proyecto {$entrega->proyecto->title}.",
+                'sent_at' => now(),
+            ]);
+        }
 
         return response()->json(['data' => $entrega], 201);
     }
@@ -338,6 +351,19 @@ class EntregaController extends Controller
         }
 
         $entrega->load('proyecto:id,code,title,current_phase');
+
+        // T-022: Notificar a los estudiantes del proyecto
+        $estudiantes = $entrega->proyecto->estudiantes()->pluck('user_id');
+        foreach ($estudiantes as $estudianteId) {
+            Notificacion::create([
+                'user_id' => $estudianteId,
+                'sender_id' => $user->id,
+                'type' => 'entrega.revisada',
+                'title' => "Entrega {$data['status']}: {$entrega->title}",
+                'content' => "Tu entrega '{$entrega->title}' ha sido {$data['status']}.",
+                'sent_at' => now(),
+            ]);
+        }
 
         return response()->json(['data' => $entrega->fresh()]);
     }

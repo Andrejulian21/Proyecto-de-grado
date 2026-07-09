@@ -169,10 +169,34 @@ class BitacoraController extends Controller
                 'director_signed_at' => now(),
             ]);
 
+            // T-013: detect suspicious rapid signatures (director signs >3 in 5 min)
+            $this->detectarFirmasSospechosas($proyecto, $user);
+
             return response()->json(['data' => $bitacora->fresh()]);
         }
 
         return response()->json(['error' => 'Estado de firma no válido para esta acción.'], 422);
+    }
+
+    /**
+     * T-013: If the director signs >3 bitácoras in a 5-minute window,
+     * mark all of them as Sospechosa.
+     */
+    private function detectarFirmasSospechosas($proyecto, $user): void
+    {
+        $fiveMinutesAgo = now()->subMinutes(5);
+
+        $firmasRecientes = Bitacora::where('proyecto_id', $proyecto->id)
+            ->whereNotNull('director_signed_at')
+            ->where('director_signed_at', '>=', $fiveMinutesAgo)
+            ->count();
+
+        if ($firmasRecientes > 3) {
+            Bitacora::where('proyecto_id', $proyecto->id)
+                ->whereNotNull('director_signed_at')
+                ->where('director_signed_at', '>=', $fiveMinutesAgo)
+                ->update(['signature_status' => EstadoFirma::Sospechosa->value]);
+        }
     }
 
     /**

@@ -92,6 +92,17 @@ Route::middleware([
     Route::post('/entregas/{id}/solicitar', [EntregaController::class, 'solicitar'])
         ->whereNumber('id')
         ->name('entregas.solicitar');
+
+    // Evaluaciones (T-016).
+    Route::get('/evaluaciones', [\App\Http\Controllers\Api\EvaluacionController::class, 'index'])
+        ->name('evaluaciones.index');
+    Route::post('/evaluaciones', [\App\Http\Controllers\Api\EvaluacionController::class, 'store'])
+        ->name('evaluaciones.store');
+
+    // Consolidado por entrega (T-017).
+    Route::get('/evaluaciones/{entrega_id}/consolidado', [\App\Http\Controllers\Api\EvaluacionController::class, 'consolidado'])
+        ->whereNumber('entrega_id')
+        ->name('evaluaciones.consolidado');
 });
 
 // -- admin (coordinador-only) routes ---------------------------------
@@ -139,6 +150,18 @@ Route::middleware(['auth:sanctum', 'role:Coordinador'])
         // Semestres CRUD (T-001).
         Route::apiResource('semestres', SemestreController::class)
             ->only(['index', 'store', 'update', 'destroy']);
+
+        // Evaluador-proyecto asignación (T-016).
+        Route::get('/evaluador-proyecto', [\App\Http\Controllers\Admin\EvaluadorProyectoController::class, 'index'])
+            ->name('evaluador-proyecto.index');
+        Route::post('/evaluador-proyecto', [\App\Http\Controllers\Admin\EvaluadorProyectoController::class, 'store'])
+            ->name('evaluador-proyecto.store');
+        Route::delete('/evaluador-proyecto', [\App\Http\Controllers\Admin\EvaluadorProyectoController::class, 'destroy'])
+            ->name('evaluador-proyecto.destroy');
+
+        // Reporte consolidado (T-018).
+        Route::get('/reportes/consolidado', [\App\Http\Controllers\Admin\ReporteController::class, 'consolidado'])
+            ->name('reportes.consolidado');
     });
 
 // Entregas — accessible by all authenticated roles (controller handles RBAC)

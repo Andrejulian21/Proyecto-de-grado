@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Admin\AuditLogController;
+use App\Http\Controllers\Admin\EntregaController;
 use App\Http\Controllers\Admin\ProyectoController;
 use App\Http\Controllers\Admin\SemestreController;
 use App\Http\Controllers\Admin\UserController;
@@ -58,6 +59,19 @@ Route::middleware([
 
     Route::post('/auth/logout', [AuthController::class, 'logout'])
         ->name('auth.logout');
+
+    // Entregas — versiones (accessible by authenticated students and directors)
+    Route::get('/entregas/{id}/versiones', [EntregaController::class, 'versiones'])
+        ->whereNumber('id')
+        ->name('entregas.versiones');
+    Route::post('/entregas/{id}/versiones', [EntregaController::class, 'subirVersion'])
+        ->whereNumber('id')
+        ->name('entregas.subir_version');
+
+    // Estudiante solicita habilitación para subir versiones
+    Route::post('/entregas/{id}/solicitar', [EntregaController::class, 'solicitar'])
+        ->whereNumber('id')
+        ->name('entregas.solicitar');
 });
 
 // -- admin (coordinador-only) routes ---------------------------------
@@ -105,4 +119,23 @@ Route::middleware(['auth:sanctum', 'role:Coordinador'])
         // Semestres CRUD (T-001).
         Route::apiResource('semestres', SemestreController::class)
             ->only(['index', 'store', 'update', 'destroy']);
+    });
+
+// Entregas — accessible by all authenticated roles (controller handles RBAC)
+Route::middleware(['auth:sanctum', 'single_session', 'activity'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+        Route::get('/entregas/finales', [EntregaController::class, 'finales'])
+            ->name('entregas.finales');
+        Route::get('/entregas', [EntregaController::class, 'index'])
+            ->name('entregas.index');
+        Route::post('/entregas', [EntregaController::class, 'store'])
+            ->name('entregas.store');
+        Route::put('/entregas/{id}/revisar', [EntregaController::class, 'revisar'])
+            ->whereNumber('id')
+            ->name('entregas.revisar');
+        Route::put('/entregas/{id}/habilitar', [EntregaController::class, 'habilitar'])
+            ->whereNumber('id')
+            ->name('entregas.habilitar');
     });

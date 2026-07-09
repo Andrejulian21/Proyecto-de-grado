@@ -179,6 +179,37 @@ class BitacoraController extends Controller
     }
 
     /**
+     * GET /api/director/proyectos/{id}/horas
+     *
+     * T-014: Total accumulated bitácora hours for a project.
+     * Available to the project's director and coordinators.
+     */
+    public function horas(Request $request, int $id): JsonResponse
+    {
+        $proyecto = Proyecto::findOrFail($id);
+        $user = $request->user();
+
+        // Only the project's director or a coordinator can view hours
+        $esCoordinador = $user->role->value === 'Coordinador';
+        $esDirector = $proyecto->director_id === $user->id;
+
+        if (! $esCoordinador && ! $esDirector) {
+            return response()->json(['error' => 'No autorizado.'], 403);
+        }
+
+        $totalHoras = (float) Bitacora::where('proyecto_id', $id)
+            ->sum('duration_hours');
+
+        $totalBitacoras = Bitacora::where('proyecto_id', $id)->count();
+
+        return response()->json([
+            'total_horas' => round($totalHoras, 2),
+            'total_bitacoras' => $totalBitacoras,
+            'proyecto_id' => $id,
+        ]);
+    }
+
+    /**
      * T-013: If the director signs >3 bitácoras in a 5-minute window,
      * mark all of them as Sospechosa.
      */

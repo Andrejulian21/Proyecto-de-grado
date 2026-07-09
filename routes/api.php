@@ -75,6 +75,11 @@ Route::middleware([
         ->whereNumber('id')
         ->name('bitacoras.firmar');
 
+    // T-014: Total bitácora hours per project (director/coordinador)
+    Route::get('/director/proyectos/{id}/horas', [\App\Http\Controllers\Api\BitacoraController::class, 'horas'])
+        ->whereNumber('id')
+        ->name('director.proyectos.horas');
+
     // Entregas — versiones (accessible by authenticated students and directors)
     Route::get('/entregas/{id}/versiones', [EntregaController::class, 'versiones'])
         ->whereNumber('id')

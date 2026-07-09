@@ -105,6 +105,80 @@ it('estudiante NO puede crear proyecto (403)', function () {
     $response->assertStatus(403);
 });
 
+// -- KPIs -----------------------------------------------------------------
+
+it('kpis endpoint devuelve estructura correcta con 4 campos', function () {
+    $response = $this->actingAs($this->coordinador)
+        ->getJson('/api/admin/proyectos/kpis');
+
+    $response->assertOk()
+        ->assertJsonStructure([
+            'proyectos_activos',
+            'en_riesgo',
+            'alertas_sin_revisar',
+            'tasa_cumplimiento',
+        ]);
+});
+
+it('kpis con 0 proyectos devuelve tasa 100', function () {
+    $response = $this->actingAs($this->coordinador)
+        ->getJson('/api/admin/proyectos/kpis');
+
+    $response->assertOk();
+    expect($response->json('proyectos_activos'))->toBe(0);
+    expect($response->json('en_riesgo'))->toBe(0);
+    expect($response->json('alertas_sin_revisar'))->toBe(0);
+    expect($response->json('tasa_cumplimiento'))->toEqual(100);
+});
+
+it('kpis reflejan proyectos creados', function () {
+    \App\Models\Proyecto::create([
+        'title' => 'Proyecto en curso',
+        'semester_id' => $this->semestre->id,
+        'status' => EstadoProyecto::EnCurso->value,
+    ]);
+    \App\Models\Proyecto::create([
+        'title' => 'Proyecto completado',
+        'semester_id' => $this->semestre->id,
+        'status' => EstadoProyecto::Completado->value,
+    ]);
+    $enRiesgo = \App\Models\Proyecto::create([
+        'title' => 'Proyecto en riesgo',
+        'semester_id' => $this->semestre->id,
+        'status' => EstadoProyecto::EnRiesgo->value,
+    ]);
+    $enRiesgo->alert_count = 3;
+    $enRiesgo->save();
+
+    $response = $this->actingAs($this->coordinador)
+        ->getJson('/api/admin/proyectos/kpis');
+
+    $response->assertOk();
+    expect($response->json('proyectos_activos'))->toBe(2);
+    expect($response->json('en_riesgo'))->toBe(1);
+    expect($response->json('alertas_sin_revisar'))->toBe(1);
+    expect($response->json('tasa_cumplimiento'))->toEqual(33.3);
+});
+
+it('kpis solo consideran semestres activos', function () {
+    $inactivo = Semestre::create([
+        'name' => '2025-2',
+        'start_date' => '2025-08-01',
+        'end_date' => '2025-12-31',
+        'is_active' => false,
+    ]);
+    \App\Models\Proyecto::create([
+        'title' => 'Proyecto en semestre inactivo',
+        'semester_id' => $inactivo->id,
+    ]);
+
+    $response = $this->actingAs($this->coordinador)
+        ->getJson('/api/admin/proyectos/kpis');
+
+    $response->assertOk();
+    expect($response->json('proyectos_activos'))->toBe(0);
+});
+
 it('fase y estado son los enums correctos', function () {
     $response = $this->actingAs($this->coordinador)
         ->postJson('/api/admin/proyectos', [

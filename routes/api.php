@@ -94,6 +94,10 @@ Route::middleware(['auth:sanctum', 'role:Coordinador'])
         Route::get('/audit-logs', [AuditLogController::class, 'index'])
             ->name('audit-logs.index');
 
+        // Proyectos KPIs (T-006). Must be before apiResource to avoid wildcard collision.
+        Route::get('/proyectos/kpis', [ProyectoController::class, 'kpis'])
+            ->name('proyectos.kpis');
+
         // Proyectos CRUD (T-002).
         Route::apiResource('proyectos', ProyectoController::class)
             ->only(['index', 'store']);

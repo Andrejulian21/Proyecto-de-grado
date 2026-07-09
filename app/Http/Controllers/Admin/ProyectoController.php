@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\EstadoProyecto;
 use App\Http\Controllers\Controller;
 use App\Models\Proyecto;
+use App\Models\Semestre;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -64,5 +66,34 @@ class ProyectoController extends Controller
         $proyecto->load(['semestre', 'director', 'estudiantes']);
 
         return response()->json(['data' => $proyecto], 201);
+    }
+
+    public function kpis(): JsonResponse
+    {
+        $activos = Proyecto::enSemestresActivos()
+            ->where('status', '!=', EstadoProyecto::Completado->value)
+            ->count();
+
+        $enRiesgo = Proyecto::enSemestresActivos()
+            ->where('status', EstadoProyecto::EnRiesgo->value)
+            ->count();
+
+        $alertas = Proyecto::enSemestresActivos()
+            ->where('alert_count', '>', 0)
+            ->count();
+
+        $total = Proyecto::enSemestresActivos()->count();
+        $completados = Proyecto::enSemestresActivos()
+            ->where('status', EstadoProyecto::Completado->value)
+            ->count();
+
+        $tasa = $total > 0 ? round(($completados / $total) * 100, 1) : 100.0;
+
+        return response()->json([
+            'proyectos_activos' => $activos,
+            'en_riesgo' => $enRiesgo,
+            'alertas_sin_revisar' => $alertas,
+            'tasa_cumplimiento' => $tasa,
+        ]);
     }
 }

@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\EstadoProyecto;
 use App\Enums\FaseProyecto;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -70,6 +71,13 @@ class Proyecto extends Model
     // {
     //     return $this->hasMany(Bitacora::class);
     // }
+
+    // -- scopes --------------------------------------------------------
+
+    public function scopeEnSemestresActivos(Builder $query): Builder
+    {
+        return $query->whereHas('semestre', fn (Builder $q) => $q->where('is_active', true));
+    }
 
     // -- boot ----------------------------------------------------------
 

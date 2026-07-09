@@ -91,6 +91,9 @@ class UserController extends Controller
         $email = $user->email;
         $user->delete();
 
+        // Also remove the whitelist entry so the email can be re-registered
+        AuthorizedEmail::where('email', $email)->delete();
+
         AuditEvent::dispatch(
             $request->user(),
             'user.deleted',
@@ -182,6 +185,7 @@ class UserController extends Controller
         $perPage = min((int) $request->query('per_page', 50), 200);
 
         $page = AuthorizedEmail::query()
+            ->with('creator:id,name')
             ->orderByDesc('id')
             ->paginate($perPage);
 
@@ -306,6 +310,10 @@ class UserController extends Controller
         }
 
         $email = $entry->email;
+
+        // Also remove the corresponding user account if one exists,
+        // so re-adding the email creates a clean slate.
+        User::where('email', $email)->delete();
 
         $entry->delete();
 

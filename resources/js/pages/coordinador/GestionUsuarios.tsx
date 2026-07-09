@@ -2,14 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { apiFetch } from '@/lib/utils';
 import {
-    Search,
     Loader2,
     ChevronLeft,
     ChevronRight,
-    Pencil,
     Trash2,
     X,
     UserPlus,
+    Pencil,
     RefreshCw,
 } from 'lucide-react';
 
@@ -62,13 +61,12 @@ export default function GestionUsuarios() {
 
     // ── Sección 1: Whitelist ──
     const [users, setUsers] = useState<User[]>([]);
-    const [meta, setMeta] = useState<PaginationMeta | null>(null);
-    const [page, setPage] = useState(1);
-    const [search, setSearch] = useState('');
-    const [debouncedSearch, setDebouncedSearch] = useState('');
-    const [loading, setLoading] = useState(true);
-    const [filterEstado, setFilterEstado] = useState('');
-    const [filterRol, setFilterRol] = useState('');
+
+    // ── Whitelist (tabla separada de users) ──
+    const [whitelistEntries, setWhitelistEntries] = useState<User[]>([]);
+    const [whitelistMeta, setWhitelistMeta] = useState<PaginationMeta | null>(null);
+    const [whitelistPage, setWhitelistPage] = useState(1);
+    const [whitelistLoading, setWhitelistLoading] = useState(false);
 
     // ── Sección 2: Crear evaluador ──
     const [evalNombre, setEvalNombre] = useState('');
@@ -94,40 +92,46 @@ export default function GestionUsuarios() {
     const [submitting, setSubmitting] = useState(false);
 
     const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
+    const [deleteIsWhitelist, setDeleteIsWhitelist] = useState(false);
     const [deleting, setDeleting] = useState(false);
 
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [savingRoles, setSavingRoles] = useState(false);
 
-    useEffect(() => {
-        const t = setTimeout(() => setDebouncedSearch(search), 400);
-        return () => clearTimeout(t);
-    }, [search]);
-
-    useEffect(() => {
-        setPage(1);
-    }, [debouncedSearch]);
-
     const fetchUsers = useCallback(async () => {
-        setLoading(true);
         try {
-            const params = new URLSearchParams({ page: String(page), per_page: '20' });
-            if (debouncedSearch) params.set('search', debouncedSearch);
-            const res = await apiFetch(`/api/admin/usuarios?${params}`);
+            const res = await apiFetch('/api/admin/usuarios?per_page=200');
             if (!res.ok) throw new Error('Error al cargar usuarios');
             const json = await res.json();
-            setUsers(json.data);
-            setMeta(json.meta);
+            setUsers(json.data ?? json);
         } catch {
             setMessage({ type: 'error', text: 'Error al cargar usuarios' });
-        } finally {
-            setLoading(false);
         }
-    }, [page, debouncedSearch]);
+    }, []);
+
+    const fetchWhitelist = useCallback(async () => {
+        setWhitelistLoading(true);
+        try {
+            const params = new URLSearchParams({ page: String(whitelistPage), per_page: '20' });
+            const res = await apiFetch(`/api/admin/whitelist?${params}`);
+            if (!res.ok) throw new Error('Error al cargar whitelist');
+            const json = await res.json();
+            setWhitelistEntries(json.data);
+            setWhitelistMeta(json.meta);
+        } catch {
+            setMessage({ type: 'error', text: 'Error al cargar whitelist' });
+        } finally {
+            setWhitelistLoading(false);
+        }
+    }, [whitelistPage]);
 
     useEffect(() => {
         fetchUsers();
     }, [fetchUsers]);
+
+    useEffect(() => {
+        fetchWhitelist();
+    }, [fetchWhitelist]);
 
     function showMsg(type: 'success' | 'error', text: string) {
         setMessage({ type, text });
@@ -171,13 +175,22 @@ export default function GestionUsuarios() {
         if (!deleteTarget || deleting) return;
         setDeleting(true);
         try {
-            const res = await apiFetch(`/api/admin/usuarios/${deleteTarget.id}`, { method: 'DELETE' });
+            const endpoint = deleteIsWhitelist
+                ? `/api/admin/whitelist/${deleteTarget.id}`
+                : `/api/admin/usuarios/${deleteTarget.id}`;
+            const res = await apiFetch(endpoint, { method: 'DELETE' });
             if (!res.ok) throw new Error('Error al eliminar');
-            showMsg('success', 'Usuario eliminado');
+            showMsg('success', deleteIsWhitelist ? 'Correo eliminado de la whitelist' : 'Usuario eliminado');
             setDeleteTarget(null);
-            fetchUsers();
+            setDeleteIsWhitelist(false);
+            if (deleteIsWhitelist) {
+                fetchWhitelist();
+                fetchUsers();
+            } else {
+                fetchUsers();
+            }
         } catch {
-            showMsg('error', 'Error al eliminar usuario');
+            showMsg('error', 'Error al eliminar');
         } finally {
             setDeleting(false);
         }
@@ -269,7 +282,7 @@ export default function GestionUsuarios() {
             showMsg('success', 'Estudiante agregado');
             setEstCorreo('');
             setEstNombre('');
-            fetchUsers();
+            fetchWhitelist();
         } catch (err: any) {
             showMsg('error', err.message);
         }
@@ -290,7 +303,7 @@ export default function GestionUsuarios() {
             showMsg('success', 'Director agregado');
             setDirCorreo('');
             setDirNombre('');
-            fetchUsers();
+            fetchWhitelist();
         } catch (err: any) {
             showMsg('error', err.message);
         }
@@ -307,11 +320,6 @@ export default function GestionUsuarios() {
 
     // Compute evaluadores from users
     const evaluadores = users.filter((u) => u.role === 'EvaluadorExterno');
-    const filteredUsers = users.filter((u) => {
-        if (filterEstado && !u.role?.toLowerCase().includes(filterEstado.toLowerCase())) return false;
-        if (filterRol && !ROLE_LABELS[u.role]?.toLowerCase().includes(filterRol.toLowerCase())) return false;
-        return true;
-    });
 
     if (role !== 'Coordinador') {
         return (
@@ -357,7 +365,7 @@ export default function GestionUsuarios() {
                 </div>
             </div>
 
-            {/* ═══ SECCIÓN 1: Correos Institucionales Autorizados ═══ */}
+            {/* ═══ SECCIÓN 1: Correos Autorizados (whitelist) ═══ */}
             <section className="rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                 <div className="mb-5 flex items-center gap-2 flex-wrap">
                     <svg viewBox="0 0 24 24" className="h-4 w-4 text-[#c2410c]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -366,52 +374,18 @@ export default function GestionUsuarios() {
                     </svg>
                     <h2 className="text-lg font-bold text-text">Correos Autorizados</h2>
                     <span className="ml-auto rounded-full bg-[#e7e5e4] px-2.5 py-0.5 text-xs font-semibold text-[#57534e]">
-                        {meta?.total ?? users.length} usuarios
+                        {whitelistMeta?.total ?? whitelistEntries.length} correos
                     </span>
                 </div>
 
-                <div className="mb-4 flex items-center gap-3 flex-wrap">
-                    <div className="flex min-w-[240px] flex-1 items-center gap-2 rounded-lg border border-transparent bg-[#f5f5f4] px-3 py-2 transition-colors focus-within:border-[#c2410c] focus-within:bg-white">
-                        <Search className="h-5 w-5 text-[#57534e]" />
-                        <input
-                            type="search"
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Buscar por correo o nombre..."
-                            className="w-full border-none bg-transparent text-sm text-text outline-none placeholder:text-[#78716c]"
-                        />
-                    </div>
-                    <select
-                        value={filterEstado}
-                        onChange={(e) => setFilterEstado(e.target.value)}
-                        className="w-[200px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-text outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
-                    >
-                        <option value="">Todos los estados</option>
-                        <option value="Activo">Activo</option>
-                        <option value="Inactivo">Inactivo</option>
-                    </select>
-                    <select
-                        value={filterRol}
-                        onChange={(e) => setFilterRol(e.target.value)}
-                        className="w-[200px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-text outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
-                    >
-                        <option value="">Todos los roles</option>
-                        {ROLES.map((r) => (
-                            <option key={r} value={ROLE_LABELS[r]}>{ROLE_LABELS[r]}</option>
-                        ))}
-                    </select>
-                </div>
-
                 <div className="w-full overflow-x-auto rounded-lg border border-[#e5e5e5] bg-white">
-                    {loading ? (
+                    {whitelistLoading ? (
                         <div className="flex items-center justify-center py-16">
                             <Loader2 className="h-6 w-6 animate-spin text-[#c2410c]" />
                         </div>
-                    ) : filteredUsers.length === 0 ? (
+                    ) : whitelistEntries.length === 0 ? (
                         <div className="py-16 text-center text-sm text-[#57534e]">
-                            {debouncedSearch
-                                ? 'No se encontraron usuarios con ese criterio de búsqueda.'
-                                : 'No hay usuarios registrados.'}
+                            No hay correos autorizados. Agregue estudiantes o directores desde los formularios de abajo.
                         </div>
                     ) : (
                         <>
@@ -420,59 +394,56 @@ export default function GestionUsuarios() {
                                     <tr>
                                         <th className="whitespace-nowrap px-4 py-3">Correo</th>
                                         <th className="whitespace-nowrap px-4 py-3">Nombre</th>
+                                        <th className="whitespace-nowrap px-4 py-3">Rol</th>
                                         <th className="whitespace-nowrap px-4 py-3">Fecha de alta</th>
-                                        <th className="whitespace-nowrap px-4 py-3">Estado</th>
                                         <th className="whitespace-nowrap px-4 py-3 text-right">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {filteredUsers.map((u, idx) => {
-                                        const isActive = u.role !== 'Inactivo';
-                                        return (
-                                            <tr key={u.id} className="border-b border-[#e5e5e5] last:border-none">
-                                                <td className="px-4 py-3 font-medium text-text">{u.email}</td>
-                                                <td className="px-4 py-3 text-text-muted">
-                                                    {(u as any).name || '—'}
-                                                </td>
-                                                <td className="px-4 py-3 text-[#78716c] text-xs">{formatDate(u.created_at)}</td>
-                                                <td className="px-4 py-3">
-                                                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.03em] ${badgeClass(isActive ? 'Activo' : 'Inactivo')}`}>
-                                                        {isActive ? 'Activo' : 'Inactivo'}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-3 text-right">
-                                                    <div className="inline-flex gap-0.5">
-                                                        <button
-                                                            onClick={() => setDeleteTarget(u)}
-                                                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#fee2e2] hover:text-[#dc2626]"
-                                                            title="Eliminar"
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
+                                    {whitelistEntries.map((w) => (
+                                        <tr key={w.id} className="border-b border-[#e5e5e5] last:border-none">
+                                            <td className="px-4 py-3 font-medium text-text">{w.email}</td>
+                                            <td className="px-4 py-3 text-text-muted">
+                                                {(w as any).name || (w as any).created_by?.name || '—'}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <span className="inline-flex items-center rounded-full bg-[#f5f5f4] px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.03em] text-[#57534e]">
+                                                    {ROLE_LABELS[w.role] || w.role}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-[#78716c] text-xs">{formatDate(w.created_at)}</td>
+                                            <td className="px-4 py-3 text-right">
+                                                <div className="inline-flex gap-0.5">
+                                                    <button
+                                                        onClick={() => { setDeleteTarget(w); setDeleteIsWhitelist(true); }}
+                                                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#fee2e2] hover:text-[#dc2626]"
+                                                        title="Eliminar de whitelist"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
                                 </tbody>
                             </table>
-                            {meta && (
+                            {whitelistMeta && (
                                 <div className="flex items-center justify-between border-t border-[#e5e5e5] px-4 py-3 text-sm text-[#57534e] flex-wrap gap-3">
-                                    <span>Mostrando {meta.total > 0 ? (meta.current_page - 1) * 20 + 1 : 0}–{Math.min(meta.current_page * 20, meta.total)} de {meta.total} resultados</span>
+                                    <span>Mostrando {whitelistMeta.total > 0 ? (whitelistMeta.current_page - 1) * 20 + 1 : 0}–{Math.min(whitelistMeta.current_page * 20, whitelistMeta.total)} de {whitelistMeta.total} resultados</span>
                                     <div className="flex items-center gap-1">
                                         <button
-                                            onClick={() => setPage((p) => Math.max(1, p - 1))}
-                                            disabled={page <= 1}
+                                            onClick={() => setWhitelistPage((p) => Math.max(1, p - 1))}
+                                            disabled={whitelistPage <= 1}
                                             className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#e5e5e5] text-text transition-colors hover:bg-[#f5f5f4] disabled:cursor-not-allowed disabled:opacity-40"
                                         >
                                             <ChevronLeft className="h-4 w-4" />
                                         </button>
-                                        {meta.last_page > 1 && Array.from({ length: meta.last_page }, (_, i) => i + 1).map((p) => (
+                                        {whitelistMeta.last_page > 1 && Array.from({ length: whitelistMeta.last_page }, (_, i) => i + 1).map((p) => (
                                             <button
                                                 key={p}
-                                                onClick={() => setPage(p)}
+                                                onClick={() => setWhitelistPage(p)}
                                                 className={`inline-flex h-8 min-w-[32px] items-center justify-center rounded-lg border px-2 text-sm font-semibold transition-colors ${
-                                                    p === page
+                                                    p === whitelistPage
                                                         ? 'border-[#c2410c] bg-[#c2410c] text-white'
                                                         : 'border-[#e5e5e5] text-text hover:bg-[#f5f5f4]'
                                                 }`}
@@ -481,8 +452,8 @@ export default function GestionUsuarios() {
                                             </button>
                                         ))}
                                         <button
-                                            onClick={() => setPage((p) => Math.min(meta.last_page, p + 1))}
-                                            disabled={page >= meta.last_page}
+                                            onClick={() => setWhitelistPage((p) => Math.min(whitelistMeta.last_page, p + 1))}
+                                            disabled={whitelistPage >= whitelistMeta.last_page}
                                             className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#e5e5e5] text-text transition-colors hover:bg-[#f5f5f4] disabled:cursor-not-allowed disabled:opacity-40"
                                         >
                                             <ChevronRight className="h-4 w-4" />
@@ -970,7 +941,7 @@ export default function GestionUsuarios() {
                         </p>
                         <div className="flex justify-end gap-3">
                             <button
-                                onClick={() => setDeleteTarget(null)}
+                                onClick={() => { setDeleteTarget(null); setDeleteIsWhitelist(false); }}
                                 className="rounded-lg border border-[#e5e5e5] px-4 py-2.5 text-sm font-medium text-text transition hover:bg-[#f5f5f4]"
                             >
                                 Cancelar

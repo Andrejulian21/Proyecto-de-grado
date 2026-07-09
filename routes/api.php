@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Admin\AuditLogController;
+use App\Http\Controllers\Admin\ProyectoController;
 use App\Http\Controllers\Admin\SemestreController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\AuthController;
@@ -92,6 +93,10 @@ Route::middleware(['auth:sanctum', 'role:Coordinador'])
         // Audit log viewer (T-024).
         Route::get('/audit-logs', [AuditLogController::class, 'index'])
             ->name('audit-logs.index');
+
+        // Proyectos CRUD (T-002).
+        Route::apiResource('proyectos', ProyectoController::class)
+            ->only(['index', 'store']);
 
         // Semestres CRUD (T-001).
         Route::apiResource('semestres', SemestreController::class)

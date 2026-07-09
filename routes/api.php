@@ -60,6 +60,21 @@ Route::middleware([
     Route::post('/auth/logout', [AuthController::class, 'logout'])
         ->name('auth.logout');
 
+    // Bitácoras CRUD + firma (T-012)
+    Route::get('/bitacoras', [\App\Http\Controllers\Api\BitacoraController::class, 'index'])
+        ->name('bitacoras.index');
+    Route::post('/bitacoras', [\App\Http\Controllers\Api\BitacoraController::class, 'store'])
+        ->name('bitacoras.store');
+    Route::get('/bitacoras/{id}', [\App\Http\Controllers\Api\BitacoraController::class, 'show'])
+        ->whereNumber('id')
+        ->name('bitacoras.show');
+    Route::put('/bitacoras/{id}', [\App\Http\Controllers\Api\BitacoraController::class, 'update'])
+        ->whereNumber('id')
+        ->name('bitacoras.update');
+    Route::post('/bitacoras/{id}/firmar', [\App\Http\Controllers\Api\BitacoraController::class, 'firmar'])
+        ->whereNumber('id')
+        ->name('bitacoras.firmar');
+
     // Entregas — versiones (accessible by authenticated students and directors)
     Route::get('/entregas/{id}/versiones', [EntregaController::class, 'versiones'])
         ->whereNumber('id')

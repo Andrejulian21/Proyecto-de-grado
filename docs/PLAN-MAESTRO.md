@@ -64,18 +64,18 @@ Cubre el ciclo completo: inscripción, entregas, bitácoras, evaluación, report
 
 ---
 
-## 3. Lo que falta — 7 sprints restantes
+## 3. Lo que falta — 6 sprints restantes
 
-| Sprint | Área | Días | Prioridad |
-|--------|------|------|-----------|
-| 2 | Proyectos + Dashboard coordinador + Semestres | 1 | **Crítica** |
-| 3 | Entregas + Versiones + Revisiones + Calificación | 1 | **Crítica** |
-| 4 | Bitácoras + TOTP + Firmas | 1 | **Crítica** |
-| 5 | Directores + Evaluadores + Evaluaciones + Reportes | 1 | **Alta** |
-| 6 | Anuncios + Recursos + Alertas + Notificaciones | 1 | Media |
-| 7 | IA (Asistente + Análisis) + QA + Despliegue | 2 | Media |
+| Sprint | Área | Prioridad |
+|--------|------|-----------|
+| 2 | Backend completo (13 migraciones, modelos, API) | **Crítica** |
+| 3 | Tests backend (200+ tests con Pest) | **Crítica** |
+| 4 | Frontend completo (portear 32 wireframes) | **Crítica** |
+| 5 | Integración frontend + backend | **Alta** |
+| 6 | Docker + CI/CD | Media |
+| 7 | Despliegue (Azure + Nginx TLS) | Media |
 
-Detalle diario en `docs/ROADMAP.md`.
+Detalle en `docs/ROADMAP.md`.
 
 ---
 
@@ -83,15 +83,13 @@ Detalle diario en `docs/ROADMAP.md`.
 
 Si el tiempo no alcanza, se sacrifica en este orden:
 
-1. ❌ **Chat interno** (Reverb WebSocket) → comunicación por email
-2. ❌ **Notificaciones push/correo** → solo notificaciones in-app
-3. ❌ **TOTP** → firma manual con checkbox + timestamp + auditoría
-4. ❌ **Agenda sustentaciones PDF/Excel** → agenda manual
-5. ❌ **Análisis automático IA de entregas** → solo asistente de orientación
-6. ❌ **Asistente IA (chatbot)** → se entrega sin módulo IA
-7. ❌ **Exportación PDF/Excel** → solo vista en pantalla
+1. ❌ **Módulos IA** (asistente + análisis automático) → se entrega sin IA
+2. ❌ **TOTP para firmas** → firma manual con timestamp + auditoría
+3. ❌ **Despliegue Azure** → deploy local / Docker Compose sin TLS
+4. ❌ **Exportación PDF/Excel** → solo vista en pantalla
+5. ❌ **Notificaciones push** → solo notificaciones in-app
 
-**NUNCA se sacrifica:** Proyectos · Entregas · Bitácoras · Evaluación · Reportes · Auditoría
+**NUNCA se sacrifica:** Auth · Proyectos · Entregas · Bitácoras · Evaluación · Reportes · Tests
 
 ---
 

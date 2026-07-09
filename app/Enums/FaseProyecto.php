@@ -28,4 +28,17 @@ enum FaseProyecto: string
             self::PresentacionFinal => 'Presentación Final',
         };
     }
+
+    /**
+     * Return the next phase, or null if this is the last phase.
+     */
+    public function next(): ?self
+    {
+        return match ($this) {
+            self::Anteproyecto => self::PresentacionAnteproyecto,
+            self::PresentacionAnteproyecto => self::Desarrollo,
+            self::Desarrollo => self::PresentacionFinal,
+            self::PresentacionFinal => null,
+        };
+    }
 }

@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property int $id
@@ -66,11 +67,11 @@ class Proyecto extends Model
     // {
     //     return $this->hasMany(Entrega::class);
     // }
-    //
-    // public function bitacoras(): HasMany
-    // {
-    //     return $this->hasMany(Bitacora::class);
-    // }
+
+    public function bitacoras(): HasMany
+    {
+        return $this->hasMany(Bitacora::class);
+    }
 
     // -- scopes --------------------------------------------------------
 

@@ -242,13 +242,9 @@ class AuthController extends Controller
      */
     private function extractHostedDomain(SocialiteUser $googleUser): ?string
     {
-        if (isset($googleUser->user['hd']) && $googleUser->user['hd'] !== '') {
-            return (string) $googleUser->user['hd'];
-        }
-
         $hd = $googleUser->user['hd'] ?? null;
 
-        return $hd !== null ? (string) $hd : null;
+        return ($hd !== null && $hd !== '') ? (string) $hd : null;
     }
 
     /**

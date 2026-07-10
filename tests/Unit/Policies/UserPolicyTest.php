@@ -6,49 +6,19 @@ use App\Enums\UserRole;
 use App\Models\User;
 use App\Policies\UserPolicy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Gate;
 
 uses(RefreshDatabase::class);
 
 /**
- * Strict TDD Cycle 12: Gates + UserPolicy (T-019).
+ * Strict TDD Cycle 12: UserPolicy (T-019, H-009).
  *
- * Gates:
- *   - manage-users  : Coordinador only
- *   - view-admin    : Coordinador + Director
+ * Gates (manage-users, view-admin) removed in H-009 — they had no
+ * call-sites in production code. Role enforcement is handled by the
+ * `role:Coordinador` route middleware.
  *
- * UserPolicy methods:
+ * UserPolicy methods retained:
  *   - viewAny, create, update, delete  : Coordinador only
  */
-it('manage-users gate allows Coordinador', function () {
-    $coord = User::factory()->coordinador()->create();
-
-    expect(Gate::forUser($coord)->allows('manage-users'))->toBeTrue();
-});
-
-it('manage-users gate denies Estudiante, Director, EvaluadorExterno', function () {
-    foreach ([UserRole::Estudiante, UserRole::Director, UserRole::EvaluadorExterno] as $role) {
-        $user = User::factory()->create(['role' => $role->value]);
-        expect(Gate::forUser($user)->allows('manage-users'))
-            ->toBeFalse("manage-users should deny {$role->value}");
-    }
-});
-
-it('view-admin gate allows Coordinador and Director', function () {
-    foreach ([UserRole::Coordinador, UserRole::Director] as $role) {
-        $user = User::factory()->create(['role' => $role->value]);
-        expect(Gate::forUser($user)->allows('view-admin'))
-            ->toBeTrue("view-admin should allow {$role->value}");
-    }
-});
-
-it('view-admin gate denies Estudiante and EvaluadorExterno', function () {
-    foreach ([UserRole::Estudiante, UserRole::EvaluadorExterno] as $role) {
-        $user = User::factory()->create(['role' => $role->value]);
-        expect(Gate::forUser($user)->allows('view-admin'))
-            ->toBeFalse("view-admin should deny {$role->value}");
-    }
-});
 
 it('UserPolicy::viewAny allows Coordinador and denies everyone else', function () {
     $policy = new UserPolicy;

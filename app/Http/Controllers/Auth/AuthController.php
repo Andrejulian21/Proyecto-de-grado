@@ -41,6 +41,23 @@ class AuthController extends Controller
     private const UNAB_HOSTED_DOMAIN = 'unab.edu.co';
 
     /**
+     * Pre-computed bcrypt hash for timing equalization (H-002).
+     * Computed lazily once per process lifetime so that the no-user
+     * login path runs exactly one Hash::check() at the same cost as
+     * a real wrong-password check — without calling Hash::make()
+     * on the request path.
+     */
+    private static ?string $dummyHash = null;
+
+    private static function dummyHash(): string
+    {
+        if (self::$dummyHash === null) {
+            self::$dummyHash = Hash::make('timing-dummy');
+        }
+        return self::$dummyHash;
+    }
+
+    /**
      * Initiate the Google OAuth dance.
      */
     public function redirectToGoogle(): RedirectResponse
@@ -271,15 +288,12 @@ class AuthController extends Controller
             ->first();
 
         // Dummy hash check to prevent timing-based user enumeration (H-002).
-        // When no user is found, Hash::check() still runs against a fixed dummy
-        // hash (pre-computed outside the request path) so the response time is
-        // indistinguishable from a wrong-password case.
+        // When no user is found, Hash::check() still runs against a pre-computed
+        // dummy hash so the response time has the same bcrypt cost as a real
+        // wrong-password check. The hash is lazily computed once per process
+        // (self::dummyHash()), avoiding Hash::make() on the request path.
         if (! $user) {
-            // Timing equalization (H-002): Hash::check() against a dynamically-
-            // generated dummy hash so the response time is indistinguishable
-            // from the wrong-password path. Hash::make() uses the configured
-            // BCRYPT_ROUNDS, ensuring the same cost as the real hash check.
-            Hash::check($payload['password'], Hash::make('timing-dummy'));
+            Hash::check($payload['password'], self::dummyHash());
             AuditEvent::dispatch(
                 null,
                 'login.rejected',

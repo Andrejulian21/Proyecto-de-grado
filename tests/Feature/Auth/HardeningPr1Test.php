@@ -19,7 +19,7 @@ uses(RefreshDatabase::class);
 
 test('login rate limit returns 429 after 5 attempts', function () {
     $user = User::factory()->external()->create([
-        'email' => 'pedro@evaluador.com',
+        'email' => 'pedro-rate@evaluador.com',
         'password' => Hash::make('TempPass!2026'),
         'password_changed_at' => now(),
     ]);
@@ -27,14 +27,14 @@ test('login rate limit returns 429 after 5 attempts', function () {
     // 5 successful attempts — don't trigger lockout, but count toward rate limit
     for ($i = 0; $i < 5; $i++) {
         $this->postJson('/api/auth/externo/login', [
-            'email' => 'pedro@evaluador.com',
+            'email' => 'pedro-rate@evaluador.com',
             'password' => 'TempPass!2026',
         ])->assertOk();
     }
 
     // 6th attempt should be rate-limited (429) even with correct credentials
     $response = $this->postJson('/api/auth/externo/login', [
-        'email' => 'pedro@evaluador.com',
+        'email' => 'pedro-rate@evaluador.com',
         'password' => 'TempPass!2026',
     ]);
 
@@ -43,33 +43,33 @@ test('login rate limit returns 429 after 5 attempts', function () {
 
 test('rate limit is per IP+email, different email from same IP is not blocked', function () {
     User::factory()->external()->create([
-        'email' => 'pedro@evaluador.com',
+        'email' => 'pedro-isolation@evaluador.com',
         'password' => Hash::make('TempPass!2026'),
         'password_changed_at' => now(),
     ]);
     User::factory()->external()->create([
-        'email' => 'maria@evaluadora.com',
+        'email' => 'maria-isolation@evaluadora.com',
         'password' => Hash::make('TempPass!2026'),
         'password_changed_at' => now(),
     ]);
 
-    // Exhaust the rate limit for pedro@evaluador.com with correct password
+    // Exhaust the rate limit for pedro-isolation@evaluador.com with correct password
     for ($i = 0; $i < 5; $i++) {
         $this->postJson('/api/auth/externo/login', [
-            'email' => 'pedro@evaluador.com',
+            'email' => 'pedro-isolation@evaluador.com',
             'password' => 'TempPass!2026',
         ])->assertOk();
     }
 
     // 6th for pedro should be 429
     $this->postJson('/api/auth/externo/login', [
-        'email' => 'pedro@evaluador.com',
+        'email' => 'pedro-isolation@evaluador.com',
         'password' => 'TempPass!2026',
     ])->assertStatus(429);
 
     // Different email from same IP should succeed (not rate-limited)
     $this->postJson('/api/auth/externo/login', [
-        'email' => 'maria@evaluadora.com',
+        'email' => 'maria-isolation@evaluadora.com',
         'password' => 'TempPass!2026',
     ])->assertOk();
 });

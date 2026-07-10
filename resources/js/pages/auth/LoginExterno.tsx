@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { AlertTriangle, Eye, EyeOff } from 'lucide-react';
+import { apiFetch } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 
 interface FieldError {
@@ -38,16 +39,14 @@ export function LoginExterno() {
         setIsSubmitting(true);
 
         try {
-            const res = await fetch('/api/auth/externo/login', {
+            const res = await apiFetch('/api/auth/externo/login', {
                 method: 'POST',
-                credentials: 'include',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                 body: JSON.stringify({ email: email.trim(), password }),
             });
 
             if (res.ok) {
                 const data = await res.json();
-                sessionStorage.setItem('auth_token', data.token);
                 sessionStorage.setItem('auth_user', JSON.stringify(data.user));
                 const role = data?.user?.role?.toLowerCase() ?? 'estudiante';
                 window.location.href = `/dashboard/${role}`;

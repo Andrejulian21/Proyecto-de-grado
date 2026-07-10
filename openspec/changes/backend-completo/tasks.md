@@ -55,3 +55,7 @@ Chain strategy: pending
 - [ ] **T-020** CRUD Anuncios: AnuncioController (admin CRUD, list vigentes), StoreAnuncioRequest, rutas, tests
 - [ ] **T-021** CRUD Recursos: RecursoController (admin CRUD, list filtros categoria/search, increment contador), StoreRecursoRequest, tests
 - [ ] **T-022** Notificaciones: crear in-app en eventos, email ShouldQueue via Redis, MarkNotificationsReadRequest, test Queue::fake()
+
+---
+
+**ARCHIVADO** — 2026-07-09. Sprint 2 completado. 22 tareas, 373 tests, 1028 assertions. Ver `archive-report.md`.

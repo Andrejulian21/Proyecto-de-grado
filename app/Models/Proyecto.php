@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\EstadoProyecto;
 use App\Enums\FaseProyecto;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -25,6 +26,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Proyecto extends Model
 {
+    use HasFactory;
+
     protected $table = 'proyectos';
 
     protected $fillable = [

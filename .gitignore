@@ -61,3 +61,5 @@ $RECYCLE.BIN/
 *.swp
 *.swo
 *~
+
+testsprite_tests\tmp\config.json

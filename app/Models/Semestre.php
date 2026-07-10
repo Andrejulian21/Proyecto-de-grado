@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
@@ -18,6 +19,8 @@ use Illuminate\Support\Carbon;
  */
 class Semestre extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'name',
         'start_date',
@@ -41,6 +44,6 @@ class Semestre extends Model
 
     public function proyectos(): HasMany
     {
-        return $this->hasMany(Proyecto::class);
+        return $this->hasMany(Proyecto::class, 'semester_id');
     }
 }

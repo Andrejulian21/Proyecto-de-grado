@@ -19,7 +19,18 @@
         <include>
             <directory>app</directory>
         </include>
+        <exclude>
+            <directory>app/Console</directory>
+            <directory>app/Exceptions</directory>
+            <directory>app/Providers</directory>
+        </exclude>
     </source>
+    <coverage>
+        <report>
+            <text outputFile=".phpunit.cache/coverage.txt"/>
+            <html outputDirectory=".phpunit.cache/coverage"/>
+        </report>
+    </coverage>
     <php>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_KEY" value="base64:wqo8lrWsXgpFszQ4Lu+XyEmkrFly7fS4anG9ig/YviE="/>

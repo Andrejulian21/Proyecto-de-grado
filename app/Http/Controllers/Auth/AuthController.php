@@ -41,6 +41,23 @@ class AuthController extends Controller
     private const UNAB_HOSTED_DOMAIN = 'unab.edu.co';
 
     /**
+     * Pre-computed bcrypt hash for timing equalization (H-002).
+     * Computed lazily once per process lifetime so that the no-user
+     * login path runs exactly one Hash::check() at the same cost as
+     * a real wrong-password check — without calling Hash::make()
+     * on the request path.
+     */
+    private static ?string $dummyHash = null;
+
+    private static function dummyHash(): string
+    {
+        if (self::$dummyHash === null) {
+            self::$dummyHash = Hash::make('timing-dummy');
+        }
+        return self::$dummyHash;
+    }
+
+    /**
      * Initiate the Google OAuth dance.
      */
     public function redirectToGoogle(): RedirectResponse
@@ -252,6 +269,12 @@ class AuthController extends Controller
 
     /**
      * External evaluator credential login (T-016, `auth-external` domain).
+     *
+     * SECURITY: All auth failures return the same 401 `{'error': 'invalid_credentials'}`
+     * to prevent user enumeration via differentiated error messages or status codes.
+     * Hash::check() is always called (against a dummy hash when the user is not found)
+     * to equalize response timing and prevent timing-based enumeration (H-002).
+     * The audit log still records the specific reason for forensic analysis.
      */
     public function loginExterno(Request $request): JsonResponse
     {
@@ -264,17 +287,19 @@ class AuthController extends Controller
             ->where('email', $payload['email'])
             ->first();
 
-        if (! $user || ! $user->es_externo) {
+        // Dummy hash check to prevent timing-based user enumeration (H-002).
+        // When no user is found, Hash::check() still runs against a pre-computed
+        // dummy hash so the response time has the same bcrypt cost as a real
+        // wrong-password check. The hash is lazily computed once per process
+        // (self::dummyHash()), avoiding Hash::make() on the request path.
+        if (! $user) {
+            Hash::check($payload['password'], self::dummyHash());
             AuditEvent::dispatch(
-                $user,
+                null,
                 'login.rejected',
                 'invalid_credentials',
-                ['channel' => 'external', 'reason' => 'not_external_evaluator'],
+                ['channel' => 'external', 'reason' => 'user_not_found'],
             );
-
-            if ($user && ! $user->es_externo) {
-                return response()->json(['error' => 'not_external_evaluator'], 403);
-            }
 
             return response()->json(['error' => 'invalid_credentials'], 401);
         }
@@ -290,15 +315,19 @@ class AuthController extends Controller
             return response()->json(['error' => 'account_locked'], 423);
         }
 
-        if (! Hash::check($payload['password'], $user->password)) {
-            $user->registerFailedLogin();
-
+        // Unified failure: same 401 for internal users AND wrong passwords (H-002).
+        if (! $user->es_externo || ! Hash::check($payload['password'], $user->password)) {
+            $reason = $user->es_externo ? 'wrong_password' : 'not_external_evaluator';
             AuditEvent::dispatch(
                 $user,
                 'login.rejected',
                 'invalid_credentials',
-                ['channel' => 'external', 'failed_attempts' => $user->failed_attempts],
+                ['channel' => 'external', 'reason' => $reason],
             );
+
+            if ($user->es_externo) {
+                $user->registerFailedLogin();
+            }
 
             return response()->json(['error' => 'invalid_credentials'], 401);
         }

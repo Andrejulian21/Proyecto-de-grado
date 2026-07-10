@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { apiFetch } from '@/lib/utils';
 
 interface User {
     id: number;
@@ -131,9 +132,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     async function logout() {
         try {
-            await fetch('/api/auth/logout', {
+            await apiFetch('/api/auth/logout', {
                 method: 'POST',
-                credentials: 'include',
                 headers: { Accept: 'application/json' },
             });
         } catch {
@@ -141,7 +141,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } finally {
             setUser(null);
             localStorage.removeItem('user_role');
-            sessionStorage.removeItem('auth_token');
             sessionStorage.removeItem('auth_user');
             navigate('/login', { replace: true });
         }

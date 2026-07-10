@@ -36,13 +36,6 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->throttleApi();
 
-        // Exclude the logout endpoint from CSRF so the SPA can always
-        // clear its session even when the XSRF-TOKEN cookie is stale.
-        $middleware->validateCsrfTokens(except: [
-            'api/auth/logout',
-            'api/auth/externo/login',
-        ]);
-
         // Route middleware aliases (T-017, T-018, T-021, T-022).
         $middleware->alias([
             'role' => RoleMiddleware::class,

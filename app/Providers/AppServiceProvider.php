@@ -32,5 +32,18 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinute(60)->by((string) $key);
         });
+
+        // Dedicated rate limiter for the external login endpoint (H-003).
+        // 5 attempts per minute per (IP + email) combination to mitigate
+        // credential stuffing and brute-force attacks. The key uses both
+        // IP and email so a single compromised credential across multiple
+        // IPs doesn't exhaust the global API budget.
+        RateLimiter::for('login', function (Request $request) {
+            $email = strtolower((string) $request->input('email', ''));
+
+            return [
+                Limit::perMinute(5)->by($request->ip().'|'.$email),
+            ];
+        });
     }
 }

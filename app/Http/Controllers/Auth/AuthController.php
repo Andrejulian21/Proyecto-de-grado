@@ -282,8 +282,8 @@ class AuthController extends Controller
         if ($user->isLocked()) {
             AuditEvent::dispatch(
                 $user,
-                'login.rejected',
-                'account_locked',
+                'login.locked',
+                'account locked by sliding-window policy',
                 ['channel' => 'external', 'locked_until' => $user->locked_until?->toIso8601String()],
             );
 

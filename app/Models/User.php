@@ -25,6 +25,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property Carbon|null $last_activity_at
  * @property string|null $totp_secret
  * @property string|null $remember_token
+ * @property Carbon|null $last_failed_at
  */
 class User extends Authenticatable
 {
@@ -50,6 +51,7 @@ class User extends Authenticatable
         'password_changed_at',
         'failed_attempts',
         'locked_until',
+        'last_failed_at',
     ];
 
     /**
@@ -81,6 +83,7 @@ class User extends Authenticatable
             'last_activity_at' => 'datetime',
             'password_changed_at' => 'datetime',
             'locked_until' => 'datetime',
+            'last_failed_at' => 'datetime',
         ];
     }
 
@@ -108,14 +111,38 @@ class User extends Authenticatable
     // -- external-evaluator helpers (T-016, T-017) -----------------------
 
     /**
-     * True when the lockout window is still in the future. Coordinators
-     * are never locked (T-016 scenario "Reject external login with
-     * wrong password" only applies to credential-based accounts).
+     * True when the lockout window is still in the future OR the
+     * cumulative failed-attempt counter has reached the policy
+     * threshold WITHIN the sliding window.
+     *
+     * The sliding window is anchored on `last_failed_at`: if the
+     * most-recent failure is older than `LoginAttemptPolicy::windowMinutes()`
+     * the counter is stale and the user is NOT locked regardless
+     * of how many old attempts accumulated. See issue #13.
+     *
+     * Coordinators (Google OAuth) are never locked — this method is
+     * only consulted on the external credential login path
+     * (`loginExterno`, T-016).
      */
     public function isLocked(): bool
     {
-        return $this->locked_until !== null
-            && $this->locked_until->isFuture();
+        // Future lockout window still in effect.
+        if ($this->locked_until !== null && $this->locked_until->isFuture()) {
+            return true;
+        }
+
+        $policy = app(LoginAttemptPolicy::class);
+
+        // No failures recorded or the most-recent failure is outside
+        // the sliding window → stale counter, not locked.
+        if ($this->last_failed_at === null
+            || $this->last_failed_at->diffInMinutes(now(), absolute: true) >= $policy->windowMinutes()
+        ) {
+            return false;
+        }
+
+        // Within the window: locked if cumulative attempts hit the cap.
+        return $this->failed_attempts >= $policy->maxAttempts();
     }
 
     /**
@@ -130,15 +157,29 @@ class User extends Authenticatable
     }
 
     /**
-     * Increment the failed-attempts counter. After
-     * `LoginAttemptPolicy::MAX_ATTEMPTS` failures in the last
-     * `LoginAttemptPolicy::WINDOW_MINUTES` minutes, the account is
-     * locked for `LoginAttemptPolicy::LOCK_MINUTES` minutes.
+     * Increment the failed-attempts counter with a sliding window.
+     *
+     * If the most-recent prior failure is older than
+     * `LoginAttemptPolicy::windowMinutes()`, the counter is reset
+     * to 0 before incrementing — old attempts are discarded.
+     * Otherwise the counter is incremented as before.
+     *
+     * When the new counter reaches the policy's maxAttempts the
+     * account is locked for `lockMinutes()` and the counter resets
+     * to 0 so the post-lockout window starts fresh.
      */
     public function registerFailedLogin(): void
     {
         $policy = app(LoginAttemptPolicy::class);
+
+        if ($this->last_failed_at !== null
+            && $this->last_failed_at->diffInMinutes(now(), absolute: true) >= $policy->windowMinutes()
+        ) {
+            $this->failed_attempts = 0;
+        }
+
         $this->failed_attempts = ($this->failed_attempts ?? 0) + 1;
+        $this->last_failed_at = now();
 
         if ($this->failed_attempts >= $policy->maxAttempts()) {
             $this->locked_until = now()->addMinutes($policy->lockMinutes());

@@ -18,6 +18,7 @@ use Illuminate\Support\Carbon;
  *
  * @property int $id
  * @property string $email
+ * @property string|null $name
  * @property UserRole $role
  * @property int|null $created_by
  * @property Carbon $created_at
@@ -32,6 +33,7 @@ class AuthorizedEmail extends Model
      */
     protected $fillable = [
         'email',
+        'name',
         'role',
         'created_by',
     ];

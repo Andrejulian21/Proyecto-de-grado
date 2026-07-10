@@ -7,6 +7,8 @@ namespace App\Http\Controllers\Auth;
 use App\Enums\UserRole;
 use App\Events\AuditEvent;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ChangePasswordRequest;
+use App\Http\Requests\LoginExternoRequest;
 use App\Models\AuthorizedEmail;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -15,7 +17,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
 use Throwable;
@@ -241,13 +242,9 @@ class AuthController extends Controller
      */
     private function extractHostedDomain(SocialiteUser $googleUser): ?string
     {
-        if (isset($googleUser->user['hd']) && $googleUser->user['hd'] !== '') {
-            return (string) $googleUser->user['hd'];
-        }
-
         $hd = $googleUser->user['hd'] ?? null;
 
-        return $hd !== null ? (string) $hd : null;
+        return ($hd !== null && $hd !== '') ? (string) $hd : null;
     }
 
     /**
@@ -272,12 +269,9 @@ class AuthController extends Controller
      * to equalize response timing and prevent timing-based enumeration (H-002).
      * The audit log still records the specific reason for forensic analysis.
      */
-    public function loginExterno(Request $request): JsonResponse
+    public function loginExterno(LoginExternoRequest $request): JsonResponse
     {
-        $payload = $request->validate([
-            'email' => ['required', 'string', 'email'],
-            'password' => ['required', 'string'],
-        ]);
+        $payload = $request->validated();
 
         $user = User::query()
             ->where('email', $payload['email'])
@@ -359,17 +353,14 @@ class AuthController extends Controller
     /**
      * Change the authenticated user's password (T-017).
      */
-    public function changePassword(Request $request): JsonResponse
+    public function changePassword(ChangePasswordRequest $request): JsonResponse
     {
-        $payload = $request->validate([
-            'current_password' => ['required', 'string'],
-            'new_password' => ['required', 'string', 'min:8', 'confirmed'],
-        ]);
+        $payload = $request->validated();
 
         $user = $request->user();
 
         if (! $user || ! Hash::check($payload['current_password'], $user->password)) {
-            throw ValidationException::withMessages([
+            throw \Illuminate\Validation\ValidationException::withMessages([
                 'current_password' => 'La contraseña actual es incorrecta.',
             ]);
         }

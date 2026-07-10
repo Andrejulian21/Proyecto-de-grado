@@ -49,9 +49,11 @@ function formatDate(dateStr: string | null | undefined) {
 
 function genPassword() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    const array = new Uint32Array(14);
+    crypto.getRandomValues(array);
     let pwd = '';
     for (let i = 0; i < 14; i++) {
-        pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+        pwd += chars.charAt(array[i] % chars.length);
     }
     return pwd + '!';
 }

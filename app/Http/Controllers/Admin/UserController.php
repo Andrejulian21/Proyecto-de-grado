@@ -7,6 +7,9 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\UserRole;
 use App\Events\AuditEvent;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\CreateEvaluadorRequest;
+use App\Http\Requests\StoreWhitelistRequest;
+use App\Http\Requests\UpdateUserRequest;
 use App\Models\AuthorizedEmail;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -42,8 +45,8 @@ class UserController extends Controller
 
         if ($search) {
             $query->where(function ($q) use ($search) {
-                $q->where('email', 'like', "%{$search}%")
-                  ->orWhere('name', 'like', "%{$search}%");
+                $q->where('email', 'ilike', "%{$search}%")
+                  ->orWhere('name', 'ilike', "%{$search}%");
             });
         }
 
@@ -55,17 +58,9 @@ class UserController extends Controller
      *
      * Updates a user's role. Only Coordinador can do this.
      */
-    public function updateUsuario(Request $request, int $id): JsonResponse
+    public function updateUsuario(UpdateUserRequest $request, User $user): JsonResponse
     {
-        $payload = $request->validate([
-            'role' => [
-                'required',
-                'string',
-                Rule::in(array_map(fn (UserRole $r) => $r->value, UserRole::cases())),
-            ],
-        ]);
-
-        $user = User::findOrFail($id);
+        $payload = $request->validated();
         $oldRole = $user->role->value;
         $user->role = $payload['role'];
         $user->save();
@@ -85,10 +80,10 @@ class UserController extends Controller
      *
      * Soft-delete or remove a user from the system.
      */
-    public function destroyUsuario(Request $request, int $id): JsonResponse
+    public function destroyUsuario(Request $request, User $user): JsonResponse
     {
-        $user = User::findOrFail($id);
         $email = $user->email;
+        $id = $user->id;
         $user->delete();
 
         // Also remove the whitelist entry so the email can be re-registered
@@ -130,14 +125,11 @@ class UserController extends Controller
      *     in PR 2; that's a future addition).
      *   - Writes an audit log entry: action=user.created_external.
      */
-    public function storeExternal(Request $request): JsonResponse
+    public function storeExternal(CreateEvaluadorRequest $request): JsonResponse
     {
-        $payload = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
-        ]);
+        $payload = $request->validated();
 
-        $temporaryPassword = Str::password(length: 12, symbols: true);
+        $temporaryPassword = Str::password(length: 16, symbols: true);
 
         $user = User::create([
             'name' => $payload['name'],
@@ -198,24 +190,9 @@ class UserController extends Controller
      * Validates that the email is well-formed, ends in
      * `@unab.edu.co`, and is not already in the whitelist.
      */
-    public function store(Request $request): JsonResponse
+    public function store(StoreWhitelistRequest $request): JsonResponse
     {
-        $payload = $request->validate([
-            'email' => [
-                'required',
-                'string',
-                'email:rfc',
-                'max:255',
-                'ends_with:@unab.edu.co',
-                'unique:authorized_emails,email',
-            ],
-            'name' => ['nullable', 'string', 'max:255'],
-            'role' => [
-                'required',
-                'string',
-                Rule::in(array_map(fn (UserRole $r) => $r->value, self::WHITELIST_ROLES)),
-            ],
-        ]);
+        $payload = $request->validated();
 
         $entry = AuthorizedEmail::create([
             'email' => strtolower($payload['email']),

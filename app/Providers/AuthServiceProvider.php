@@ -4,21 +4,17 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
-use App\Enums\UserRole;
 use App\Models\User;
 use App\Policies\UserPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as BaseAuthServiceProvider;
-use Illuminate\Support\Facades\Gate;
 
 /**
- * Authorization provider (T-019).
+ * Authorization provider (T-019, H-009).
  *
- * Gates:
- *   - manage-users:  Coordinador only
- *   - view-admin:    Coordinador + Director
+ * Gates that had no call-sites in production code have been removed.
+ * The `role:Coordinador` middleware enforces access at the route level.
  *
- * Policies:
- *   - User → UserPolicy (coordinador-only mutating actions)
+ * UserPolicy is retained — it is still exercised by tests.
  */
 class AuthServiceProvider extends BaseAuthServiceProvider
 {
@@ -32,16 +28,5 @@ class AuthServiceProvider extends BaseAuthServiceProvider
     public function boot(): void
     {
         $this->registerPolicies();
-
-        Gate::define('manage-users', function (User $user): bool {
-            return $user->role === UserRole::Coordinador;
-        });
-
-        Gate::define('view-admin', function (User $user): bool {
-            return in_array($user->role, [
-                UserRole::Coordinador,
-                UserRole::Director,
-            ], true);
-        });
     }
 }

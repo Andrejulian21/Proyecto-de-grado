@@ -1,96 +1,207 @@
-import { Link } from 'react-router-dom';
-import { LayoutDashboard, Users, FolderKanban, ClipboardCheck, BarChart3, ArrowRight } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { StatCard } from '@/components/ui/StatCard';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { DataTable, type Column } from '@/components/ui/DataTable';
+import {
+    ClipboardList,
+    TrendingDown,
+    Bell,
+    TrendingUp,
+    Eye,
+    AlertTriangle,
+    UserX,
+    AlertCircle,
+} from 'lucide-react';
 
-const cards = [
+/* ── Mock data ── */
+
+interface Project {
+    id: number;
+    code: string;
+    title: string;
+    students: string;
+    director: string;
+    phase: string;
+    status: 'active' | 'at-risk' | 'completed';
+    alertCount: number;
+}
+
+const MOCK_PROJECTS: Project[] = [
+    { id: 1, code: 'PG-2401', title: 'Sistema predictivo de deserción estudiantil', students: 'Ana Martínez, Luis Rojas', director: 'Carlos Gómez', phase: 'Presentación', status: 'active', alertCount: 0 },
+    { id: 2, code: 'PG-2402', title: 'Plataforma IoT para monitoreo ambiental', students: 'Pedro Sánchez', director: 'María Torres', phase: 'Desarrollo', status: 'at-risk', alertCount: 2 },
+    { id: 3, code: 'PG-2403', title: 'Aplicación móvil para tutorías inteligentes', students: 'Laura Jiménez, Carlos Ruiz', director: 'Andrés Pérez', phase: 'Anteproyecto', status: 'active', alertCount: 0 },
+    { id: 4, code: 'PG-2404', title: 'Dashboard de indicadores académicos', students: 'Diana Pardo', director: 'Sofía Medina', phase: 'Desarrollo', status: 'at-risk', alertCount: 1 },
+    { id: 5, code: 'PG-2405', title: 'Sistema de recomendación de cursos', students: 'Miguel Ángel Díaz, Olga Luna', director: 'Carlos Gómez', phase: 'Final', status: 'completed', alertCount: 0 },
+    { id: 6, code: 'PG-2406', title: 'Blockchain para certificados académicos', students: 'Ricardo Mora', director: 'Andrés Pérez', phase: 'Presentación', status: 'active', alertCount: 0 },
+    { id: 7, code: 'PG-2407', title: 'Chatbot institucional con IA generativa', students: 'Camila Rangel, David Peña', director: 'María Torres', phase: 'Desarrollo', status: 'at-risk', alertCount: 3 },
+    { id: 8, code: 'PG-2408', title: 'Plataforma de realidad virtual para laboratorios', students: 'Fernando Gil', director: 'Sofía Medina', phase: 'Anteproyecto', status: 'active', alertCount: 0 },
+];
+
+interface AlertItem {
+    icon: typeof AlertTriangle;
+    title: string;
+    description: string;
+    variant: 'error' | 'warning' | 'info';
+}
+
+const MOCK_ALERTS: AlertItem[] = [
     {
-        icon: Users,
-        title: 'Usuarios',
-        description: 'Gestiona los usuarios del sistema',
-        status: 'Próximamente',
-        link: '/coordinador/usuarios',
-        color: 'text-primary',
-        bg: 'bg-primary-container/50',
+        icon: AlertTriangle,
+        title: 'Entrega vencida',
+        description: 'El proyecto PG-2402 no ha realizado la entrega de desarrollo. La fecha límite venció hace 3 días.',
+        variant: 'error',
     },
     {
-        icon: FolderKanban,
-        title: 'Proyectos',
-        description: 'Administra los proyectos de grado',
-        status: 'Próximamente',
-        color: 'text-secondary',
-        bg: 'bg-secondary-container/50',
+        icon: UserX,
+        title: 'Proyecto sin director',
+        description: 'El proyecto PG-2409 (Sistema de gestión de egresados) no tiene director asignado esta semana.',
+        variant: 'warning',
     },
     {
-        icon: ClipboardCheck,
-        title: 'Evaluaciones',
-        description: 'Configura y revisa evaluaciones',
-        status: 'Próximamente',
-        color: 'text-accent',
-        bg: 'bg-cyan-50',
-    },
-    {
-        icon: BarChart3,
-        title: 'Estadísticas',
-        description: 'Indicadores y reportes del sistema',
-        status: 'Próximamente',
-        color: 'text-text',
-        bg: 'bg-surface-variant',
+        icon: AlertCircle,
+        title: 'Bajo rendimiento',
+        description: '3 proyectos tienen menos del 50% de avance en el semestre. Revise los reportes para más detalles.',
+        variant: 'info',
     },
 ];
 
+/* ── Columns ── */
+
+const projectColumns: Column<Project>[] = [
+    {
+        key: 'code',
+        label: 'Código',
+        className: 'font-medium text-text',
+    },
+    {
+        key: 'title',
+        label: 'Título',
+        className: 'max-w-[200px] truncate',
+    },
+    {
+        key: 'students',
+        label: 'Estudiantes',
+        className: 'text-text-muted',
+    },
+    {
+        key: 'director',
+        label: 'Director',
+        className: 'text-text-muted',
+    },
+    {
+        key: 'phase',
+        label: 'Fase',
+        render: (row: Project) => (
+            <StatusBadge variant={row.phase === 'Final' ? 'success' : row.phase === 'Desarrollo' ? 'en-curso' : 'warning'}>
+                {row.phase}
+            </StatusBadge>
+        ),
+    },
+    {
+        key: 'status',
+        label: 'Estado',
+        render: (row: Project) => (
+            <StatusBadge variant={row.status === 'active' ? 'success' : row.status === 'at-risk' ? 'riesgo' : 'inactivo'}>
+                {row.status === 'active' ? 'Activo' : row.status === 'at-risk' ? 'En Riesgo' : 'Completado'}
+            </StatusBadge>
+        ),
+    },
+    {
+        key: 'alertCount',
+        label: 'Alertas',
+        render: (row: Project) => (
+            <span className={`tabular-nums ${row.alertCount > 0 ? 'font-bold text-error' : 'text-text-muted'}`}>
+                {row.alertCount}
+            </span>
+        ),
+    },
+    {
+        key: 'actions',
+        label: 'Acciones',
+        className: 'text-right',
+        render: () => (
+            <button
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-alt hover:text-primary"
+                aria-label="Ver proyecto"
+            >
+                <Eye className="h-4 w-4" />
+            </button>
+        ),
+    },
+];
+
+/* ── Subcomponents ── */
+
+function AlertCard({ icon: Icon, title, description, variant }: AlertItem) {
+    const variantStyles = {
+        error: 'bg-error-container/40 border-error/20',
+        warning: 'bg-warning-container/40 border-warning/20',
+        info: 'bg-secondary-container/40 border-secondary/20',
+    };
+
+    const iconStyles = {
+        error: 'bg-error-container text-error',
+        warning: 'bg-warning-container text-warning',
+        info: 'bg-secondary-container text-secondary',
+    };
+
+    return (
+        <div className={`rounded-xl border p-4 ${variantStyles[variant]}`}>
+            <div className="flex items-start gap-3">
+                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${iconStyles[variant]}`}>
+                    <Icon className="h-4 w-4" />
+                </div>
+                <div className="flex flex-col gap-1">
+                    <h4 className="text-sm font-bold text-text">{title}</h4>
+                    <p className="text-xs text-text-muted leading-relaxed">{description}</p>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* ── Main component ── */
+
 export default function CoordinadorDashboard() {
     return (
-        <div className="space-y-6">
-            <div className="flex items-center gap-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-container shadow-warm-sm">
-                    <LayoutDashboard className="h-7 w-7 text-primary" />
+        <div className="flex flex-col gap-6">
+            <PageHeader
+                eyebrow="Dashboard"
+                title="Panel de Coordinador"
+                subtitle="Administra los proyectos de grado, revisa alertas y da seguimiento al progreso general."
+            />
+
+            {/* KPI row */}
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                <StatCard icon={ClipboardList} label="Proyectos Activos" value={24} variant="default" />
+                <StatCard icon={TrendingDown} label="En Riesgo" value={12} variant="warning" />
+                <StatCard icon={Bell} label="Alertas sin revisar" value={8} variant="warning" />
+                <StatCard icon={TrendingUp} label="Tasa de cumplimiento" value="87%" variant="success" />
+            </div>
+
+            {/* Projects table */}
+            <section aria-labelledby="projects-heading">
+                <h2 id="projects-heading" className="mb-4 text-sm font-bold uppercase tracking-[0.05em] text-text-muted">
+                    Proyectos de Grado
+                </h2>
+                <DataTable<Project>
+                    columns={projectColumns}
+                    data={MOCK_PROJECTS}
+                    getRowKey={(row) => row.id}
+                />
+            </section>
+
+            {/* Alert cards */}
+            <section aria-labelledby="alerts-heading">
+                <h2 id="alerts-heading" className="mb-4 text-sm font-bold uppercase tracking-[0.05em] text-text-muted">
+                    Alertas Activas
+                </h2>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                    {MOCK_ALERTS.map((alert) => (
+                        <AlertCard key={alert.title} {...alert} />
+                    ))}
                 </div>
-                <div>
-                    <h1 className="text-2xl font-bold text-text">Panel de Coordinador</h1>
-                    <p className="mt-1 text-sm text-text-muted">
-                        Administra el sistema de proyectos de grado
-                    </p>
-                </div>
-            </div>
-
-            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-                {cards.map((card) => {
-                    const content = (
-                        <div
-                            className="flex h-full flex-col rounded-xl border border-border bg-surface p-5 shadow-warm-sm transition hover:shadow-warm-md"
-                        >
-                            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-surface-alt">
-                                <card.icon className={`h-5 w-5 ${card.color}`} />
-                            </div>
-                            <h3 className="font-semibold text-text">{card.title}</h3>
-                            <p className="mt-1 flex-1 text-sm text-text-muted">{card.description}</p>
-                            <span className="mt-3 inline-block rounded-md bg-surface-alt px-2.5 py-0.5 text-xs font-medium text-text-muted">
-                                {card.status}
-                            </span>
-                        </div>
-                    );
-
-                    if (card.link) {
-                        return (
-                            <Link key={card.title} to={card.link} className="group block">
-                                <div className="relative">
-                                    {content}
-                                    <span className="absolute right-4 top-4 text-text-subtle opacity-0 transition group-hover:opacity-100">
-                                        <ArrowRight className="h-4 w-4" />
-                                    </span>
-                                </div>
-                            </Link>
-                        );
-                    }
-
-                    return <div key={card.title}>{content}</div>;
-                })}
-            </div>
-
-            <div className="flex items-center justify-center rounded-xl border-2 border-dashed border-border p-12">
-                <p className="text-center text-sm text-text-muted">
-                    Contenido personalizado — próximamente
-                </p>
-            </div>
+            </section>
         </div>
     );
 }

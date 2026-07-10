@@ -79,7 +79,7 @@ it('rejects wrong password with 401 and writes an audit log', function () {
     expect($user->fresh()->failed_attempts)->toBe(1);
 });
 
-it('rejects an internal user (no es_externo flag) with 403', function () {
+it('rejects an internal user (no es_externo flag) with 401', function () {
     $user = User::factory()->create([
         'email' => 'ana@unab.edu.co',
         'role' => UserRole::Estudiante->value,
@@ -92,8 +92,8 @@ it('rejects an internal user (no es_externo flag) with 403', function () {
         'password' => 'Password!2026',
     ]);
 
-    $response->assertStatus(403)
-        ->assertJson(['error' => 'not_external_evaluator']);
+    $response->assertStatus(401)
+        ->assertJson(['error' => 'invalid_credentials']);
 });
 
 it('locks the account after 3 failed attempts and returns 423', function () {

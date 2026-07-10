@@ -63,3 +63,11 @@ $RECYCLE.BIN/
 *~
 
 testsprite_tests\tmp\config.json
+
+# Sensitive / backup files (contain secrets)
+.env.bak
+.env.docker
+.env.docker.bak
+cookies.txt
+proyecto_grado
+response*.txt

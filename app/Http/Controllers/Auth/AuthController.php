@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\NewAccessToken;
@@ -138,8 +139,12 @@ class AuthController extends Controller
         );
 
         // 5. Single-session enforcement: purge prior Sanctum tokens
-        // before issuing the new one (T-021).
+        // AND prior cookie session rows before issuing the new
+        // session (issues #10, T-021). Without the sessions-table
+        // cleanup, device A's Sanctum SPA cookie would stay valid
+        // after device B logs in with the same Google account.
         $user->tokens()->delete();
+        $this->purgePriorSessions($user);
         $user->update(['last_activity_at' => now()]);
 
         // 6. Issue a fresh Sanctum token.
@@ -197,6 +202,21 @@ class AuthController extends Controller
         }
 
         return null;
+    }
+
+    /**
+     * Issue #10 — invalidate every existing session row for the
+     * given user. Sanctum's `tokens()->delete()` covers API tokens
+     * but NOT the cookie-backed session row written by `Auth::login()`
+     * via the `database` session driver. Without this call, a user
+     * logging in on device B leaves device A's Sanctum SPA cookie
+     * valid. The `sessions` table is created by the framework's
+     * default `0001_01_01_000000_create_users_table` migration —
+     * no project migration needed.
+     */
+    private function purgePriorSessions(User $user): void
+    {
+        DB::table('sessions')->where('user_id', $user->id)->delete();
     }
 
     /**
@@ -286,6 +306,7 @@ class AuthController extends Controller
         $user->clearFailedLogin();
         $user->update(['last_activity_at' => now()]);
         $user->tokens()->delete();
+        $this->purgePriorSessions($user);
 
         // Log into the session so the SPA can read /api/auth/user
         // via Sanctum cookie-based auth.

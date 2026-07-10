@@ -12,6 +12,8 @@ import EstudianteDashboard from '@/pages/dashboard/EstudianteDashboard';
 import DirectorDashboard from '@/pages/dashboard/DirectorDashboard';
 import CoordinadorDashboard from '@/pages/dashboard/CoordinadorDashboard';
 import EvaluadorDashboard from '@/pages/dashboard/EvaluadorDashboard';
+import LandingPage from '@/pages/landing/LandingPage';
+import BitacorasEstudiante from '@/pages/estudiante/BitacorasEstudiante';
 import { Loader2 } from 'lucide-react';
 
 const AnunciosPublica = lazy(() => import('@/pages/shared/AnunciosPublica'));
@@ -57,6 +59,7 @@ function App() {
         <Routes>
             <Route path="/login" element={<LoginInstitucional />} />
             <Route path="/login/externo" element={<LoginExterno />} />
+            <Route path="/" element={<LandingPage />} />
 
             <Route
                 path="/*"
@@ -66,6 +69,7 @@ function App() {
                             <Routes>
                                 <Route path="/" element={<DashboardRouter />} />
                                 <Route path="/dashboard/estudiante" element={<EstudianteDashboard />} />
+                                <Route path="/bitacora" element={<BitacorasEstudiante />} />
                                 <Route path="/dashboard/director" element={<DirectorDashboard />} />
                                 <Route path="/dashboard/coordinador" element={<CoordinadorDashboard />} />
                                 <Route path="/dashboard/evaluador-externo" element={<EvaluadorDashboard />} />

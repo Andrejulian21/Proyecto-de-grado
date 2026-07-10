@@ -16,7 +16,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
-use Laravel\Sanctum\NewAccessToken;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
 use Throwable;
@@ -164,11 +163,8 @@ class AuthController extends Controller
         $this->purgePriorSessions($user);
         $user->update(['last_activity_at' => now()]);
 
-        // 6. Issue a fresh Sanctum token.
-        /** @var NewAccessToken $accessToken */
-        $accessToken = $user->createToken('google-oauth');
-
-        // 6b. Log the user into the session (Sanctum SPA cookie auth).
+        // 6. Log the user into the session (Sanctum SPA cookie auth).
+        // No Bearer token — cookie-only per H-004.
         Auth::login($user, remember: false);
 
         // 7. Audit success.
@@ -338,11 +334,8 @@ class AuthController extends Controller
         $this->purgePriorSessions($user);
 
         // Log into the session so the SPA can read /api/auth/user
-        // via Sanctum cookie-based auth.
+        // via Sanctum cookie-based auth. No Bearer token — cookie-only (H-004).
         Auth::login($user, remember: false);
-
-        /** @var NewAccessToken $accessToken */
-        $accessToken = $user->createToken('external-evaluator', ['*'], now()->addMinutes(15));
 
         AuditEvent::dispatch(
             $user,
@@ -352,7 +345,6 @@ class AuthController extends Controller
         );
 
         return response()->json([
-            'token' => $accessToken->plainTextToken,
             'user' => [
                 'id' => $user->id,
                 'email' => $user->email,

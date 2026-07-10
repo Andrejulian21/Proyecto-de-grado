@@ -133,11 +133,9 @@ Route::middleware(['auth:sanctum', 'single_session', 'activity', 'ensure_passwor
     ->group(function () {
         Route::get('/usuarios', [UserController::class, 'usuarios'])
             ->name('usuarios.index');
-        Route::put('/usuarios/{id}', [UserController::class, 'updateUsuario'])
-            ->whereNumber('id')
+        Route::put('/usuarios/{user}', [UserController::class, 'updateUsuario'])
             ->name('usuarios.update');
-        Route::delete('/usuarios/{id}', [UserController::class, 'destroyUsuario'])
-            ->whereNumber('id')
+        Route::delete('/usuarios/{user}', [UserController::class, 'destroyUsuario'])
             ->name('usuarios.destroy');
 
         Route::post('/evaluadores', [UserController::class, 'storeExternal'])

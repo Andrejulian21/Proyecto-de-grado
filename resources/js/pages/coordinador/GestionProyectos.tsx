@@ -9,7 +9,7 @@ interface Project {
     id: number;
     code: string;
     title: string;
-    student: string;
+    students: string[];
     director: string;
     status: 'active' | 'completed' | 'on-hold' | 'inscribed';
     period: string;
@@ -24,13 +24,13 @@ interface Cupo {
 }
 
 const MOCK_PROJECTS: Project[] = [
-    { id: 1, code: 'PG-2026-014', title: 'Sistema Centralizado de Proyectos de Grado', student: 'Carlos Méndez', director: 'Dr. Ricardo Gómez', status: 'active', period: '2026-01' },
-    { id: 2, code: 'PG-2026-015', title: 'Plataforma de Análisis de Sentimientos', student: 'María Rincón', director: 'Dr. Ricardo Gómez', status: 'active', period: '2026-01' },
-    { id: 3, code: 'PG-2026-012', title: 'App Móvil Gestión Hospitalaria', student: 'Juan Pérez', director: 'Dra. Laura Martínez', status: 'completed', period: '2025-02' },
-    { id: 4, code: 'PG-2026-010', title: 'Sistema de Recomendación de Rutas', student: 'Laura Gómez', director: 'Dr. Andrés Vega', status: 'on-hold', period: '2025-02' },
-    { id: 5, code: 'PG-2026-008', title: 'Dashboard Indicadores Académicos', student: 'Andrés Torres', director: 'Dra. Laura Martínez', status: 'active', period: '2026-01' },
-    { id: 6, code: 'PG-2026-005', title: 'Plataforma E-Learning Programación', student: 'Diana Rojas', director: 'Dr. Andrés Vega', status: 'active', period: '2026-01' },
-    { id: 7, code: 'PG-2026-003', title: 'Sistema de Gestión de Biblioteca', student: 'Pedro Ramírez', director: 'Dr. Ricardo Gómez', status: 'inscribed', period: '2026-01' },
+    { id: 1, code: 'PG-2026-014', title: 'Sistema Centralizado de Proyectos de Grado', students: ['Carlos Méndez', 'Ana Torres'], director: 'Dr. Ricardo Gómez', status: 'active', period: '2026-01' },
+    { id: 2, code: 'PG-2026-015', title: 'Plataforma de Análisis de Sentimientos', students: ['María Rincón'], director: 'Dr. Ricardo Gómez', status: 'active', period: '2026-01' },
+    { id: 3, code: 'PG-2026-012', title: 'App Móvil Gestión Hospitalaria', students: ['Juan Pérez', 'Luis Ramírez', 'Camila Rojas'], director: 'Dra. Laura Martínez', status: 'completed', period: '2025-02' },
+    { id: 4, code: 'PG-2026-010', title: 'Sistema de Recomendación de Rutas', students: ['Laura Gómez'], director: 'Dr. Andrés Vega', status: 'on-hold', period: '2025-02' },
+    { id: 5, code: 'PG-2026-008', title: 'Dashboard Indicadores Académicos', students: ['Andrés Torres', 'Paula Medina'], director: 'Dra. Laura Martínez', status: 'active', period: '2026-01' },
+    { id: 6, code: 'PG-2026-005', title: 'Plataforma E-Learning Programación', students: ['Diana Rojas', 'Sofía Peña', 'Mateo Cruz'], director: 'Dr. Andrés Vega', status: 'active', period: '2026-01' },
+    { id: 7, code: 'PG-2026-003', title: 'Sistema de Gestión de Biblioteca', students: ['Pedro Ramírez'], director: 'Dr. Ricardo Gómez', status: 'inscribed', period: '2026-01' },
 ];
 
 const MOCK_CUPOS: Cupo[] = [
@@ -52,7 +52,9 @@ const statusConfig: Record<string, { label: string; variant: 'success' | 'info' 
 const columns: Column<Project>[] = [
     { key: 'code', label: 'Código', className: 'whitespace-nowrap font-mono text-xs' },
     { key: 'title', label: 'Título', className: 'max-w-xs', render: (row) => <span className="line-clamp-2">{row.title}</span> },
-    { key: 'student', label: 'Estudiante' },
+    { key: 'students', label: 'Estudiantes', render: (row) => (
+        <span className="text-xs text-text-muted">{row.students.join(', ')}</span>
+    ) },
     { key: 'director', label: 'Director' },
     {
         key: 'status',
@@ -91,7 +93,7 @@ export default function GestionProyectos() {
     const filtered = MOCK_PROJECTS.filter((p) => {
         const ms = p.title.toLowerCase().includes(search.toLowerCase()) ||
             p.code.toLowerCase().includes(search.toLowerCase()) ||
-            p.student.toLowerCase().includes(search.toLowerCase());
+            p.students.some((s) => s.toLowerCase().includes(search.toLowerCase())) || p.code.toLowerCase().includes(search.toLowerCase());
         const mp = periodFilter === 'all' || p.period === periodFilter;
         return ms && mp;
     });

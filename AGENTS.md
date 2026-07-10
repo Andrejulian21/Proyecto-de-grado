@@ -53,9 +53,30 @@ con versionado, bitácoras firmadas con TOTP, evaluación y generación de repor
 
 ## Estado actual / pendientes
 
-- ✅ **Sprint 1 completado** — Auth (Google OAuth + externo + RBAC), Layout (sidebar/header fijos), Gestión de Usuarios (whitelist CRUD, roles), Auditoría, 151 tests
-- ⏳ **En progreso** — Sprint 2: Proyectos + Dashboard coordinador + Semestres
-- ❌ Pendientes: Entregas, Bitácoras+TOTP, Directores+Evaluadores, Anuncios+Recursos, IA, QA+Deploy
+### ✅ Completado
+
+| Sprint / Change | Logros | Tests |
+|----------------|--------|-------|
+| **Sprint 1** — `auth-access-module` | Google OAuth, login externo, RBAC, SingleSession, Whitelist CRUD, Auditoría inmutable, Layout (sidebar/header), Login pages React | 151 |
+| **Sprint 2** — `backend-completo` | 13 migraciones, 12 modelos, 5 enums, 7 controladores, ~40 endpoints, auto-código PG-xxxx, KPIs dashboard | 373 |
+| **Sprint 3** — `test-qa-backend` | 7 factories, tests unitarios/feature, cobertura configurada | 439 |
+| `fix-critical-issues` | CI pipeline, inmutabilidad DB, single-session cookie, lockout sliding window | 452 |
+| `hardening-audit-fixes` | 15 hallazgos: rate limiting, CSRF, FormRequests, índices, SoftDeletes, constant-time login | 495 |
+| **Sprint 4** — ✅ `frontend-wireframes-port` | **29 wireframes porteados a React.** 7 shared components. 14 PRs chained. Dashboards reales con KPIs/stepper/progress. Landing page. Flujo Estudiante (bitácoras, entregas, TOTP, IA mock). Flujo Director (supervisión, firmas, revisión). Flujo Coordinador (proyectos, anuncios, evaluadores, alertas, reportes). Flujo Evaluador (rúbrica, calificar). Responsive. WCAG AA. Build 0 errores. | 495 |
+
+### 🔜 Próximos sprints
+
+| Sprint | Área | Prioridad |
+|--------|------|-----------|
+| **5** | Integración backend — reemplazar mock data con apiFetch() a endpoints reales | Crítica |
+| **6** | Docker refinado + CI/CD, E2E con Playwright | Media |
+| **7** | Despliegue Azure VM + Nginx TLS | Media |
+
+### 🎯 Orden de sacrificio
+
+Si el tiempo no alcanza: IA (asistente + análisis) → TOTP → Despliegue Azure → Exportación PDF/Excel → Notificaciones push
+
+**NUNCA se sacrifica:** Auth · Proyectos · Entregas · Bitácoras · Evaluación · Reportes · Tests
 
 ## Convenciones
 

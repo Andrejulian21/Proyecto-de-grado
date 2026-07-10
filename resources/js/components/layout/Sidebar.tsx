@@ -52,6 +52,8 @@ const navConfig: Record<string, { to: string; icon: typeof LayoutDashboard; labe
     EvaluadorExterno: [
         { to: '/', label: 'Panel de Control', icon: LayoutDashboard },
         { to: '/evaluaciones', label: 'Evaluaciones', icon: ClipboardCheck },
+        { to: '/anuncios', label: 'Anuncios', icon: Megaphone },
+        { to: '/recursos', label: 'Recursos', icon: FolderKanban },
     ],
 };
 

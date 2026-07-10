@@ -51,9 +51,9 @@ Chain strategy: feature-branch-chain
 ## Phase 2: Dashboards (Upgrade) + Shared Pages — PRs 1-3
 
 - [x] 2.1 **T-002: EstudianteDashboard** — Replace placeholder in `pages/dashboard/EstudianteDashboard.tsx`: project hero, stepper (4 phases), upload zone, accordion deliveries, version table. Mock: PG-2026-014, 4 phases. Responsive: stepper → vertical stack ≤640px; accordion full-width.
-- [ ] 2.2 **T-003: CoordinadorDashboard** — Replace placeholder in `pages/dashboard/CoordinadorDashboard.tsx`: 4 StatCards KPIs, projects table (8 rows), 3 alert cards. Responsive: KPI grid 2×2 on ≤640px, table scroll.
-- [ ] 2.3 **T-004: DirectorDashboard** — Replace placeholder in `pages/dashboard/DirectorDashboard.tsx`: bezel header, 4 KPIs, 3 progress cards with shadcn Progress, deliveries table. Responsive: progress cards stack single-col on ≤767px.
-- [ ] 2.4 **T-005: EvaluadorDashboard** — Replace placeholder in `pages/dashboard/EvaluadorDashboard.tsx`: 3 KPIs, 3 evaluation cards with star rating. Responsive: cards stack on mobile.
+- [x] 2.2 **T-003: CoordinadorDashboard** — Replace placeholder in `pages/dashboard/CoordinadorDashboard.tsx`: 4 StatCards KPIs, projects table (8 rows), 3 alert cards. Responsive: KPI grid 2×2 on ≤640px, table scroll.
+- [x] 2.3 **T-004: DirectorDashboard** — Replace placeholder in `pages/dashboard/DirectorDashboard.tsx`: bezel header, 4 KPIs, 3 progress cards with shadcn Progress, deliveries table. Responsive: progress cards stack single-col on ≤767px.
+- [x] 2.4 **T-005: EvaluadorDashboard** — Replace placeholder in `pages/dashboard/EvaluadorDashboard.tsx`: 3 KPIs, 3 evaluation cards with star rating. Responsive: cards stack on mobile.
 - [ ] 2.5 **T-006: AnunciosPublica** — Create `pages/shared/AnunciosPublica.tsx`: PageHeader + card list (2 mock). Responsive: cards full-width on mobile.
 - [ ] 2.6 **T-007: AnuncioDetalle** — Create `pages/shared/AnuncioDetalle.tsx`: back link + card: badge, h1, meta, body, attachments. Responsive: attachments grid → stack ≤640px.
 - [ ] 2.7 **T-008: Recursos** — Create `pages/shared/Recursos.tsx`: search + tabs + 3-col resource card grid (4 mock). Responsive: 1-col on mobile, 2-col on tablet.

@@ -20,6 +20,25 @@ const AnunciosPublica = lazy(() => import('@/pages/shared/AnunciosPublica'));
 const AnuncioDetalle = lazy(() => import('@/pages/shared/AnuncioDetalle'));
 const Recursos = lazy(() => import('@/pages/shared/Recursos'));
 const RecursoDetalle = lazy(() => import('@/pages/shared/RecursoDetalle'));
+const NuevaBitacora = lazy(() => import('@/pages/estudiante/NuevaBitacora'));
+const DetalleEntregaEstudiante = lazy(() => import('@/pages/estudiante/DetalleEntregaEstudiante'));
+const SupervisionProyectoDirector = lazy(() => import('@/pages/director/SupervisionProyectoDirector'));
+const SeleccionProyectosBitacoras = lazy(() => import('@/pages/director/SeleccionProyectosBitacoras'));
+const BitacorasDirector = lazy(() => import('@/pages/director/BitacorasDirector'));
+const DetalleFirmaBitacora = lazy(() => import('@/pages/director/DetalleFirmaBitacora'));
+const RevisionEntregaDirector = lazy(() => import('@/pages/director/RevisionEntregaDirector'));
+const GestionProyectos = lazy(() => import('@/pages/coordinador/GestionProyectos'));
+const AnunciosAdmin = lazy(() => import('@/pages/coordinador/AnunciosAdmin'));
+const AsignacionEvaluadores = lazy(() => import('@/pages/coordinador/AsignacionEvaluadores'));
+const CoordinadorEntregas = lazy(() => import('@/pages/coordinador/CoordinadorEntregas'));
+const CoordinadorBitacoras = lazy(() => import('@/pages/coordinador/CoordinadorBitacoras'));
+const GestionAlertas = lazy(() => import('@/pages/coordinador/GestionAlertas'));
+const ReportesConsolidados = lazy(() => import('@/pages/coordinador/ReportesConsolidados'));
+const RecursosAdmin = lazy(() => import('@/pages/coordinador/RecursosAdmin'));
+const EvaluarProyecto = lazy(() => import('@/pages/evaluador/EvaluarProyecto'));
+const EvaluadorCalificar = lazy(() => import('@/pages/evaluador/EvaluadorCalificar'));
+const AnalisisAutomaticoEntregas = lazy(() => import('@/pages/estudiante/AnalisisAutomaticoEntregas'));
+const AsistenteOrientacion = lazy(() => import('@/pages/estudiante/AsistenteOrientacion'));
 
 function SuspenseWrapper({ children }: { children: React.ReactNode }) {
     return (
@@ -79,6 +98,35 @@ function App() {
                                 <Route path="/anuncios/:id" element={<SuspenseWrapper><AnuncioDetalle /></SuspenseWrapper>} />
                                 <Route path="/recursos" element={<SuspenseWrapper><Recursos /></SuspenseWrapper>} />
                                 <Route path="/recursos/:id" element={<SuspenseWrapper><RecursoDetalle /></SuspenseWrapper>} />
+                                {/* PR5: Estudiante pages */}
+                                <Route path="/bitacora/nueva" element={<ProtectedRoute allowedRoles={['Estudiante']}><SuspenseWrapper><NuevaBitacora /></SuspenseWrapper></ProtectedRoute>} />
+                                <Route path="/mi-proyecto/entregas/:id" element={<ProtectedRoute allowedRoles={['Estudiante']}><SuspenseWrapper><DetalleEntregaEstudiante /></SuspenseWrapper></ProtectedRoute>} />
+                                {/* PR6: Director pages */}
+                                <Route path="/supervision/:proyectoId" element={<ProtectedRoute allowedRoles={['Director']}><SuspenseWrapper><SupervisionProyectoDirector /></SuspenseWrapper></ProtectedRoute>} />
+                                <Route path="/bitacoras/proyectos" element={<ProtectedRoute allowedRoles={['Director']}><SuspenseWrapper><SeleccionProyectosBitacoras /></SuspenseWrapper></ProtectedRoute>} />
+                                {/* PR7: Director bitacoras */}
+                                <Route path="/bitacoras" element={<ProtectedRoute allowedRoles={['Director']}><SuspenseWrapper><BitacorasDirector /></SuspenseWrapper></ProtectedRoute>} />
+                                <Route path="/bitacoras/:id/firmar" element={<ProtectedRoute allowedRoles={['Director']}><SuspenseWrapper><DetalleFirmaBitacora /></SuspenseWrapper></ProtectedRoute>} />
+                                {/* PR8: Director review */}
+                                <Route path="/entregas/:id/revisar" element={<ProtectedRoute allowedRoles={['Director']}><SuspenseWrapper><RevisionEntregaDirector /></SuspenseWrapper></ProtectedRoute>} />
+                                {/* PR9: Coordinador proyectos */}
+                                <Route path="/proyectos" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><GestionProyectos /></SuspenseWrapper></ProtectedRoute>} />
+                                {/* PR10: Coordinador admin */}
+                                <Route path="/anuncios/admin" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><AnunciosAdmin /></SuspenseWrapper></ProtectedRoute>} />
+                                <Route path="/evaluadores" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><AsignacionEvaluadores /></SuspenseWrapper></ProtectedRoute>} />
+                                {/* PR11: Coordinador seguimiento */}
+                                <Route path="/coordinador/entregas" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><CoordinadorEntregas /></SuspenseWrapper></ProtectedRoute>} />
+                                <Route path="/coordinador/bitacoras" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><CoordinadorBitacoras /></SuspenseWrapper></ProtectedRoute>} />
+                                <Route path="/alertas" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><GestionAlertas /></SuspenseWrapper></ProtectedRoute>} />
+                                {/* PR12: Coordinador reports */}
+                                <Route path="/reportes" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><ReportesConsolidados /></SuspenseWrapper></ProtectedRoute>} />
+                                <Route path="/recursos/admin" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><RecursosAdmin /></SuspenseWrapper></ProtectedRoute>} />
+                                {/* PR13: Evaluador */}
+                                <Route path="/evaluaciones/:id" element={<ProtectedRoute allowedRoles={['Director', 'EvaluadorExterno']}><SuspenseWrapper><EvaluarProyecto /></SuspenseWrapper></ProtectedRoute>} />
+                                <Route path="/evaluaciones/:id/calificar" element={<ProtectedRoute allowedRoles={['EvaluadorExterno']}><SuspenseWrapper><EvaluadorCalificar /></SuspenseWrapper></ProtectedRoute>} />
+                                {/* PR14: IA mock */}
+                                <Route path="/analisis-entregas" element={<ProtectedRoute allowedRoles={['Estudiante']}><SuspenseWrapper><AnalisisAutomaticoEntregas /></SuspenseWrapper></ProtectedRoute>} />
+                                <Route path="/asistente" element={<ProtectedRoute allowedRoles={['Estudiante']}><SuspenseWrapper><AsistenteOrientacion /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="*" element={<Navigate to="/" replace />} />
                             </Routes>
                         </AppShell>

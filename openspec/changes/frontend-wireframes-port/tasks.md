@@ -54,16 +54,16 @@ Chain strategy: feature-branch-chain
 - [x] 2.2 **T-003: CoordinadorDashboard** — Replace placeholder in `pages/dashboard/CoordinadorDashboard.tsx`: 4 StatCards KPIs, projects table (8 rows), 3 alert cards. Responsive: KPI grid 2×2 on ≤640px, table scroll.
 - [x] 2.3 **T-004: DirectorDashboard** — Replace placeholder in `pages/dashboard/DirectorDashboard.tsx`: bezel header, 4 KPIs, 3 progress cards with shadcn Progress, deliveries table. Responsive: progress cards stack single-col on ≤767px.
 - [x] 2.4 **T-005: EvaluadorDashboard** — Replace placeholder in `pages/dashboard/EvaluadorDashboard.tsx`: 3 KPIs, 3 evaluation cards with star rating. Responsive: cards stack on mobile.
-- [ ] 2.5 **T-006: AnunciosPublica** — Create `pages/shared/AnunciosPublica.tsx`: PageHeader + card list (2 mock). Responsive: cards full-width on mobile.
-- [ ] 2.6 **T-007: AnuncioDetalle** — Create `pages/shared/AnuncioDetalle.tsx`: back link + card: badge, h1, meta, body, attachments. Responsive: attachments grid → stack ≤640px.
-- [ ] 2.7 **T-008: Recursos** — Create `pages/shared/Recursos.tsx`: search + tabs + 3-col resource card grid (4 mock). Responsive: 1-col on mobile, 2-col on tablet.
-- [ ] 2.8 **T-009: RecursoDetalle** — Create `pages/shared/RecursoDetalle.tsx`: breadcrumb + hero + description card + sticky sidebar. Responsive: stack sidebar below on ≤767px.
-- [ ] 2.9 **T-010: Routing + Shell** — Update `app.tsx` (lazy imports, Suspense, Landing at `/` outside ProtectedRoute, new routes per batch); `AppShell.tsx` (~15 ROUTE_TITLES additions); `Sidebar.tsx` (navConfig: Coordinador add `/anuncios/admin`, `/recursos/admin`, `/coordinador/entregas`, `/coordinador/bitacoras`; Director add `/supervision/:proyectoId`, `/bitacoras/proyectos`; EvaluadorExterno add `/anuncios`, `/recursos`).
+- [x] 2.5 **T-006: AnunciosPublica** — Create `pages/shared/AnunciosPublica.tsx`: PageHeader + card list (2 mock). Responsive: cards full-width on mobile.
+- [x] 2.6 **T-007: AnuncioDetalle** — Create `pages/shared/AnuncioDetalle.tsx`: back link + card: badge, h1, meta, body, attachments. Responsive: attachments grid → stack ≤640px.
+- [x] 2.7 **T-008: Recursos** — Create `pages/shared/Recursos.tsx`: search + tabs + 3-col resource card grid (4 mock). Responsive: 1-col on mobile, 2-col on tablet.
+- [x] 2.8 **T-009: RecursoDetalle** — Create `pages/shared/RecursoDetalle.tsx`: breadcrumb + hero + description card + sticky sidebar. Responsive: stack sidebar below on ≤767px.
+- [x] 2.9 **T-010: Routing + Shell** — Update `app.tsx` (lazy imports, Suspense, Landing at `/` outside ProtectedRoute, new routes per batch); `AppShell.tsx` (~15 ROUTE_TITLES additions); `Sidebar.tsx` (navConfig: Coordinador add `/anuncios/admin`, `/recursos/admin`, `/coordinador/entregas`, `/coordinador/bitacoras`; Director add `/supervision/:proyectoId`, `/bitacoras/proyectos`; EvaluadorExterno add `/anuncios`, `/recursos`).
 
 ## Phase 3: Landing + Estudiante — PRs 4-5
 
-- [ ] 3.1 **T-011: LandingPage** — Create `pages/landing/LandingPage.tsx`: hero h1 + 5 role cards (Estudiante, Director, Coordinador, Evaluador, Admin) linking to `/login`. Full-width, NO AppShell. Footer. Responsive: role cards 1-col mobile, 3-col tablet, 5-col desktop.
-- [ ] 3.2 **T-012: BitacorasEstudiante** — Create `pages/estudiante/BitacorasEstudiante.tsx`: PageHeader + "Nueva Bitácora" button + DataTable (8 mock rows, 3 signature states). Responsive: table horizontal scroll on mobile.
+- [x] 3.1 **T-011: LandingPage** — Create `pages/landing/LandingPage.tsx`: hero h1 + 5 role cards (Estudiante, Director, Coordinador, Evaluador, Admin) linking to `/login`. Full-width, NO AppShell. Footer. Responsive: role cards 1-col mobile, 3-col tablet, 5-col desktop.
+- [x] 3.2 **T-012: BitacorasEstudiante** — Create `pages/estudiante/BitacorasEstudiante.tsx`: PageHeader + "Nueva Bitácora" button + DataTable (8 mock rows, 3 signature states). Responsive: table horizontal scroll on mobile.
 - [ ] 3.3 **T-013: NuevaBitacora** — Create `pages/estudiante/NuevaBitacora.tsx`: two-column form (date, topic, description + info alert + "Enviar y generar clave" → mock TOTP). Responsive: stack form cols on ≤767px.
 - [ ] 3.4 **T-014: DetalleEntregaEstudiante** — Create `pages/estudiante/DetalleEntregaEstudiante.tsx`: split-screen left=document viewer, right=review panel (badge, observations, score checklist, upload button). Responsive: stack vertical on ≤767px.
 

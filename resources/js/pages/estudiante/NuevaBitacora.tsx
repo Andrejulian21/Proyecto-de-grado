@@ -1,0 +1,206 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { TOTPInput } from '@/components/ui/TOTPInput';
+import { ArrowLeft, Save, ShieldCheck, Loader2 } from 'lucide-react';
+
+export default function NuevaBitacora() {
+    const navigate = useNavigate();
+
+    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [topic, setTopic] = useState('');
+    const [description, setDescription] = useState('');
+    const [duration, setDuration] = useState('1');
+    const [showTOTP, setShowTOTP] = useState(false);
+    const [totpCode, setTotpCode] = useState('');
+    const [totpError, setTotpError] = useState('');
+    const [submitting, setSubmitting] = useState(false);
+
+    function handleTOTPComplete(code: string) {
+        setTotpCode(code);
+        setTotpError('');
+    }
+
+    async function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        if (!date || !topic.trim() || !description.trim()) return;
+
+        if (!showTOTP) {
+            setShowTOTP(true);
+            return;
+        }
+
+        if (totpCode.length !== 6) {
+            setTotpError('Debe ingresar el código TOTP de 6 dígitos.');
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            // await apiFetch('/api/bitacoras', { ... })
+            await new Promise((r) => setTimeout(r, 800));
+            navigate('/bitacora');
+        } catch {
+            setTotpError('Error al crear la bitácora. Intente de nuevo.');
+        } finally {
+            setSubmitting(false);
+        }
+    }
+
+    return (
+        <div className="flex flex-col gap-6">
+            <PageHeader
+                eyebrow="Bitácora"
+                title="Nueva Bitácora"
+                subtitle="Registra una nueva sesión de trabajo de tu proyecto de grado"
+                actions={
+                    <button
+                        onClick={() => navigate('/bitacora')}
+                        className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-transparent px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:border-[#c2410c] hover:bg-[#fed7aa] hover:text-[#c2410c] active:scale-[0.98]"
+                    >
+                        <ArrowLeft className="h-4 w-4" />
+                        Volver
+                    </button>
+                }
+            />
+
+            <form onSubmit={handleSubmit}>
+                <div className="rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
+                    <div className="mb-5 flex items-center gap-2">
+                        <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#c2410c]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="16" y1="13" x2="8" y2="13" />
+                            <line x1="16" y1="17" x2="8" y2="17" />
+                        </svg>
+                        <h2 className="text-lg font-bold text-[#1c1917]">Detalles de la sesión</h2>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                        <div className="flex flex-col gap-1.5">
+                            <label htmlFor="binnacle-date" className="text-sm font-semibold text-[#1c1917]">
+                                Fecha <span className="text-[#dc2626]">*</span>
+                            </label>
+                            <input
+                                id="binnacle-date"
+                                type="date"
+                                value={date}
+                                onChange={(e) => setDate(e.target.value)}
+                                className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                required
+                            />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                            <label htmlFor="binnacle-duration" className="text-sm font-semibold text-[#1c1917]">
+                                Duración (horas) <span className="text-[#dc2626]">*</span>
+                            </label>
+                            <input
+                                id="binnacle-duration"
+                                type="number"
+                                min="0.5"
+                                max="8"
+                                step="0.5"
+                                value={duration}
+                                onChange={(e) => setDuration(e.target.value)}
+                                className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] tabular-nums"
+                                required
+                            />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5 sm:col-span-2">
+                            <label htmlFor="binnacle-topic" className="text-sm font-semibold text-[#1c1917]">
+                                Tema de la sesión <span className="text-[#dc2626]">*</span>
+                            </label>
+                            <input
+                                id="binnacle-topic"
+                                type="text"
+                                value={topic}
+                                onChange={(e) => setTopic(e.target.value)}
+                                placeholder="Ej: Revisión de requisitos funcionales"
+                                className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                required
+                            />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5 sm:col-span-2">
+                            <label htmlFor="binnacle-desc" className="text-sm font-semibold text-[#1c1917]">
+                                Descripción detallada <span className="text-[#dc2626]">*</span>
+                            </label>
+                            <textarea
+                                id="binnacle-desc"
+                                rows={5}
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                placeholder="Describa las actividades realizadas durante la sesión, acuerdos, decisiones tomadas, etc."
+                                className="w-full min-h-[100px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y"
+                                required
+                            />
+                            <span className="text-xs text-[#78716c] text-right tabular-nums">
+                                {description.length} caracteres
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Divider */}
+                    <hr className="my-6 border-t border-[#e5e5e5]" />
+
+                    {/* TOTP Section */}
+                    {showTOTP && (
+                        <div className="mb-6 rounded-lg border border-[#e0e7ff] bg-[#e0e7ff] p-4">
+                            <div className="flex items-start gap-3">
+                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#4f46e5] text-white">
+                                    <ShieldCheck className="h-4 w-4" />
+                                </div>
+                                <div className="flex flex-col gap-2">
+                                    <p className="text-sm font-semibold text-[#312e81]">
+                                        Verificación de Seguridad
+                                    </p>
+                                    <p className="text-xs text-[#312e81]">
+                                        Ingrese el código de 6 dígitos generado por su aplicación de autenticación.
+                                    </p>
+                                    <TOTPInput
+                                        onComplete={handleTOTPComplete}
+                                        error={totpError}
+                                        disabled={submitting}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {!showTOTP && (
+                        <div className="flex items-center gap-2 rounded-lg border border-[#fed7aa] bg-[#fed7aa] px-4 py-3">
+                            <ShieldCheck className="h-4 w-4 shrink-0 text-[#c2410c]" />
+                            <p className="text-xs font-medium text-[#7c2d12]">
+                                Al guardar, se solicitará un código de verificación TOTP para firmar la bitácora.
+                            </p>
+                        </div>
+                    )}
+
+                    <div className="mt-6 flex items-center justify-end gap-3">
+                        <button
+                            type="button"
+                            onClick={() => navigate('/bitacora')}
+                            className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-transparent px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:bg-[#f5f5f4] active:scale-[0.98]"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={submitting}
+                            className="inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            {submitting ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <Save className="h-4 w-4" />
+                            )}
+                            {showTOTP ? 'Firmar y Guardar Bitácora' : 'Guardar Bitácora'}
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    );
+}

@@ -35,6 +35,7 @@ Route::get('/health', fn () => ['status' => 'ok', 'time' => now()->toIso8601Stri
 // -- guest routes ----------------------------------------------------
 
 Route::post('/auth/externo/login', [AuthController::class, 'loginExterno'])
+    ->middleware('throttle:login')
     ->name('auth.externo.login');
 
 // -- authenticated routes -------------------------------------------

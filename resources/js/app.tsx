@@ -13,8 +13,11 @@ import CoordinadorDashboard from '@/pages/dashboard/CoordinadorDashboard';
 import EvaluadorDashboard from '@/pages/dashboard/EvaluadorDashboard';
 import { Loader2 } from 'lucide-react';
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-    const { isAuthenticated, isLoading } = useAuth();
+function ProtectedRoute({ children, allowedRoles }: {
+    children: React.ReactNode;
+    allowedRoles?: string[];
+}) {
+    const { isAuthenticated, isLoading, role } = useAuth();
 
     if (isLoading) {
         return (
@@ -26,6 +29,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
     if (!isAuthenticated) {
         return <Navigate to="/login" replace />;
+    }
+
+    if (allowedRoles && role && !allowedRoles.includes(role)) {
+        return <Navigate to="/" replace />;
     }
 
     return <>{children}</>;
@@ -48,8 +55,8 @@ function App() {
                                 <Route path="/dashboard/director" element={<DirectorDashboard />} />
                                 <Route path="/dashboard/coordinador" element={<CoordinadorDashboard />} />
                                 <Route path="/dashboard/evaluador-externo" element={<EvaluadorDashboard />} />
-                                <Route path="/coordinador/usuarios" element={<GestionUsuarios />} />
-                                <Route path="/coordinador/audit-log" element={<AuditLog />} />
+                                <Route path="/coordinador/usuarios" element={<ProtectedRoute allowedRoles={['Coordinador']}><GestionUsuarios /></ProtectedRoute>} />
+                                <Route path="/coordinador/audit-log" element={<ProtectedRoute allowedRoles={['Coordinador']}><AuditLog /></ProtectedRoute>} />
                                 <Route path="*" element={<Navigate to="/" replace />} />
                             </Routes>
                         </AppShell>

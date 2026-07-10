@@ -127,7 +127,7 @@ Route::middleware([
 
 // -- admin (coordinador-only) routes ---------------------------------
 
-Route::middleware(['auth:sanctum', 'role:Coordinador'])
+Route::middleware(['auth:sanctum', 'single_session', 'activity', 'ensure_password_changed', 'role:Coordinador'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {

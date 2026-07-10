@@ -131,6 +131,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, []);
 
     async function logout() {
+        // Clear the poll interval before logout (H-006).
+        if (refreshRef.current) {
+            clearInterval(refreshRef.current);
+            refreshRef.current = null;
+        }
+
         try {
             await apiFetch('/api/auth/logout', {
                 method: 'POST',

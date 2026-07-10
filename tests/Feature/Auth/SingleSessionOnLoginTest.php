@@ -31,7 +31,7 @@ it('loginExterno deletes prior tokens for the same user', function () {
     $user->createToken('device-a');
     expect($user->fresh()->tokens)->toHaveCount(1);
 
-    // Device B: new login.
+    // Device B: new login. No new token is created (H-004 — cookie-only auth).
     $response = $this->postJson('/api/auth/externo/login', [
         'email' => 'pedro@evaluador.com',
         'password' => 'TempPass!2026',
@@ -39,9 +39,8 @@ it('loginExterno deletes prior tokens for the same user', function () {
 
     $response->assertOk();
 
-    // The old token is gone; only the new one remains.
-    expect($user->fresh()->tokens)->toHaveCount(1)
-        ->and($user->fresh()->tokens->first()->name)->toBe('external-evaluator');
+    // The old token is gone. No new token was created (cookie-only auth).
+    expect($user->fresh()->tokens)->toHaveCount(0);
 });
 
 /**

@@ -27,7 +27,7 @@ uses(RefreshDatabase::class);
  *   - The first successful login sets `password_changed_at` only after
  *     the user calls the change-password endpoint.
  */
-it('logs in a valid external evaluator and returns a Sanctum token', function () {
+it('logs in a valid external evaluator via SPA cookie', function () {
     $user = User::factory()->external()->create([
         'email' => 'pedro@evaluador.com',
         'password' => Hash::make('TempPass!2026'),
@@ -40,17 +40,14 @@ it('logs in a valid external evaluator and returns a Sanctum token', function ()
     ]);
 
     $response->assertOk()
-        ->assertJsonStructure(['token', 'user' => ['id', 'email', 'role', 'es_externo']]);
+        ->assertJsonStructure(['user' => ['id', 'email', 'role', 'es_externo']]);
 
     expect($response->json('user.email'))->toBe('pedro@evaluador.com')
         ->and($response->json('user.role'))->toBe(UserRole::EvaluadorExterno->value)
         ->and($response->json('user.es_externo'))->toBeTrue();
 
-    // The token from the response must authenticate the user.
-    $this->withToken($response->json('token'))
-        ->getJson('/api/auth/user')
-        ->assertOk()
-        ->assertJson(['email' => 'pedro@evaluador.com']);
+    // No Bearer token is returned (H-004 — cookie-only auth).
+    expect($response->json())->not->toHaveKey('token');
 });
 
 it('rejects wrong password with 401 and writes an audit log', function () {

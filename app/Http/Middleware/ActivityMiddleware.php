@@ -7,6 +7,7 @@ namespace App\Http\Middleware;
 use App\Events\AuditEvent;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -46,6 +47,21 @@ class ActivityMiddleware
         if ($lastActivity !== null
             && $lastActivity->lt(now()->subMinutes(self::INACTIVITY_MINUTES))) {
             $user->currentAccessToken()?->delete();
+
+            // Invalidate the Sanctum SPA session too (H-005).
+            // These operations require a session-backed guard (web).
+            // When using Bearer tokens with the stateless Sanctum
+            // guard, there is no session — we skip gracefully.
+            try {
+                Auth::logout();
+            } catch (\BadMethodCallException) {
+                // Stateless guard.
+            }
+
+            if ($request->hasSession()) {
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+            }
 
             AuditEvent::dispatch(
                 $user,

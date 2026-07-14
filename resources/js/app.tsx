@@ -18,6 +18,7 @@ import { Loader2 } from 'lucide-react';
 
 const AnunciosPublica = lazy(() => import('@/pages/shared/AnunciosPublica'));
 const AnuncioDetalle = lazy(() => import('@/pages/shared/AnuncioDetalle'));
+const SupervisionReadOnly = lazy(() => import('@/components/supervision/SupervisionReadOnly'));
 const Recursos = lazy(() => import('@/pages/shared/Recursos'));
 const RecursoDetalle = lazy(() => import('@/pages/shared/RecursoDetalle'));
 const NuevaBitacora = lazy(() => import('@/pages/estudiante/NuevaBitacora'));
@@ -91,6 +92,11 @@ function App() {
                                 <Route path="/bitacora" element={<BitacorasEstudiante />} />
                                 <Route path="/dashboard/director" element={<DirectorDashboard />} />
                                 <Route path="/dashboard/coordinador" element={<CoordinadorDashboard />} />
+                                <Route path="/dashboard/coordinador/proyecto/:id" element={
+                                    <ProtectedRoute allowedRoles={['Coordinador']}>
+                                        <SuspenseWrapper><SupervisionReadOnly /></SuspenseWrapper>
+                                    </ProtectedRoute>
+                                } />
                                 <Route path="/dashboard/evaluador-externo" element={<EvaluadorDashboard />} />
                                 <Route path="/coordinador/usuarios" element={<ProtectedRoute allowedRoles={['Coordinador']}><GestionUsuarios /></ProtectedRoute>} />
                                 <Route path="/coordinador/audit-log" element={<ProtectedRoute allowedRoles={['Coordinador']}><AuditLog /></ProtectedRoute>} />

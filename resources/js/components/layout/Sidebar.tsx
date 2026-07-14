@@ -23,7 +23,7 @@ interface SidebarProps {
 
 const navConfig: Record<string, { to: string; icon: typeof LayoutDashboard; label: string }[]> = {
     Coordinador: [
-        { to: '/', label: 'Panel de Control', icon: LayoutDashboard },
+        { to: '/dashboard/coordinador', label: 'Panel de Control', icon: LayoutDashboard },
         { to: '/proyectos', label: 'Proyectos', icon: FolderKanban },
         { to: '/directores', label: 'Directores', icon: UserCheck },
         { to: '/evaluadores', label: 'Evaluadores', icon: ClipboardCheck },
@@ -110,7 +110,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                             <li key={item.to}>
                                 <NavLink
                                     to={item.to}
-                                    end={item.to === '/'}
+                                    end={['/', '/dashboard/coordinador', '/anuncios', '/anuncios/admin'].includes(item.to)}
                                     onClick={onClose}
                                     className={({ isActive }) =>
                                         cn(

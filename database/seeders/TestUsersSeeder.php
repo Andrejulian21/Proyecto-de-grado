@@ -35,7 +35,7 @@ class TestUsersSeeder extends Seeder
         // ── 2. Estudiante (login externo con credenciales) ──
         User::create([
             'name' => 'Julian Estudiante',
-            'email' => 'juliartega938@gmail.com',
+            'email' => 'juliarteaga938@gmail.com',
             'password' => Hash::make('Pruebas123!'),
             'role' => UserRole::Estudiante,
             'es_externo' => true,

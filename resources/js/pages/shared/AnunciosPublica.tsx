@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Loader2, ArrowRight, Megaphone, Calendar } from 'lucide-react';
+import { Loader2, ArrowRight, Megaphone, Calendar, AlertCircle } from 'lucide-react';
+import { apiFetch } from '@/lib/utils';
 
 interface Announcement {
     id: number;
@@ -13,22 +14,26 @@ interface Announcement {
     excerpt: string;
 }
 
-const MOCK_ANUNCIOS: Announcement[] = [
-    {
-        id: 1,
-        title: 'Cronograma de sustentaciones',
-        category: 'importante',
-        date: '28/06/2026',
-        excerpt: 'Se informa a los estudiantes y directores que las sustentaciones de proyectos de grado se realizarán durante la primera semana de agosto. Los plazos para la entrega de documentos finales vencen el 25 de julio.',
-    },
-    {
-        id: 2,
-        title: 'Recordatorio: Entrega de informes finales',
-        category: 'recordatorio',
-        date: '25/06/2026',
-        excerpt: 'El plazo para la entrega de informes finales del ciclo 2026-S1 vence el próximo 15 de julio. Asegúrese de completar las correcciones sugeridas por su director y cargar la versión final en el sistema.',
-    },
-];
+/** Shape returned by GET /api/anuncios */
+interface ApiAnnouncement {
+    id: number;
+    title: string;
+    content: string;
+    published_at: string | null;
+    is_active: boolean;
+}
+
+function fromApi(a: ApiAnnouncement): Announcement {
+    return {
+        id: a.id,
+        title: a.title,
+        category: 'informativo',
+        date: a.published_at
+            ? new Date(a.published_at).toLocaleDateString('es-CO')
+            : '—',
+        excerpt: a.content,
+    };
+}
 
 const categoryVariant: Record<string, 'error' | 'warning' | 'info'> = {
     importante: 'error',
@@ -45,13 +50,35 @@ const categoryLabels: Record<string, string> = {
 export default function AnunciosPublica() {
     const [anuncios, setAnuncios] = useState<Announcement[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setAnuncios(MOCK_ANUNCIOS);
-            setLoading(false);
-        }, 400);
-        return () => clearTimeout(timer);
+        let cancelled = false;
+
+        async function load() {
+            setLoading(true);
+            setError(null);
+            try {
+                const res = await apiFetch('/api/anuncios');
+                if (!res.ok) throw new Error('Error al cargar anuncios');
+                const body = await res.json();
+                if (!cancelled) {
+                    setAnuncios((body.data ?? []).map(fromApi));
+                }
+            } catch (err) {
+                if (!cancelled) {
+                    setError(err instanceof Error ? err.message : 'Error desconocido');
+                }
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        }
+
+        load();
+
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
     return (
@@ -63,8 +90,31 @@ export default function AnunciosPublica() {
             />
 
             {loading ? (
-                <div className="flex items-center justify-center py-16">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <div className="flex flex-col gap-4">
+                    {[1, 2].map((i) => (
+                        <div key={i} className="animate-pulse rounded-xl border border-border bg-surface p-6">
+                            <div className="flex flex-col gap-3">
+                                <div className="flex items-center gap-2">
+                                    <div className="h-5 w-24 rounded-full bg-[#f5f5f4]" />
+                                    <div className="h-3 w-20 rounded bg-[#f5f5f4]" />
+                                </div>
+                                <div className="h-5 w-3/4 rounded bg-[#f5f5f4]" />
+                                <div className="h-3 w-full rounded bg-[#f5f5f4]" />
+                                <div className="h-3 w-1/2 rounded bg-[#f5f5f4]" />
+                                <div className="h-9 w-24 rounded-lg bg-[#f5f5f4]" />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : error ? (
+                <div className="rounded-xl border border-[#fee2e2] bg-[#fef2f2] p-6">
+                    <div className="flex items-start gap-3">
+                        <AlertCircle className="h-5 w-5 shrink-0 text-[#dc2626]" />
+                        <div>
+                            <p className="text-sm font-semibold text-[#dc2626]">Error al cargar anuncios</p>
+                            <p className="mt-1 text-sm text-[#991b1b]">{error}</p>
+                        </div>
+                    </div>
                 </div>
             ) : anuncios.length === 0 ? (
                 <EmptyState

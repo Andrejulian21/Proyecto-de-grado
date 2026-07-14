@@ -36,6 +36,7 @@ const CoordinadorBitacoras = lazy(() => import('@/pages/coordinador/CoordinadorB
 const GestionAlertas = lazy(() => import('@/pages/coordinador/GestionAlertas'));
 const ReportesConsolidados = lazy(() => import('@/pages/coordinador/ReportesConsolidados'));
 const RecursosAdmin = lazy(() => import('@/pages/coordinador/RecursosAdmin'));
+const DirectoresPage = lazy(() => import('@/pages/coordinador/DirectoresPage'));
 const EvaluarProyecto = lazy(() => import('@/pages/evaluador/EvaluarProyecto'));
 const EvaluadorCalificar = lazy(() => import('@/pages/evaluador/EvaluadorCalificar'));
 const AnalisisAutomaticoEntregas = lazy(() => import('@/pages/estudiante/AnalisisAutomaticoEntregas'));
@@ -117,6 +118,7 @@ function App() {
                                 <Route path="/entregas/:id/revisar" element={<ProtectedRoute allowedRoles={['Director']}><SuspenseWrapper><RevisionEntregaDirector /></SuspenseWrapper></ProtectedRoute>} />
                                 {/* PR9: Coordinador proyectos */}
                                 <Route path="/proyectos" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><GestionProyectos /></SuspenseWrapper></ProtectedRoute>} />
+                                <Route path="/directores" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><DirectoresPage /></SuspenseWrapper></ProtectedRoute>} />
                                 {/* PR10: Coordinador admin */}
                                 <Route path="/anuncios/admin" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><AnunciosAdmin /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/evaluadores" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><AsignacionEvaluadores /></SuspenseWrapper></ProtectedRoute>} />

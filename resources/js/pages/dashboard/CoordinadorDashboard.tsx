@@ -1,7 +1,9 @@
+import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatCard } from '@/components/ui/StatCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { DataTable, type Column } from '@/components/ui/DataTable';
+import { useKpis } from '@/hooks/useKpis';
 import {
     ClipboardList,
     TrendingDown,
@@ -11,9 +13,11 @@ import {
     AlertTriangle,
     UserX,
     AlertCircle,
+    Loader2,
+    RefreshCw,
 } from 'lucide-react';
 
-/* ── Mock data ── */
+/* ── Mock data (preserved until PR6) ── */
 
 interface Project {
     id: number;
@@ -67,7 +71,11 @@ const MOCK_ALERTS: AlertItem[] = [
 
 /* ── Columns ── */
 
-const projectColumns: Column<Project>[] = [
+interface ProjectRow extends Project {
+    _navigate: (id: number) => void;
+}
+
+const projectColumns: Column<ProjectRow>[] = [
     {
         key: 'code',
         label: 'Código',
@@ -91,7 +99,7 @@ const projectColumns: Column<Project>[] = [
     {
         key: 'phase',
         label: 'Fase',
-        render: (row: Project) => (
+        render: (row: ProjectRow) => (
             <StatusBadge variant={row.phase === 'Final' ? 'success' : row.phase === 'Desarrollo' ? 'en-curso' : 'warning'}>
                 {row.phase}
             </StatusBadge>
@@ -100,7 +108,7 @@ const projectColumns: Column<Project>[] = [
     {
         key: 'status',
         label: 'Estado',
-        render: (row: Project) => (
+        render: (row: ProjectRow) => (
             <StatusBadge variant={row.status === 'active' ? 'success' : row.status === 'at-risk' ? 'riesgo' : 'inactivo'}>
                 {row.status === 'active' ? 'Activo' : row.status === 'at-risk' ? 'En Riesgo' : 'Completado'}
             </StatusBadge>
@@ -109,7 +117,7 @@ const projectColumns: Column<Project>[] = [
     {
         key: 'alertCount',
         label: 'Alertas',
-        render: (row: Project) => (
+        render: (row: ProjectRow) => (
             <span className={`tabular-nums ${row.alertCount > 0 ? 'font-bold text-error' : 'text-text-muted'}`}>
                 {row.alertCount}
             </span>
@@ -119,10 +127,11 @@ const projectColumns: Column<Project>[] = [
         key: 'actions',
         label: 'Acciones',
         className: 'text-right',
-        render: () => (
+        render: (row: ProjectRow) => (
             <button
+                onClick={() => row._navigate(row.id)}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-alt hover:text-primary"
-                aria-label="Ver proyecto"
+                aria-label={`Ver proyecto ${row.code}`}
             >
                 <Eye className="h-4 w-4" />
             </button>
@@ -131,6 +140,42 @@ const projectColumns: Column<Project>[] = [
 ];
 
 /* ── Subcomponents ── */
+
+function KpiSkeleton() {
+    return (
+        <>
+            {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                    key={i}
+                    className="animate-pulse rounded-xl border border-[#e5e5e5] bg-white p-5 shadow-[0_1px_2px_rgba(28,25,23,0.05)]"
+                >
+                    <div className="mb-3 h-10 w-10 rounded-xl bg-[#e5e5e5]" />
+                    <div className="mb-1 h-3 w-20 rounded bg-[#e5e5e5]" />
+                    <div className="h-7 w-16 rounded bg-[#e5e5e5]" />
+                </div>
+            ))}
+        </>
+    );
+}
+
+function KpiError({ message, onRetry }: { message: string; onRetry: () => void }) {
+    return (
+        <div className="col-span-full rounded-xl border border-[#fee2e2] bg-[#fee2e2]/40 p-4">
+            <div className="flex items-center gap-3">
+                <AlertTriangle className="h-5 w-5 shrink-0 text-[#dc2626]" />
+                <p className="text-sm text-[#7f1d1d]">{message}</p>
+                <button
+                    onClick={onRetry}
+                    className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-[#dc2626]/30 bg-white px-3 py-1.5 text-xs font-semibold text-[#7f1d1d] transition-colors hover:bg-[#fee2e2]"
+                    aria-label="Reintentar carga de KPIs"
+                >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Reintentar
+                </button>
+            </div>
+        </div>
+    );
+}
 
 function AlertCard({ icon: Icon, title, description, variant }: AlertItem) {
     const variantStyles = {
@@ -163,6 +208,9 @@ function AlertCard({ icon: Icon, title, description, variant }: AlertItem) {
 /* ── Main component ── */
 
 export default function CoordinadorDashboard() {
+    const navigate = useNavigate();
+    const { data: kpis, loading, error, refetch } = useKpis();
+
     return (
         <div className="flex flex-col gap-6">
             <PageHeader
@@ -173,10 +221,38 @@ export default function CoordinadorDashboard() {
 
             {/* KPI row */}
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                <StatCard icon={ClipboardList} label="Proyectos Activos" value={24} variant="default" />
-                <StatCard icon={TrendingDown} label="En Riesgo" value={12} variant="warning" />
-                <StatCard icon={Bell} label="Alertas sin revisar" value={8} variant="warning" />
-                <StatCard icon={TrendingUp} label="Tasa de cumplimiento" value="87%" variant="success" />
+                {loading ? (
+                    <KpiSkeleton />
+                ) : error ? (
+                    <KpiError message={error} onRetry={refetch} />
+                ) : (
+                    <>
+                        <StatCard
+                            icon={ClipboardList}
+                            label="Proyectos Activos"
+                            value={kpis?.proyectos_activos ?? '—'}
+                            variant="default"
+                        />
+                        <StatCard
+                            icon={TrendingDown}
+                            label="En Riesgo"
+                            value={kpis?.en_riesgo ?? '—'}
+                            variant="warning"
+                        />
+                        <StatCard
+                            icon={Bell}
+                            label="Alertas sin revisar"
+                            value={kpis?.alertas_sin_revisar ?? '—'}
+                            variant="warning"
+                        />
+                        <StatCard
+                            icon={TrendingUp}
+                            label="Tasa de cumplimiento"
+                            value={kpis?.tasa_cumplimiento != null ? `${kpis.tasa_cumplimiento}%` : '—'}
+                            variant="success"
+                        />
+                    </>
+                )}
             </div>
 
             {/* Projects table */}
@@ -184,9 +260,9 @@ export default function CoordinadorDashboard() {
                 <h2 id="projects-heading" className="mb-4 text-sm font-bold uppercase tracking-[0.05em] text-text-muted">
                     Proyectos de Grado
                 </h2>
-                <DataTable<Project>
+                <DataTable<ProjectRow>
                     columns={projectColumns}
-                    data={MOCK_PROJECTS}
+                    data={MOCK_PROJECTS.map((p) => ({ ...p, _navigate: (id: number) => navigate(`/dashboard/coordinador/proyecto/${id}`) }))}
                     getRowKey={(row) => row.id}
                 />
             </section>

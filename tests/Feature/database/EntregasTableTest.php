@@ -26,7 +26,7 @@ test('entregas.status defaults to pendiente', function () {
     $col = collect($columns)->firstWhere('name', 'status');
 
     expect($col)->not->toBeNull();
-    $cleaned = explode('::', trim((string) $col['default'], "'"))[0];
+    $cleaned = trim(explode('::', (string) $col['default'])[0], "'");
     expect($cleaned)->toBe('pendiente');
 });
 

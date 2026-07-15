@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Admin\AuditLogController;
+use App\Http\Controllers\Admin\DirectorCupoController;
 use App\Http\Controllers\Admin\EntregaController;
 use App\Http\Controllers\Admin\ProyectoController;
 use App\Http\Controllers\Admin\SemestreController;
@@ -81,6 +82,12 @@ Route::middleware([
         ->whereNumber('id')
         ->name('director.proyectos.horas');
 
+    // Estudiante — proyecto y entregas propias
+    Route::get('/estudiante/proyecto', [\App\Http\Controllers\Api\EstudianteController::class, 'proyecto'])
+        ->name('estudiante.proyecto');
+    Route::get('/estudiante/entregas', [\App\Http\Controllers\Api\EstudianteController::class, 'entregas'])
+        ->name('estudiante.entregas');
+
     // Entregas — versiones (accessible by authenticated students and directors)
     Route::get('/entregas/{id}/versiones', [EntregaController::class, 'versiones'])
         ->whereNumber('id')
@@ -108,6 +115,8 @@ Route::middleware([
     // Anuncios — todos los roles pueden ver (T-020)
     Route::get('/anuncios', [\App\Http\Controllers\Api\AnuncioController::class, 'index'])
         ->name('anuncios.index');
+    Route::get('/anuncios/{anuncio}', [\App\Http\Controllers\Api\AnuncioController::class, 'show'])
+        ->name('anuncios.show');
 
     // Recursos — todos los roles pueden ver (T-021)
     Route::get('/recursos', [\App\Http\Controllers\Api\RecursoController::class, 'index'])
@@ -163,7 +172,7 @@ Route::middleware(['auth:sanctum', 'single_session', 'activity', 'ensure_passwor
 
         // Proyectos CRUD (T-002).
         Route::apiResource('proyectos', ProyectoController::class)
-            ->only(['index', 'store']);
+            ->only(['index', 'store', 'show']);
 
         // Semestres CRUD (T-001).
         Route::apiResource('semestres', SemestreController::class)
@@ -174,7 +183,11 @@ Route::middleware(['auth:sanctum', 'single_session', 'activity', 'ensure_passwor
             ->name('evaluador-proyecto.index');
         Route::post('/evaluador-proyecto', [\App\Http\Controllers\Admin\EvaluadorProyectoController::class, 'store'])
             ->name('evaluador-proyecto.store');
-        Route::delete('/evaluador-proyecto', [\App\Http\Controllers\Admin\EvaluadorProyectoController::class, 'destroy'])
+        Route::put('/evaluador-proyecto/{id}', [\App\Http\Controllers\Admin\EvaluadorProyectoController::class, 'update'])
+            ->whereNumber('id')
+            ->name('evaluador-proyecto.update');
+        Route::delete('/evaluador-proyecto/{id}', [\App\Http\Controllers\Admin\EvaluadorProyectoController::class, 'destroy'])
+            ->whereNumber('id')
             ->name('evaluador-proyecto.destroy');
 
         // Reporte consolidado (T-018).
@@ -190,12 +203,33 @@ Route::middleware(['auth:sanctum', 'single_session', 'activity', 'ensure_passwor
             ->name('anuncios.destroy');
 
         // Recursos CRUD (T-021) — solo coordinador
+        Route::get('/recursos', [\App\Http\Controllers\Api\RecursoController::class, 'index'])
+            ->name('recursos.admin');
         Route::post('/recursos', [\App\Http\Controllers\Api\RecursoController::class, 'store'])
             ->name('recursos.store');
         Route::put('/recursos/{recurso}', [\App\Http\Controllers\Api\RecursoController::class, 'update'])
             ->name('recursos.update');
         Route::delete('/recursos/{recurso}', [\App\Http\Controllers\Api\RecursoController::class, 'destroy'])
             ->name('recursos.destroy');
+
+        // Director quota management — cupos (Sprint 5).
+        Route::get('/directores/cupos', [DirectorCupoController::class, 'index'])
+            ->name('directores.cupos');
+        Route::put('/directores/{director}/cupo', [DirectorCupoController::class, 'update'])
+            ->whereNumber('director')
+            ->name('directores.cupo.update');
+
+        // Directores list + sus proyectos (para la página /directores).
+        Route::get('/directores', [DirectorCupoController::class, 'directores'])
+            ->name('directores.index');
+        Route::get('/directores/{director}/proyectos', [DirectorCupoController::class, 'directorProyectos'])
+            ->whereNumber('director')
+            ->name('directores.proyectos');
+
+        // Bitácoras por proyecto (para la página /directores).
+        Route::get('/proyectos/{proyecto}/bitacoras', [\App\Http\Controllers\Api\BitacoraController::class, 'porProyecto'])
+            ->whereNumber('proyecto')
+            ->name('proyectos.bitacoras');
     });
 
 // Entregas — accessible by all authenticated roles (controller handles RBAC)
@@ -215,4 +249,10 @@ Route::middleware(['auth:sanctum', 'single_session', 'activity'])
         Route::put('/entregas/{id}/habilitar', [EntregaController::class, 'habilitar'])
             ->whereNumber('id')
             ->name('entregas.habilitar');
+        Route::put('/entregas/{id}', [EntregaController::class, 'update'])
+            ->whereNumber('id')
+            ->name('entregas.update');
+        Route::delete('/entregas/{id}', [EntregaController::class, 'destroy'])
+            ->whereNumber('id')
+            ->name('entregas.destroy');
     });

@@ -36,7 +36,8 @@ test('authorized_emails.role is a string column', function () {
     $col = collect($columns)->firstWhere('name', 'role');
 
     expect($col)->not->toBeNull();
-    expect($col['type'])->toBeIn(['varchar', 'string', 'text']);
+    expect($col['type'] === 'varchar' || $col['type'] === 'string' || $col['type'] === 'text' || str_starts_with($col['type'], 'character varying'))
+        ->toBeTrue('role column type should be varchar/string/text/character varying');
 });
 
 test('authorized_emails.created_by is nullable (system seed rows have no creator)', function () {

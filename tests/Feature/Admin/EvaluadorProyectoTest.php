@@ -108,18 +108,23 @@ describe('T-016: CRUD asignacion evaluador-proyecto', function () {
 
         $response->assertOk();
         expect($response->json('data'))->toHaveCount(1);
-        expect($response->json('data')[0]['evaluador_id'])->toBe($this->evaluador->id);
+        expect($response->json('data')[0]['evaluador_principal_id'])->toBe($this->evaluador->id);
     });
 
     it('coordinador puede asignar evaluador a proyecto', function () {
+        $evaluador2 = User::factory()->external()->create(['password_changed_at' => now()]);
         $response = $this->actingAs($this->coordinador)
             ->postJson('/api/admin/evaluador-proyecto', [
                 'proyecto_id' => $this->proyecto->id,
-                'evaluador_id' => $this->evaluador->id,
+                'evaluador_ids' => [$this->evaluador->id, $evaluador2->id],
+                'fecha' => '2026-06-15',
+                'hora_inicio' => '09:00',
+                'hora_fin' => '11:00',
+                'fase' => 'Final',
             ]);
 
         $response->assertCreated();
-        expect(EvaluadorProyecto::count())->toBe(1);
+        expect(EvaluadorProyecto::count())->toBe(2);
     });
 
     it('asignar evaluador valida campos requeridos', function () {
@@ -133,7 +138,11 @@ describe('T-016: CRUD asignacion evaluador-proyecto', function () {
         $response = $this->actingAs($this->evaluador)
             ->postJson('/api/admin/evaluador-proyecto', [
                 'proyecto_id' => $this->proyecto->id,
-                'evaluador_id' => $this->evaluador->id,
+                'evaluador_ids' => [$this->evaluador->id],
+                'fecha' => '2026-06-15',
+                'hora_inicio' => '09:00',
+                'hora_fin' => '11:00',
+                'fase' => 'Final',
             ]);
 
         $response->assertStatus(403);
@@ -148,10 +157,7 @@ describe('T-016: CRUD asignacion evaluador-proyecto', function () {
         ]);
 
         $response = $this->actingAs($this->coordinador)
-            ->deleteJson('/api/admin/evaluador-proyecto?' . http_build_query([
-                'proyecto_id' => $this->proyecto->id,
-                'evaluador_id' => $this->evaluador->id,
-            ]));
+            ->deleteJson('/api/admin/evaluador-proyecto/' . $asignacion->id);
 
         $response->assertOk();
         expect(EvaluadorProyecto::count())->toBe(0);

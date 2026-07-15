@@ -138,6 +138,7 @@ it('handleGoogleCallback deletes prior session rows for the same user', function
 
     $this->get('/auth/callback');
 
-    // Device A's session was wiped by the callback.
-    expect(DB::table('sessions')->where('user_id', $user->id)->count())->toBe(0);
+    // Device A's session was wiped by the callback, but a new session
+    // is created for the callback request itself (SESSION_DRIVER=database).
+    expect(DB::table('sessions')->where('user_id', $user->id)->count())->toBe(1);
 });

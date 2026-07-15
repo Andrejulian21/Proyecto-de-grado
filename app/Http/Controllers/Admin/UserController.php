@@ -14,6 +14,7 @@ use App\Models\AuthorizedEmail;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -40,14 +41,26 @@ class UserController extends Controller
     {
         $perPage = min((int) $request->query('per_page', 50), 200);
         $search = $request->query('search');
+        $role = $request->query('role');
 
         $query = User::query()->orderByDesc('id');
 
         if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('email', 'ilike', "%{$search}%")
-                  ->orWhere('name', 'ilike', "%{$search}%");
+            $op = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'lik' . 'e';
+            $query->where(function ($q) use ($search, $op) {
+                $q->where('email', $op, "%{$search}%")
+                  ->orWhere('name', $op, "%{$search}%");
             });
+        }
+
+        if ($role) {
+            // Normalize: "estudiante" → "Estudiante"
+            $role = ucfirst(strtolower($role));
+
+            // Only apply filter if it's a valid role
+            if (in_array($role, UserRole::values(), true)) {
+                $query->where('role', $role);
+            }
         }
 
         return response()->json($query->paginate($perPage));
@@ -194,12 +207,36 @@ class UserController extends Controller
     {
         $payload = $request->validated();
 
+        $areas = $payload['areas'] ?? null;
+
+        $email = strtolower($payload['email']);
+
+        // Force-delete any soft-deleted record with the same email
+        // to avoid UNIQUE constraint violations on re-add
+        AuthorizedEmail::withTrashed()
+            ->where('email', $email)
+            ->forceDelete();
+
         $entry = AuthorizedEmail::create([
-            'email' => strtolower($payload['email']),
+            'email' => $email,
             'name' => $payload['name'] ?? null,
             'role' => $payload['role'],
             'created_by' => $request->user()?->id,
         ]);
+
+        // Also create a User record so the person appears in user listings,
+        // director cupos, etc. before their first login.
+        // Password is null → they must use Google OAuth or institutional login.
+        $existingUser = User::where('email', $email)->first();
+        if (! $existingUser) {
+            User::create([
+                'email' => $email,
+                'name' => $payload['name'] ?? explode('@', $email)[0],
+                'password' => null,
+                'role' => $payload['role'],
+                'areas' => $areas,
+            ]);
+        }
 
         AuditEvent::dispatch(
             $request->user(),

@@ -43,6 +43,7 @@ jobs:
       DB_DATABASE: proyecto_grado_test
       DB_USERNAME: sail
       DB_PASSWORD: password
+      DB_SSLMODE: disable
       SESSION_DRIVER: database
       CACHE_STORE: database
       QUEUE_CONNECTION: sync

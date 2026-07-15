@@ -50,10 +50,10 @@ it('declares .github/workflows/ci.yml with the required triggers, services and s
         ->toContain('pint')
         ->toContain('--test');
 
-    // Node + npm build — frontend compile.
+    // pnpm + build — frontend compile.
     expect($raw)
-        ->toContain('npm ci')
-        ->toContain('npm run build');
+        ->toContain('pnpm install')
+        ->toContain('pnpm run build');
 
     // ---- PHP version pinned to the project's runtime (8.3+) ----------
     expect((bool) preg_match('/php-version:\s*[\'"]?8\.[3-9]/i', $raw))

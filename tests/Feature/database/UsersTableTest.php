@@ -52,7 +52,8 @@ test('users.role is a string column (string-backed enum)', function () {
     expect($role)->not->toBeNull();
     // SQLite reports 'varchar' for $table->string(); both are acceptable
     // for storing the UserRole backing value.
-    expect($role['type'])->toBeIn(['varchar', 'string', 'text']);
+    expect($role['type'] === 'varchar' || $role['type'] === 'string' || $role['type'] === 'text' || str_starts_with($role['type'], 'character varying'))
+        ->toBeTrue('role column type should be varchar/string/text/character varying');
 });
 
 test('users.es_externo defaults to false', function () {

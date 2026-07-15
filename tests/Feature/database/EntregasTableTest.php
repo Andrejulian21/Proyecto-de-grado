@@ -26,8 +26,8 @@ test('entregas.status defaults to pendiente', function () {
     $col = collect($columns)->firstWhere('name', 'status');
 
     expect($col)->not->toBeNull();
-    $default = $col['default'] ?? null;
-    expect(trim($default ?? '', "'"))->toBe('pendiente');
+    $cleaned = $col['default'] ? explode('::', trim((string) $col['default'], "'"))[0] : '';
+    expect($cleaned)->toBe('pendiente');
 });
 
 test('entregas.consolidated_grade is nullable', function () {

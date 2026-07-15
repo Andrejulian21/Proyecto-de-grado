@@ -14,6 +14,7 @@ use App\Models\AuthorizedEmail;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -45,9 +46,10 @@ class UserController extends Controller
         $query = User::query()->orderByDesc('id');
 
         if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('email', 'like', "%{$search}%")
-                  ->orWhere('name', 'like', "%{$search}%");
+            $op = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+            $query->where(function ($q) use ($search, $op) {
+                $q->where('email', $op, "%{$search}%")
+                  ->orWhere('name', $op, "%{$search}%");
             });
         }
 

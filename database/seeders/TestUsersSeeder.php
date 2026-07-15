@@ -55,10 +55,11 @@ class TestUsersSeeder extends Seeder
         $estudianteNicolas = User::updateOrCreate(
             ['email' => 'nicorfire1.4@gmail.com'],
             [
-                'name'       => 'Nicolas Estudiante Test',
-                'password'   => Hash::make('Pruebas123!'),
-                'role'       => UserRole::Estudiante,
-                'es_externo' => true,
+                'name'                => 'Nicolas Estudiante Test',
+                'password'            => Hash::make('Pruebas123!'),
+                'role'                => UserRole::Estudiante,
+                'es_externo'          => true,
+                'password_changed_at' => now(),
             ],
         );
 

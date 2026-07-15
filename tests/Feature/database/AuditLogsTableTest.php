@@ -50,7 +50,8 @@ test('audit_logs.action is a string column with bounded length', function () {
     $col = collect($columns)->firstWhere('name', 'action');
 
     expect($col)->not->toBeNull();
-    expect($col['type'])->toBeIn(['varchar', 'string', 'text']);
+    expect($col['type'] === 'varchar' || $col['type'] === 'string' || $col['type'] === 'text' || str_starts_with($col['type'], 'character varying'))
+        ->toBeTrue('action column type should be varchar/string/text/character varying');
 });
 
 test('audit_logs.ip_address is a string column (IPv6-compatible)', function () {
@@ -61,7 +62,8 @@ test('audit_logs.ip_address is a string column (IPv6-compatible)', function () {
     $col = collect($columns)->firstWhere('name', 'ip_address');
 
     expect($col)->not->toBeNull();
-    expect($col['type'])->toBeIn(['varchar', 'string', 'text']);
+    expect($col['type'] === 'varchar' || $col['type'] === 'string' || $col['type'] === 'text' || str_starts_with($col['type'], 'character varying'))
+        ->toBeTrue('ip_address column type should be varchar/string/text/character varying');
 });
 
 test('audit_logs is reversible (down drops it)', function () {

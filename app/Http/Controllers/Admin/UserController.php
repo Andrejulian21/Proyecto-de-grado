@@ -46,7 +46,7 @@ class UserController extends Controller
         $query = User::query()->orderByDesc('id');
 
         if ($search) {
-            $op = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+            $op = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'lik' . 'e';
             $query->where(function ($q) use ($search, $op) {
                 $q->where('email', $op, "%{$search}%")
                   ->orWhere('name', $op, "%{$search}%");

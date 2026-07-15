@@ -27,7 +27,7 @@ test('bitacoras.signature_status defaults to Pendiente', function () {
     $col = collect($columns)->firstWhere('name', 'signature_status');
 
     expect($col)->not->toBeNull();
-    $cleaned = $col['default'] ? explode('::', trim((string) $col['default'], "'"))[0] : '';
+    $cleaned = explode('::', trim((string) $col['default'], "'"))[0];
     expect($cleaned)->toBe('Pendiente');
 });
 

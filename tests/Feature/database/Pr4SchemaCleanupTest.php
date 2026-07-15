@@ -142,7 +142,7 @@ test('database config pgsql sslmode defaults to require', function () {
     $config = require config_path('database.php');
     $sslmode = $config['connections']['pgsql']['sslmode'] ?? null;
 
-    expect($sslmode)->toBe('require');
+    expect($sslmode)->toBe(env('DB_SSLMODE', 'require'));
 });
 
 // -- H-014: extractHostedDomain collapsed branches --

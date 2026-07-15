@@ -10,7 +10,6 @@ import {
     Plus,
     Loader2,
     Link2,
-    BookOpen,
     FileSpreadsheet,
     FileImage,
     Video,

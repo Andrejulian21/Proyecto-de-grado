@@ -35,6 +35,7 @@ class User extends Authenticatable
      * Mass-assignable fields. The auth-access-module adds role, es_externo,
      * google_id, avatar, last_activity_at, totp_secret, password_changed_at,
      * failed_attempts, and locked_until to the default name/email/password trio.
+     * Sprint 5 added max_capacity (director quota) and areas (director expertise).
      *
      * @var list<string>
      */
@@ -52,6 +53,8 @@ class User extends Authenticatable
         'failed_attempts',
         'locked_until',
         'last_failed_at',
+        'max_capacity',
+        'areas',
     ];
 
     /**
@@ -84,6 +87,8 @@ class User extends Authenticatable
             'password_changed_at' => 'datetime',
             'locked_until' => 'datetime',
             'last_failed_at' => 'datetime',
+            'max_capacity' => 'integer',
+            'areas' => 'string',
         ];
     }
 
@@ -106,6 +111,15 @@ class User extends Authenticatable
     public function authorizedEmailsCreated(): HasMany
     {
         return $this->hasMany(AuthorizedEmail::class, 'created_by');
+    }
+
+    /**
+     * Projects this user directs (director role). Used for capacity/quotas
+     * in the coordinator dashboard.
+     */
+    public function proyectosDirigidos(): HasMany
+    {
+        return $this->hasMany(Proyecto::class, 'director_id');
     }
 
     // -- external-evaluator helpers (T-016, T-017) -----------------------

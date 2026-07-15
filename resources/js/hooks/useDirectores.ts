@@ -3,26 +3,20 @@ import { apiFetch } from '@/lib/utils';
 
 /* ── Types ── */
 
-export interface DirectorArea {
-    id: number;
-    name: string;
-}
-
 export interface Director {
-    id: number;
+    id: number | null;
     name: string;
     email: string;
-    areas: DirectorArea[];
+    areas: string[];
 }
 
 export interface DirectorProyecto {
     id: number;
     code: string;
     title: string;
-    students: { id: number; name: string }[];
-    phase: string;
+    estudiantes: { id: number; name: string }[];
+    current_phase: string;
     status: string;
-    grupo_id: number;
 }
 
 export interface Bitacora {
@@ -113,6 +107,16 @@ export function useDirectores() {
         }
     }, []);
 
+    const viewProyecto = useCallback((proyecto: DirectorProyecto) => {
+        setSelectedProyecto(proyecto);
+    }, []);
+
+    const clearProyecto = useCallback(() => {
+        setSelectedProyecto(null);
+        setBitacoras([]);
+        setErrorBitacoras(null);
+    }, []);
+
     const reset = useCallback(() => {
         setSelectedDirector(null);
         setSelectedProyecto(null);
@@ -137,6 +141,8 @@ export function useDirectores() {
         bitacoras,
         loadingBitacoras,
         errorBitacoras,
+        viewProyecto,
+        clearProyecto,
         reset,
     };
 }

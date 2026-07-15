@@ -1,428 +1,947 @@
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { useUnifiedUsers, type UnifiedUser, type UnifiedRole } from '@/hooks/useUnifiedUsers';
-import { DataTable, type Column } from '@/components/ui/DataTable';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { PageHeader } from '@/components/ui/PageHeader';
+import { apiFetch } from '@/lib/utils';
 import {
     Loader2,
-    UserPlus,
-    Save,
+    ChevronLeft,
+    ChevronRight,
     Trash2,
-    Users,
-    RefreshCw,
     X,
-    AlertCircle,
+    UserPlus,
+    Pencil,
+    RefreshCw,
+    Search,
+    Users,
 } from 'lucide-react';
 
-const ROLES: UnifiedRole[] = ['Estudiante', 'Director', 'Coordinador', 'EvaluadorExterno'];
+interface User {
+    id: number;
+    email: string;
+    role: string;
+    name?: string;
+    created_by: { name: string } | null;
+    created_at: string;
+    last_activity_at?: string | null;
+}
+
+interface PaginationMeta {
+    current_page: number;
+    last_page: number;
+    total: number;
+}
+
+const ROLES = ['Estudiante', 'Director', 'Coordinador', 'EvaluadorExterno'] as const;
 const ROLE_LABELS: Record<string, string> = {
     Estudiante: 'Estudiante',
     Director: 'Director',
     Coordinador: 'Coordinador',
     EvaluadorExterno: 'Evaluador Externo',
-    Pendiente: 'Pendiente',
 };
 
-function formatDate(dateStr: string | null | undefined): string {
+function formatDate(dateStr: string | null | undefined) {
     if (!dateStr) return '—';
-    try {
-        const d = new Date(dateStr);
-        return d.toLocaleDateString('es-CO', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-        });
-    } catch {
-        return '—';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('es-CO', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+
+function genPassword() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    const array = new Uint32Array(14);
+    crypto.getRandomValues(array);
+    let pwd = '';
+    for (let i = 0; i < 14; i++) {
+        pwd += chars.charAt(array[i] % chars.length);
     }
+    return pwd + '!';
 }
 
 export default function GestionUsuarios() {
-    const { user } = useAuth();
-    const {
-        data: users,
-        loading,
-        error,
-        refetch,
-        addToWhitelist,
-        updateRole,
-        deleteUser,
-    } = useUnifiedUsers();
+    const { role } = useAuth();
 
-    // Role change tracking
+    // ── Sección 1: Whitelist ──
+    const [users, setUsers] = useState<User[]>([]);
+
+    // ── Whitelist (tabla separada de users) ──
+    const [whitelistEntries, setWhitelistEntries] = useState<User[]>([]);
+    const [whitelistMeta, setWhitelistMeta] = useState<PaginationMeta | null>(null);
+    const [whitelistPage, setWhitelistPage] = useState(1);
+    const [whitelistLoading, setWhitelistLoading] = useState(false);
+
+    // ── Sección 2: Crear evaluador ──
+    const [evalNombre, setEvalNombre] = useState('');
+    const [evalCorreo, setEvalCorreo] = useState('');
+    const [evalPass, setEvalPass] = useState(genPassword());
+    const [evalPass2, setEvalPass2] = useState(evalPass);
+
+    // ── Sección 3: Agregar correos ──
+    const [estCorreo, setEstCorreo] = useState('');
+    const [estNombre, setEstNombre] = useState('');
+    const [dirCorreo, setDirCorreo] = useState('');
+    const [dirNombre, setDirNombre] = useState('');
+    const [dirAreas, setDirAreas] = useState('');
+
+    // ── Sección 4: Roles ──
     const [roleChanges, setRoleChanges] = useState<Record<string, string>>({});
-    const [savingRoles, setSavingRoles] = useState<Set<string>>(new Set());
 
-    // Delete state
-    const [deleteTarget, setDeleteTarget] = useState<UnifiedUser | null>(null);
+    // ── Modal / message ──
+    const [modalOpen, setModalOpen] = useState(false);
+    const [editingUser, setEditingUser] = useState<User | null>(null);
+    const [formEmail, setFormEmail] = useState('');
+    const [formName, setFormName] = useState('');
+    const [formRole, setFormRole] = useState('Estudiante');
+    const [submitting, setSubmitting] = useState(false);
+
+    const [editingIsWhitelist, setEditingIsWhitelist] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState<any>(null);
+    const [deleteIsWhitelist, setDeleteIsWhitelist] = useState(false);
     const [deleting, setDeleting] = useState(false);
 
-    // Add user form state
-    const [showAddForm, setShowAddForm] = useState(false);
-    const [addEmail, setAddEmail] = useState('');
-    const [addName, setAddName] = useState('');
-    const [adding, setAdding] = useState(false);
-    const [addError, setAddError] = useState<string | null>(null);
+    const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [savingRoles, setSavingRoles] = useState(false);
 
-    // Banner
-    const [banner, setBanner] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    // ── Paginación y filtros ──
+    const [page, setPage] = useState(1);
+    const pageSize = 10;
+    const [searchQuery, setSearchQuery] = useState('');
+    const [roleFilter, setRoleFilter] = useState('');
 
-    function showBanner(type: 'success' | 'error', text: string) {
-        setBanner({ type, text });
-        setTimeout(() => setBanner(null), 4000);
-    }
-
-    // Derive a stable row key from email (unique across all sources)
-    const getRowKey = useCallback((row: UnifiedUser) => row.email, []);
-
-    // ── Role change handlers ──
-
-    function handleRoleChange(email: string, newRole: string) {
-        setRoleChanges((prev) => {
-            const next = { ...prev };
-            if (next[email] === newRole) {
-                delete next[email];
-            } else {
-                next[email] = newRole;
-            }
-            return next;
-        });
-    }
-
-    async function handleSaveRole(row: UnifiedUser) {
-        const newRole = roleChanges[row.email];
-        if (!newRole || row.id === null) return;
-
-        const key = row.email;
-        setSavingRoles((prev) => new Set(prev).add(key));
-
+    const fetchUsers = useCallback(async () => {
         try {
-            await updateRole(row.id, newRole);
-            setRoleChanges((prev) => {
-                const next = { ...prev };
-                delete next[key];
-                return next;
-            });
-            showBanner('success', `Rol actualizado a "${ROLE_LABELS[newRole] || newRole}"`);
-        } catch (err: any) {
-            showBanner('error', err.message ?? 'Error al actualizar rol');
+            const res = await apiFetch('/api/admin/usuarios?per_page=200');
+            if (!res.ok) throw new Error('Error al cargar usuarios');
+            const json = await res.json();
+            setUsers(json.data ?? json);
+        } catch {
+            setMessage({ type: 'error', text: 'Error al cargar usuarios' });
+        }
+    }, []);
+
+    const fetchWhitelist = useCallback(async () => {
+        setWhitelistLoading(true);
+        try {
+            const params = new URLSearchParams({ page: String(whitelistPage), per_page: '20' });
+            const res = await apiFetch(`/api/admin/whitelist?${params}`);
+            if (!res.ok) throw new Error('Error al cargar whitelist');
+            const json = await res.json();
+            setWhitelistEntries(json.data);
+            setWhitelistMeta(json.meta);
+        } catch {
+            setMessage({ type: 'error', text: 'Error al cargar whitelist' });
         } finally {
-            setSavingRoles((prev) => {
-                const next = new Set(prev);
-                next.delete(key);
-                return next;
+            setWhitelistLoading(false);
+        }
+    }, [whitelistPage]);
+
+    useEffect(() => {
+        fetchUsers();
+    }, [fetchUsers]);
+
+    useEffect(() => {
+        fetchWhitelist();
+    }, [fetchWhitelist]);
+
+    const combinedEntries = useMemo(() => {
+        const map = new Map<string, any>();
+        for (const w of whitelistEntries) {
+            map.set(w.email, { ...w, _isUser: false });
+        }
+        for (const u of users) {
+            map.set(u.email, { ...u, _isUser: true });
+        }
+        return Array.from(map.values());
+    }, [users, whitelistEntries]);
+
+    const filteredEntries = useMemo(() => {
+        let result = combinedEntries;
+        if (searchQuery) {
+            const q = searchQuery.toLowerCase();
+            result = result.filter((e: any) =>
+                (e.name || '').toLowerCase().includes(q) ||
+                e.email.toLowerCase().includes(q)
+            );
+        }
+        if (roleFilter) {
+            result = result.filter((e: any) => e.role === roleFilter);
+        }
+        return result;
+    }, [combinedEntries, searchQuery, roleFilter]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredEntries.length / pageSize));
+    const paginatedEntries = filteredEntries.slice((page - 1) * pageSize, page * pageSize);
+
+    useEffect(() => {
+        setPage(1);
+    }, [searchQuery, roleFilter]);
+
+    function showMsg(type: 'success' | 'error', text: string) {
+        setMessage({ type, text });
+        setTimeout(() => setMessage(null), 4000);
+    }
+
+    async function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        if (submitting) return;
+        setSubmitting(true);
+        try {
+            const url = editingUser
+                ? (editingIsWhitelist ? `/api/admin/whitelist/${editingUser.id}` : `/api/admin/usuarios/${editingUser.id}`)
+                : '/api/admin/whitelist';
+            const method = editingUser ? 'PUT' : 'POST';
+            const body = editingUser
+                ? { name: formName.trim(), email: formEmail.trim(), role: formRole }
+                : { email: formEmail.trim(), name: formName.trim() || null, role: formRole };
+            
+            const res = await apiFetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
             });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => null);
+                throw new Error(err?.message || 'Error al guardar');
+            }
+
+            showMsg('success', editingUser ? 'Usuario actualizado' : 'Usuario creado');
+            setModalOpen(false);
+            setEditingUser(null);
+            setEditingIsWhitelist(false);
+            setFormName('');
+            setFormEmail('');
+            setFormRole('Estudiante');
+            fetchUsers();
+            if (editingIsWhitelist) fetchWhitelist();
+        } catch (err: any) {
+            showMsg('error', err.message);
+        } finally {
+            setSubmitting(false);
         }
     }
 
-    // ── Delete handler ──
-
     async function handleDelete() {
-        if (!deleteTarget) return;
-
+        if (!deleteTarget || deleting) return;
         setDeleting(true);
         try {
-            await deleteUser(deleteTarget);
-            showBanner('success', 'Usuario eliminado correctamente');
+            const isUser = deleteTarget._isUser;
+
+            // Primary delete
+            const primaryEndpoint = isUser
+                ? `/api/admin/usuarios/${deleteTarget.id}`
+                : `/api/admin/whitelist/${deleteTarget.id}`;
+
+            const res = await apiFetch(primaryEndpoint, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Error al eliminar');
+
+            // If it was a user, also try to remove from whitelist by email
+            if (isUser) {
+                const whitelistEntry = whitelistEntries.find((w: any) => w.email === deleteTarget.email);
+                if (whitelistEntry) {
+                    try {
+                        await apiFetch(`/api/admin/whitelist/${whitelistEntry.id}`, { method: 'DELETE' });
+                    } catch {
+                        // Non-critical: whitelist entry may not exist
+                    }
+                }
+            }
+
+            showMsg('success', isUser ? 'Usuario eliminado' : 'Correo eliminado de la whitelist');
             setDeleteTarget(null);
-        } catch (err: any) {
-            showBanner('error', err.message ?? 'Error al eliminar');
+            setDeleteIsWhitelist(false);
+
+            // Always refresh both lists regardless of type
+            fetchWhitelist();
+            fetchUsers();
+        } catch {
+            showMsg('error', 'Error al eliminar');
         } finally {
             setDeleting(false);
         }
     }
 
-    // ── Add whitelist handler ──
+    function openEdit(u: any, isWhitelist: boolean) {
+        setEditingUser(u);
+        setEditingIsWhitelist(isWhitelist);
+        setFormName(u.name || '');
+        setFormEmail(u.email);
+        setFormRole(u.role);
+        setModalOpen(true);
+    }
 
-    async function handleAddUser(e: React.FormEvent) {
-        e.preventDefault();
-        if (adding || !addEmail.trim()) return;
+    async     function toggleBlock(_u: User) {
+        // Función reservada para futura activación/desactivación de usuarios.
+    }
 
-        setAdding(true);
-        setAddError(null);
+    function handleRoleChange(userId: number, newRole: string) {
+        setRoleChanges((prev) => {
+            const next = { ...prev };
+            if (next[userId] === newRole) {
+                delete next[userId];
+            } else {
+                next[userId] = newRole;
+            }
+            return next;
+        });
+    }
 
+    async function saveAllRoles() {
+        setSavingRoles(true);
         try {
-            await addToWhitelist(addEmail.trim(), addName.trim() || undefined);
-            showBanner('success', 'Usuario agregado a la whitelist');
-            setAddEmail('');
-            setAddName('');
-            setShowAddForm(false);
-        } catch (err: any) {
-            setAddError(err.message);
+            for (const [userId, newRole] of Object.entries(roleChanges)) {
+                const res = await apiFetch(`/api/admin/usuarios/${userId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ role: newRole }),
+                });
+                if (!res.ok) throw new Error(`Error al actualizar usuario ${userId}`);
+            }
+            showMsg('success', 'Roles actualizados correctamente');
+            setRoleChanges({});
+            fetchUsers();
+        } catch {
+            showMsg('error', 'Error al guardar cambios de roles');
         } finally {
-            setAdding(false);
+            setSavingRoles(false);
         }
     }
 
-    // ── Columns ──
+    async function handleCrearEvaluador(e: React.FormEvent) {
+        e.preventDefault();
+        try {
+            const res = await apiFetch('/api/admin/evaluadores', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: evalCorreo.trim(),
+                    name: evalNombre.trim(),
+                }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => null);
+                throw new Error(err?.message || 'Error al crear evaluador');
+            }
+            showMsg('success', 'Evaluador creado exitosamente');
+            setEvalNombre('');
+            setEvalCorreo('');
+            const newPw = genPassword();
+            setEvalPass(newPw);
+            setEvalPass2(newPw);
+            fetchUsers();
+        } catch (err: any) {
+            showMsg('error', err.message);
+        }
+    }
 
-    const isSelf = useCallback(
-        (row: UnifiedUser) => user?.email?.toLowerCase() === row.email.toLowerCase(),
-        [user?.email],
-    );
+    async function handleAgregarEstudiante(e: React.FormEvent) {
+        e.preventDefault();
+        try {
+            const res = await apiFetch('/api/admin/whitelist', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: estCorreo.trim(), name: estNombre.trim() || null, role: 'Estudiante' }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => null);
+                throw new Error(err?.message || 'Error al agregar estudiante');
+            }
+            showMsg('success', 'Estudiante agregado');
+            setEstCorreo('');
+            setEstNombre('');
+            fetchWhitelist();
+            fetchUsers();
+        } catch (err: any) {
+            showMsg('error', err.message);
+        }
+    }
 
-    const columns: Column<UnifiedUser>[] = [
-        {
-            key: 'name',
-            label: 'Nombre',
-            render: (row) => (
-                <span className="font-medium text-[#1c1917]">
-                    {row.name || '—'}
-                </span>
-            ),
-        },
-        {
-            key: 'email',
-            label: 'Correo',
-        },
-        {
-            key: 'role',
-            label: 'Rol',
-            className: 'min-w-[160px]',
-            render: (row) => {
-                const self = isSelf(row);
-                const saving = savingRoles.has(row.email);
-                const hasChange = row.email in roleChanges;
-                const currentRole = roleChanges[row.email] ?? row.role;
+    async function handleAgregarDirector(e: React.FormEvent) {
+        e.preventDefault();
+        try {
+            const res = await apiFetch('/api/admin/whitelist', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: dirCorreo.trim(), name: dirNombre.trim() || null, role: 'Director', areas: dirAreas.trim() || null }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => null);
+                throw new Error(err?.message || 'Error al agregar director');
+            }
+            showMsg('success', 'Director agregado');
+            setDirCorreo('');
+            setDirNombre('');
+            setDirAreas('');
+            fetchWhitelist();
+            fetchUsers();
+        } catch (err: any) {
+            showMsg('error', err.message);
+        }
+    }
 
-                return (
-                    <div className="flex items-center gap-2">
-                        <select
-                            value={currentRole}
-                            onChange={(e) => handleRoleChange(row.email, e.target.value)}
-                            disabled={self || row.role === 'Pendiente' || saving}
-                            className="min-w-[140px] rounded-lg border border-[#e5e5e5] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] disabled:cursor-not-allowed disabled:opacity-50"
-                            aria-label={`Cambiar rol de ${row.email}`}
-                        >
-                            {row.role === 'Pendiente' ? (
-                                <option value="Pendiente">Pendiente</option>
-                            ) : (
-                                ROLES.map((r) => (
-                                    <option key={r} value={r}>
-                                        {ROLE_LABELS[r]}
-                                    </option>
-                                ))
-                            )}
-                        </select>
+    function badgeClass(status: string) {
+        switch (status) {
+            case 'Activo': return 'bg-[#dcfce7] text-[#14532d]';
+            case 'Inactivo': return 'bg-[#e7e5e4] text-[#57534e]';
+            case 'Pendiente': return 'bg-[#fef3c7] text-[#78350f]';
+            default: return 'bg-[#e7e5e4] text-[#57534e]';
+        }
+    }
 
-                        {hasChange && !self && (
-                            <button
-                                onClick={() => handleSaveRole(row)}
-                                disabled={saving}
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[#c2410c] transition-colors hover:bg-[#fed7aa] disabled:opacity-50"
-                                title="Guardar cambio de rol"
-                                aria-label={`Guardar cambio de rol para ${row.email}`}
-                            >
-                                {saving ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                ) : (
-                                    <Save className="h-3.5 w-3.5" />
-                                )}
-                            </button>
-                        )}
+    // Compute evaluadores from users
+    const evaluadores = users.filter((u) => u.role === 'EvaluadorExterno');
 
-                        {self && (
-                            <span className="text-[10px] font-medium text-[#dc2626] whitespace-nowrap">
-                                No puedes cambiar tu propio rol
-                            </span>
-                        )}
-                    </div>
-                );
-            },
-        },
-        {
-            key: 'last_access',
-            label: 'Último acceso',
-            render: (row) => (
-                <span className="text-xs text-[#78716c]">{formatDate(row.last_access)}</span>
-            ),
-        },
-        {
-            key: 'actions',
-            label: 'Acciones',
-            className: 'text-right',
-            render: (row) => (
-                <div className="inline-flex gap-0.5">
-                    <button
-                        onClick={() => setDeleteTarget(row)}
-                        disabled={isSelf(row)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#fee2e2] hover:text-[#dc2626] disabled:cursor-not-allowed disabled:opacity-30"
-                        title="Eliminar usuario"
-                        aria-label={`Eliminar ${row.email}`}
-                    >
-                        <Trash2 className="h-4 w-4" />
-                    </button>
-                </div>
-            ),
-        },
-    ];
-
-    // ── Role check ──
-
-    if (!user || user.role !== 'Coordinador') {
+    if (role !== 'Coordinador') {
         return (
-            <div className="flex items-center justify-center rounded-xl border-2 border-dashed border-[#e5e5e5] p-12">
-                <p className="text-sm text-[#57534e]">
-                    No tienes permisos para acceder a esta sección.
-                </p>
+            <div className="flex items-center justify-center rounded-xl border-2 border-dashed border-border p-12">
+                <p className="text-text-muted">No tienes permisos para acceder a esta sección.</p>
             </div>
         );
     }
 
-    // ── Render ──
-
     return (
         <div className="flex flex-col gap-6">
-            {/* Banner */}
-            {banner && (
+            {message && (
                 <div
                     className={`rounded-lg border px-4 py-3 text-sm font-medium ${
-                        banner.type === 'success'
+                        message.type === 'success'
                             ? 'border-[#dcfce7] bg-[#dcfce7] text-[#14532d]'
                             : 'border-[#fee2e2] bg-[#fee2e2] text-[#7f1d1d]'
                     }`}
-                    role="alert"
                 >
-                    {banner.text}
+                    {message.text}
                 </div>
             )}
 
-            {/* Error banner with retry */}
-            {error && !loading && (
-                <div className="flex items-center gap-3 rounded-lg border border-[#fee2e2] bg-[#fee2e2] px-4 py-3 text-sm text-[#7f1d1d]">
-                    <AlertCircle className="h-5 w-5 shrink-0" />
-                    <span className="flex-1">{error}</span>
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[#fed7aa] px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.05em] text-[#c2410c]">
+                        Administración
+                    </span>
+                    <h2 className="mt-2 text-2xl font-bold text-text">Gestión de Usuarios y Accesos</h2>
+                    <p className="mt-1 text-sm text-text-muted">
+                        Administre los correos institucionales autorizados y cree cuentas para evaluadores externos.
+                    </p>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
                     <button
-                        onClick={refetch}
-                        className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[#fca5a5] bg-white px-3 py-1.5 text-xs font-semibold text-[#7f1d1d] transition-colors hover:bg-[#fef2f2]"
+                        onClick={() => document.getElementById('crear-evaluador')?.scrollIntoView({ behavior: 'smooth' })}
+                        className="inline-flex items-center gap-2 rounded-lg border border-[#e5e5e5] bg-transparent px-4 py-2.5 text-sm font-semibold text-text transition-colors hover:border-[#c2410c] hover:bg-[#fed7aa] hover:text-[#c2410c]"
                     >
-                        <RefreshCw className="h-3.5 w-3.5" />
-                        Reintentar
+                        <UserPlus className="h-4 w-4" />
+                        Crear evaluador
                     </button>
+
                 </div>
-            )}
+            </div>
 
-            {/* Page header */}
-            <PageHeader
-                eyebrow="Administración"
-                title="Gestión de Usuarios"
-                subtitle="Administre los usuarios del sistema, asigne roles y gestione la lista de correos autorizados."
-                actions={
-                    !showAddForm && (
-                        <button
-                            onClick={() => setShowAddForm(true)}
-                            className="inline-flex items-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a]"
-                        >
-                            <UserPlus className="h-4 w-4" />
-                            Agregar usuario
-                        </button>
-                    )
-                }
-            />
+            {/* ═══ SECCIÓN 1: Usuarios y Accesos (Fusionada) ═══ */}
+            <section className="rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
+                <div className="mb-5 flex items-center gap-2 flex-wrap">
+                    <Users className="h-4 w-4 text-[#c2410c]" />
+                    <h2 className="text-lg font-bold text-text">Usuarios y Accesos</h2>
+                    <span className="ml-auto rounded-full bg-[#e7e5e4] px-2.5 py-0.5 text-xs font-semibold text-[#57534e]">
+                        {filteredEntries.length} registros
+                    </span>
+                </div>
 
-            {/* Inline add form */}
-            {showAddForm && (
-                <form
-                    onSubmit={handleAddUser}
-                    className="rounded-xl border border-[#e5e5e5] bg-white p-4 shadow-[0_1px_2px_rgba(28,25,23,0.05)]"
-                >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                        <div className="flex-1">
-                            <label
-                                htmlFor="add-email"
-                                className="mb-1 block text-xs font-semibold text-[#1c1917]"
-                            >
+                {/* Filtros */}
+                <div className="mb-4 flex items-center gap-3 flex-wrap">
+                    <div className="relative flex-1 min-w-[200px]">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#78716c]" />
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Buscar por nombre o correo..."
+                            className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white pl-9 pr-3 py-2 text-sm text-text outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                        />
+                    </div>
+                    <select
+                        value={roleFilter}
+                        onChange={(e) => setRoleFilter(e.target.value)}
+                        className="min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-text outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                    >
+                        <option value="">Todos los roles</option>
+                        {ROLES.map((r) => (
+                            <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div className="w-full overflow-x-auto rounded-lg border border-[#e5e5e5] bg-white">
+                    {filteredEntries.length === 0 ? (
+                        <div className="py-16 text-center text-sm text-[#57534e]">
+                            No hay usuarios registrados. Agregue estudiantes o directores desde los formularios de abajo.
+                        </div>
+                    ) : (
+                        <table className="w-full text-left text-sm tabular-nums">
+                            <thead className="bg-[#f5f5f4] text-[11px] font-bold uppercase tracking-[0.05em] text-[#57534e]">
+                                <tr>
+                                    <th className="whitespace-nowrap px-4 py-3">Nombre</th>
+                                    <th className="whitespace-nowrap px-4 py-3">Correo</th>
+                                    <th className="whitespace-nowrap px-4 py-3">Rol</th>
+                                    <th className="whitespace-nowrap px-4 py-3">Último Acceso</th>
+                                    <th className="whitespace-nowrap px-4 py-3 text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                    {paginatedEntries.map((entry: any) => {
+                                    const k = (entry._isUser ? "u-" : "w-") + entry.id;
+                                    return (
+                                    <tr key={k} className="border-b border-[#e5e5e5] last:border-none">
+                                        <td className="px-4 py-3 font-medium text-text">{entry.name || entry.created_by?.name || "—"}</td>
+                                        <td className="px-4 py-3 text-text-muted">{entry.email}</td>
+                                        <td className="px-4 py-3">
+                                            <span className="inline-flex items-center rounded-full bg-[#f5f5f4] px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.03em] text-[#57534e]">
+                                                {ROLE_LABELS[entry.role] || entry.role}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-[#78716c] text-xs">
+                                            {entry._isUser && entry.last_activity_at
+                                                ? formatDate(entry.last_activity_at)
+                                                : entry._isUser ? formatDate(entry.created_at) : "—"}
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            <div className="inline-flex gap-0.5">
+                                                <button onClick={() => openEdit(entry, !entry._isUser)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#f5f5f4]" title="Editar">
+                                                    <Pencil className="h-4 w-4" />
+                                                </button>
+                                                <button onClick={() => { setDeleteTarget(entry); setDeleteIsWhitelist(!entry._isUser); }} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#fee2e2] hover:text-[#dc2626]" title={entry._isUser ? "Eliminar usuario" : "Eliminar de whitelist"}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+
+                    {/* Paginación */}
+                    {totalPages > 1 && (
+                        <div className="flex items-center justify-between border-t border-[#e5e5e5] px-4 py-3">
+                            <p className="text-sm text-[#57534e]">
+                                Mostrando {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filteredEntries.length)} de {filteredEntries.length} resultados
+                            </p>
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={() => setPage(Math.max(1, page - 1))}
+                                    disabled={page === 1}
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#f5f5f4] disabled:cursor-not-allowed disabled:opacity-40"
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </button>
+                                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                                    <button
+                                        key={p}
+                                        onClick={() => setPage(p)}
+                                        className={`inline-flex h-8 w-8 items-center justify-center rounded-lg text-sm font-medium transition-colors ${
+                                            p === page
+                                                ? 'bg-[#c2410c] text-white'
+                                                : 'text-[#57534e] hover:bg-[#f5f5f4]'
+                                        }`}
+                                    >
+                                        {p}
+                                    </button>
+                                ))}
+                                <button
+                                    onClick={() => setPage(Math.min(totalPages, page + 1))}
+                                    disabled={page === totalPages}
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#f5f5f4] disabled:cursor-not-allowed disabled:opacity-40"
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+            </section>
+
+            {/* ═══ SECCIÓN 2: Evaluadores Externos — Crear Cuentas ═══ */}
+            <section id="crear-evaluador" className="rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
+                <div className="mb-5 flex items-center gap-2 flex-wrap">
+                    <UserPlus className="h-4 w-4 text-[#c2410c]" />
+                    <h2 className="text-lg font-bold text-text">Evaluadores Externos - Crear Cuentas</h2>
+                    <span className="ml-auto rounded-full bg-[#e7e5e4] px-2.5 py-0.5 text-xs font-semibold text-[#57534e]">
+                        {evaluadores.length} cuentas
+                    </span>
+                </div>
+
+                <form onSubmit={handleCrearEvaluador}>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        <div className="flex flex-col gap-1.5">
+                            <label htmlFor="eval-nombre" className="text-sm font-semibold text-text">
+                                Nombre completo <span className="text-[#dc2626]">*</span>
+                            </label>
+                            <input
+                                id="eval-nombre"
+                                type="text"
+                                value={evalNombre}
+                                onChange={(e) => setEvalNombre(e.target.value)}
+                                className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-text outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                placeholder="Nombre del evaluador"
+                                required
+                            />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                            <label htmlFor="eval-correo" className="text-sm font-semibold text-text">
                                 Correo electrónico <span className="text-[#dc2626]">*</span>
                             </label>
                             <input
-                                id="add-email"
+                                id="eval-correo"
                                 type="email"
-                                value={addEmail}
-                                onChange={(e) => setAddEmail(e.target.value)}
-                                placeholder="usuario@unab.edu.co"
+                                value={evalCorreo}
+                                onChange={(e) => setEvalCorreo(e.target.value)}
+                                className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-text outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                placeholder="evaluador@ejemplo.com"
                                 required
-                                className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
                             />
                         </div>
-                        <div className="flex-1">
-                            <label
-                                htmlFor="add-name"
-                                className="mb-1 block text-xs font-semibold text-[#1c1917]"
-                            >
-                                Nombre completo
+                        <div className="flex flex-col gap-1.5">
+                            <label htmlFor="eval-pass" className="text-sm font-semibold text-text">
+                                Contraseña <span className="text-[#dc2626]">*</span>
                             </label>
-                            <input
-                                id="add-name"
-                                type="text"
-                                value={addName}
-                                onChange={(e) => setAddName(e.target.value)}
-                                placeholder="Ej: Juan Pérez"
-                                className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
-                            />
+                            <div className="flex gap-1">
+                                <input
+                                    id="eval-pass"
+                                    type="text"
+                                    value={evalPass}
+                                    onChange={(e) => setEvalPass(e.target.value)}
+                                    className="flex-1 min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm font-mono text-text outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                    required
+                                />
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col gap-1.5">
+                            <label htmlFor="eval-pass2" className="text-sm font-semibold text-text">
+                                Confirmar contraseña
+                            </label>
+                            <div className="flex gap-1">
+                                <input
+                                    id="eval-pass2"
+                                    type="text"
+                                    value={evalPass2}
+                                    onChange={(e) => setEvalPass2(e.target.value)}
+                                    className="flex-1 min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm font-mono text-text outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const p = genPassword();
+                                        setEvalPass(p);
+                                        setEvalPass2(p);
+                                    }}
+                                    className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[#e5e5e5] px-3 py-2 text-xs font-semibold text-[#57534e] transition-colors hover:bg-[#f5f5f4] hover:text-[#c2410c]"
+                                >
+                                    <RefreshCw className="h-3.5 w-3.5" />
+                                    Generar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="mt-5 flex items-center gap-3">
+                        <button
+                            type="submit"
+                            className="inline-flex items-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a]"
+                        >
+                            <UserPlus className="h-4 w-4" />
+                            Crear cuenta de evaluador
+                        </button>
+                    </div>
+                </form>
+
+                <hr className="my-6 border-t border-[#e5e5e5]" />
+
+                <div className="mb-4 flex items-center gap-2 flex-wrap">
+                    <svg viewBox="0 0 24 24" className="h-4 w-4 text-[#c2410c]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                    <h3 className="text-md font-bold text-text">Evaluadores Creados</h3>
+                </div>
+
+                <div className="w-full overflow-x-auto rounded-lg border border-[#e5e5e5] bg-white">
+                    <table className="w-full text-left text-sm tabular-nums">
+                        <thead className="bg-[#f5f5f4] text-[11px] font-bold uppercase tracking-[0.05em] text-[#57534e]">
+                            <tr>
+                                <th className="whitespace-nowrap px-4 py-3">Nombre</th>
+                                <th className="whitespace-nowrap px-4 py-3">Correo</th>
+                                <th className="whitespace-nowrap px-4 py-3">Usuario</th>
+                                <th className="whitespace-nowrap px-4 py-3">Fecha creación</th>
+                                <th className="whitespace-nowrap px-4 py-3">Último acceso</th>
+                                <th className="whitespace-nowrap px-4 py-3">Estado</th>
+                                <th className="whitespace-nowrap px-4 py-3 text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {evaluadores.length === 0 ? (
+                                <tr>
+                                    <td colSpan={7} className="px-4 py-12 text-center text-sm text-[#57534e]">
+                                        No hay evaluadores externos registrados.
+                                    </td>
+                                </tr>
+                            ) : (
+                                evaluadores.map((ev) => {
+                                    const isActive = ev.role !== 'Inactivo';
+                                    const statusLabel = isActive ? 'Activo' : 'Inactivo';
+                                    return (
+                                        <tr key={ev.id} className="border-b border-[#e5e5e5] last:border-none">
+                                            <td className="px-4 py-3 font-medium text-text">
+                                                {(ev as any).name || (ev.created_by?.name ?? '—')}
+                                            </td>
+                                            <td className="px-4 py-3 text-text-muted">{ev.email}</td>
+                                            <td className="px-4 py-3 font-mono text-xs text-[#78716c]">
+                                                {ev.email.split('@')[0]}
+                                            </td>
+                                            <td className="px-4 py-3 text-xs text-[#78716c]">{formatDate(ev.created_at)}</td>
+                                            <td className="px-4 py-3 text-xs text-[#78716c]">—</td>
+                                            <td className="px-4 py-3">
+                                                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.03em] ${badgeClass(statusLabel)}`}>
+                                                    {statusLabel}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-right">
+                                                <div className="inline-flex gap-0.5">
+                                                    <button className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#f5f5f4] hover:text-[#c2410c]" title="Editar">
+                                                        <Pencil className="h-4 w-4" />
+                                                    </button>
+                                                    <button className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#f5f5f4] hover:text-[#c2410c]" title="Restablecer contraseña">
+                                                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /><path d="M12 15v-2" /><circle cx="12" cy="18" r="0.5" fill="currentColor" /></svg>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            {/* ═══ SECCIÓN 3: Agregar Usuarios ═══ */}
+            <section className="rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
+                <div className="mb-5 flex items-center gap-2 flex-wrap">
+                    <svg viewBox="0 0 24 24" className="h-4 w-4 text-[#c2410c]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="4" width="20" height="16" rx="2" />
+                        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                    </svg>
+                    <h2 className="text-lg font-bold text-text">Agregar Usuarios</h2>
+                    <span className="ml-auto rounded-full bg-[#e7e5e4] px-2.5 py-0.5 text-xs font-semibold text-[#57534e]">
+                        Nuevos usuarios
+                    </span>
+                </div>
+                <p className="mb-4 text-sm text-[#57534e]">
+                    Registre los correos institucionales para crear cuentas de estudiantes y directores. Podrán acceder al sistema usando su correo institucional (Google OAuth).
+                </p>
+
+                <div className="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-2">
+                    {/* Estudiantes */}
+                    <form onSubmit={handleAgregarEstudiante} className="rounded-2xl bg-[#e7e5e4] p-[2px]">
+                        <div className="rounded-[22px] bg-white p-5" style={{ borderRadius: 'calc(24px - 2px)' }}>
+                            <div className="mb-4 flex items-center gap-2">
+                                <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#c2410c]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+                                    <path d="M6 12v5c0 1.1 2.7 3 6 3s6-1.9 6-3v-5" />
+                                </svg>
+                                <h3 className="text-md font-bold text-text m-0">Estudiantes</h3>
+                            </div>
+                            <div className="flex flex-col gap-1.5 mb-3">
+                                <label htmlFor="correo-est" className="text-sm font-semibold text-text">Correo institucional</label>
+                                <input
+                                    id="correo-est"
+                                    type="email"
+                                    value={estCorreo}
+                                    onChange={(e) => setEstCorreo(e.target.value)}
+                                    className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-text outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                    placeholder="ejemplo@unab.edu.co"
+                                />
+                                <span className="text-xs text-[#57534e]">El correo debe ser institucional @unab.edu.co</span>
+                            </div>
+                            <div className="flex flex-col gap-1.5 mb-4">
+                                <label htmlFor="nombre-est" className="text-sm font-semibold text-text">Nombre completo</label>
+                                <input
+                                    id="nombre-est"
+                                    type="text"
+                                    value={estNombre}
+                                    onChange={(e) => setEstNombre(e.target.value)}
+                                    className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-text outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                    placeholder="Ej: Juan Pérez"
+                                />
+                            </div>
                             <button
                                 type="submit"
-                                disabled={adding || !addEmail.trim()}
-                                className="inline-flex items-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a] disabled:cursor-not-allowed disabled:opacity-60"
+                                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a]"
                             >
-                                {adding && <Loader2 className="h-4 w-4 animate-spin" />}
                                 <UserPlus className="h-4 w-4" />
-                                Agregar
+                                Agregar Estudiante
+                            </button>
+                        </div>
+                    </form>
+
+                    {/* Directores */}
+                    <form onSubmit={handleAgregarDirector} className="rounded-2xl bg-[#e7e5e4] p-[2px]">
+                        <div className="rounded-[22px] bg-white p-5" style={{ borderRadius: 'calc(24px - 2px)' }}>
+                            <div className="mb-4 flex items-center gap-2">
+                                <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#4f46e5]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M6 9a6 6 0 0 1 12 0v6a6 6 0 0 1-12 0V9Z" />
+                                    <path d="M12 3v3" />
+                                    <path d="M8 21h8" />
+                                </svg>
+                                <h3 className="text-md font-bold text-text m-0">Directores</h3>
+                            </div>
+                            <div className="flex flex-col gap-1.5 mb-3">
+                                <label htmlFor="correo-dir" className="text-sm font-semibold text-text">Correo institucional</label>
+                                <input
+                                    id="correo-dir"
+                                    type="email"
+                                    value={dirCorreo}
+                                    onChange={(e) => setDirCorreo(e.target.value)}
+                                    className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-text outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                    placeholder="docente@unab.edu.co"
+                                />
+                                <span className="text-xs text-[#57534e]">Docentes y directores de proyecto</span>
+                            </div>
+                            <div className="flex flex-col gap-1.5 mb-4">
+                                <label htmlFor="nombre-dir" className="text-sm font-semibold text-text">Nombre completo</label>
+                                <input
+                                    id="nombre-dir"
+                                    type="text"
+                                    value={dirNombre}
+                                    onChange={(e) => setDirNombre(e.target.value)}
+                                    className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-text outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                    placeholder="Ej: Dr. Ricardo Gómez"
+                                />
+                            </div>
+                            <div className="flex flex-col gap-1.5 mb-4">
+                                <label htmlFor="areas-dir" className="text-sm font-semibold text-text">Áreas de especialización</label>
+                                <textarea
+                                    id="areas-dir"
+                                    rows={3}
+                                    value={dirAreas}
+                                    onChange={(e) => setDirAreas(e.target.value)}
+                                    className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-text outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y"
+                                    placeholder="Ej: Inteligencia Artificial, Desarrollo Web, Seguridad..."
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#4f46e5] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#4338ca]"
+                            >
+                                <UserPlus className="h-4 w-4" />
+                                Agregar Director
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            {/* ═══ MODAL: Nuevo / Editar usuario ═══ */}
+            {modalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                    <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-[0_20px_60px_rgba(28,25,23,0.15)]">
+                        <div className="mb-5 flex items-center justify-between">
+                            <h2 className="text-lg font-bold text-text">
+                                {editingUser ? 'Cambiar rol' : 'Nuevo usuario'}
+                            </h2>
+                            <button
+                                onClick={() => { setModalOpen(false); setEditingUser(null); setEditingIsWhitelist(false); }}
+                                className="rounded-lg p-1.5 text-text-muted transition hover:bg-[#f5f5f4] hover:text-text"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                                    <div>
+                                        <label className="mb-1.5 block text-sm font-semibold text-text">Nombre completo</label>
+                                        <input
+                                            type="text"
+                                            value={formName}
+                                            onChange={(e) => setFormName(e.target.value)}
+                                            placeholder="Ej: Juan Pérez"
+                                            className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3.5 py-2.5 text-sm text-text outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="mb-1.5 block text-sm font-semibold text-text">Correo electrónico</label>
+                                        <input
+                                            type="email"
+                                            value={formEmail}
+                                            onChange={(e) => setFormEmail(e.target.value)}
+                                            required
+                                            placeholder="usuario@unab.edu.co"
+                                            className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3.5 py-2.5 text-sm text-text outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                        />
+                                    </div>
+                            <div>
+                                <label className="mb-1.5 block text-sm font-semibold text-text">Rol</label>
+                                <select
+                                    value={formRole}
+                                    onChange={(e) => setFormRole(e.target.value)}
+                                    className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3.5 py-2.5 text-sm text-text outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                >
+                                    {ROLES.map((r) => (
+                                        <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="flex justify-end gap-3 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => { setModalOpen(false); setEditingUser(null); setEditingIsWhitelist(false); }}
+                                    className="rounded-lg border border-[#e5e5e5] px-4 py-2.5 text-sm font-medium text-text transition hover:bg-[#f5f5f4]"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={submitting}
+                                    className="inline-flex items-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#9a330a] disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                                    {editingUser ? 'Guardar cambios' : 'Crear usuario'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ═══ MODAL: Confirmar eliminación ═══ */}
+            {deleteTarget && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                    <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-[0_20px_60px_rgba(28,25,23,0.15)]">
+                        <h2 className="mb-2 text-lg font-bold text-text">Confirmar eliminación</h2>
+                        <p className="mb-5 text-sm text-[#57534e]">
+                            ¿Estás seguro de que deseas eliminar a <strong>{deleteTarget.email}</strong>?
+                            Esta acción no se puede deshacer.
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <button
+                                onClick={() => { setDeleteTarget(null); setDeleteIsWhitelist(false); }}
+                                className="rounded-lg border border-[#e5e5e5] px-4 py-2.5 text-sm font-medium text-text transition hover:bg-[#f5f5f4]"
+                            >
+                                Cancelar
                             </button>
                             <button
-                                type="button"
-                                onClick={() => {
-                                    setShowAddForm(false);
-                                    setAddEmail('');
-                                    setAddName('');
-                                    setAddError(null);
-                                }}
-                                className="inline-flex items-center gap-2 rounded-lg border border-[#e5e5e5] bg-transparent px-4 py-2.5 text-sm font-semibold text-[#1c1917] transition-colors hover:bg-[#f5f5f4]"
+                                onClick={handleDelete}
+                                disabled={deleting}
+                                className="inline-flex items-center gap-2 rounded-lg bg-[#dc2626] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#b91c1c] disabled:cursor-not-allowed disabled:opacity-60"
                             >
-                                <X className="h-4 w-4" />
-                                Cancelar
+                                {deleting && <Loader2 className="h-4 w-4 animate-spin" />}
+                                Eliminar
                             </button>
                         </div>
                     </div>
-                    {addError && (
-                        <p className="mt-2 text-xs font-medium text-[#dc2626]" role="alert">
-                            {addError}
-                        </p>
-                    )}
-                </form>
+                </div>
             )}
-
-            {/* Users table */}
-            <DataTable
-                columns={columns}
-                data={users}
-                loading={loading}
-                emptyMessage="No hay usuarios registrados."
-                getRowKey={getRowKey}
-            />
-
-            {/* Delete confirmation dialog */}
-            <ConfirmDialog
-                open={deleteTarget !== null}
-                title="Eliminar usuario"
-                message={
-                    deleteTarget
-                        ? `¿Estás seguro de que deseas eliminar a ${deleteTarget.name || deleteTarget.email}? Esta acción no se puede deshacer.`
-                        : ''
-                }
-                confirmLabel={deleting ? 'Eliminando…' : 'Eliminar'}
-                cancelLabel="Cancelar"
-                onConfirm={handleDelete}
-                onCancel={() => {
-                    if (!deleting) setDeleteTarget(null);
-                }}
-                variant="danger"
-            />
         </div>
     );
 }

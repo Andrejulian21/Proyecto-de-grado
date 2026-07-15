@@ -37,7 +37,7 @@ export function useCupos() {
         fetchData();
     }, [fetchData]);
 
-    const updateCupo = useCallback(async (directorId: number, newMax: number): Promise<{ ok: boolean; error?: string }> => {
+    const updateCupo = useCallback(async (directorId: number, newMax: number, newAreas?: string): Promise<{ ok: boolean; error?: string }> => {
         const director = data.find((d) => d.id === directorId);
         if (!director) return { ok: false, error: 'Director no encontrado' };
 
@@ -49,10 +49,14 @@ export function useCupos() {
         }
 
         try {
+            const body: Record<string, unknown> = { max_capacity: newMax };
+            if (newAreas !== undefined) {
+                body.areas = newAreas;
+            }
             const res = await apiFetch(`/api/admin/directores/${directorId}/cupo`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ max_capacity: newMax }),
+                body: JSON.stringify(body),
             });
             if (!res.ok) {
                 const body = await res.json().catch(() => null);

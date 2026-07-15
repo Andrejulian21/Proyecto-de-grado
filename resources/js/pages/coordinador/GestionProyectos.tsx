@@ -28,10 +28,10 @@ import {
 /* ------------------------------------------------------------------ */
 
 const statusConfig: Record<string, { label: string; variant: 'success' | 'info' | 'inactivo' | 'warning' | 'en-curso' | 'riesgo' }> = {
-    active: { label: 'Activo', variant: 'success' },
-    completed: { label: 'Completado', variant: 'inactivo' },
-    'at-risk': { label: 'En riesgo', variant: 'riesgo' },
-    'on-hold': { label: 'En pausa', variant: 'warning' },
+    en_curso: { label: 'En curso', variant: 'success' },
+    completado: { label: 'Completado', variant: 'inactivo' },
+    en_riesgo: { label: 'En riesgo', variant: 'riesgo' },
+    incumplimiento: { label: 'Incumplimiento', variant: 'warning' },
     inscribed: { label: 'Inscrito', variant: 'en-curso' },
 };
 
@@ -93,7 +93,7 @@ export default function GestionProyectos() {
     } = useProyectos(selectedGroupId);
 
     // We need grupos for create-form group display & GroupSelector
-    const { data: grupos } = useGrupos();
+    const { data: grupos, refetch: refetchGrupos, actualizar } = useGrupos();
 
     const {
         data: cupos,
@@ -120,8 +120,16 @@ export default function GestionProyectos() {
     /* ── Cupo editing state ────────────────────────────────────────── */
     const [editingCupoId, setEditingCupoId] = useState<number | null>(null);
     const [editingCupoValue, setEditingCupoValue] = useState<number>(0);
+    const [editingCupoAreas, setEditingCupoAreas] = useState<string>('');
     const [cupoSaving, setCupoSaving] = useState<number | null>(null);
     const [cupoError, setCupoError] = useState<string | null>(null);
+
+    /* ── Semester toggle state ─────────────────────────────────────── */
+    const [toggleLoading, setToggleLoading] = useState(false);
+    const [toggleError, setToggleError] = useState<string | null>(null);
+
+    /* ── Selected semester ─────────────────────────────────────────── */
+    const selectedGroup = selectedGroupId ? grupos.find((g) => g.id === selectedGroupId) ?? null : null;
 
     /* ── Search (local filter) ─────────────────────────────────────── */
     const [search, setSearch] = useState('');
@@ -143,7 +151,7 @@ export default function GestionProyectos() {
         try {
             await crearProyecto({
                 title: formTitle.trim(),
-                grupo_id: selectedGroupId!,
+                semester_id: selectedGroupId!,
                 director_id: formDirectorId!,
                 student_ids: formStudents.map((s) => s.id),
             });
@@ -166,7 +174,7 @@ export default function GestionProyectos() {
             directorId: proyecto.director?.id ?? 0,
         });
         setEditStudents(
-            proyecto.students.map((s) => ({ id: s.id, name: s.name, email: '' })),
+            (proyecto.estudiantes ?? []).map((s) => ({ id: s.id, name: s.name, email: s.email ?? '' })),
         );
     }, []);
 
@@ -201,7 +209,7 @@ export default function GestionProyectos() {
         async (directorId: number) => {
             setCupoSaving(directorId);
             setCupoError(null);
-            const result = await updateCupo(directorId, editingCupoValue);
+            const result = await updateCupo(directorId, editingCupoValue, editingCupoAreas);
             if (!result.ok) {
                 setCupoError(result.error ?? 'Error al guardar cupo');
             } else {
@@ -209,7 +217,7 @@ export default function GestionProyectos() {
             }
             setCupoSaving(null);
         },
-        [editingCupoValue, updateCupo],
+        [editingCupoValue, editingCupoAreas, updateCupo],
     );
 
     /* ── Table columns ─────────────────────────────────────────────── */
@@ -234,7 +242,7 @@ export default function GestionProyectos() {
             label: 'Estudiantes',
             render: (row) => (
                 <span className="text-xs text-[#57534e]">
-                    {row.students.map((s) => s.name).join(', ')}
+                    {row.estudiantes?.map((s) => s.name).join(', ') ?? '—'}
                 </span>
             ),
         },
@@ -249,14 +257,14 @@ export default function GestionProyectos() {
             key: 'phase',
             label: 'Fase',
             render: (row) => (
-                <span className="text-xs text-[#57534e]">{row.phase ?? '—'}</span>
+                <span className="text-xs text-[#57534e]">{row.current_phase ?? '—'}</span>
             ),
         },
         {
             key: 'status',
             label: 'Estado',
             render: (row) => {
-                const cfg = statusConfig[row.status] ?? statusConfig.active;
+                const cfg = statusConfig[row.status] ?? { label: row.status, variant: 'info' as const };
                 return <StatusBadge variant={cfg.variant}>{cfg.label}</StatusBadge>;
             },
         },
@@ -300,7 +308,7 @@ export default function GestionProyectos() {
         return (
             p.code.toLowerCase().includes(q) ||
             p.title.toLowerCase().includes(q) ||
-            p.students.some((s) => s.name.toLowerCase().includes(q))
+            (p.estudiantes?.some((s) => s.name.toLowerCase().includes(q)) ?? false)
         );
     });
 
@@ -324,6 +332,62 @@ export default function GestionProyectos() {
                     <p className="mt-2 text-xs text-[#78716c]">
                         Seleccione un grupo para ver sus proyectos.
                     </p>
+                )}
+
+                {selectedGroup && (
+                    <div className="mt-4 flex items-center justify-between rounded-lg border border-[#e5e5e5] bg-[#fafaf9] px-4 py-3">
+                        <div className="flex items-center gap-3">
+                            <span className="text-sm font-semibold text-[#1c1917]">
+                                {selectedGroup.name}
+                            </span>
+                            <span
+                                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                                    selectedGroup.is_active
+                                        ? 'bg-[#dcfce7] text-[#166534]'
+                                        : 'bg-[#f5f5f4] text-[#78716c]'
+                                }`}
+                            >
+                                <span
+                                    className={`h-1.5 w-1.5 rounded-full ${
+                                        selectedGroup.is_active ? 'bg-[#16a34a]' : 'bg-[#a8a29e]'
+                                    }`}
+                                />
+                                {selectedGroup.is_active ? 'Activo' : 'Inactivo'}
+                            </span>
+                        </div>
+                        <button
+                            onClick={async () => {
+                                if (toggleLoading) return;
+                                setToggleLoading(true);
+                                setToggleError(null);
+                                try {
+                                    await actualizar(selectedGroup.id, {
+                                        is_active: !selectedGroup.is_active,
+                                    });
+                                    await refetchGrupos();
+                                } catch (err) {
+                                    setToggleError(
+                                        err instanceof Error ? err.message : 'Error al cambiar estado',
+                                    );
+                                } finally {
+                                    setToggleLoading(false);
+                                }
+                            }}
+                            disabled={toggleLoading}
+                            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors active:scale-[0.98] disabled:opacity-60 ${
+                                selectedGroup.is_active
+                                    ? 'border border-[#e5e5e5] text-[#dc2626] hover:bg-[#fef2f2]'
+                                    : 'bg-[#c2410c] text-white hover:bg-[#9a330a]'
+                            }`}
+                        >
+                            {toggleLoading && <Loader2 className="h-3 w-3 animate-spin" />}
+                            {selectedGroup.is_active ? 'Desactivar' : 'Activar'}
+                        </button>
+                    </div>
+                )}
+
+                {toggleError && (
+                    <p className="mt-2 text-xs font-medium text-[#dc2626]">{toggleError}</p>
                 )}
             </section>
 
@@ -528,7 +592,18 @@ export default function GestionProyectos() {
                                                 {c.name}
                                             </td>
                                             <td className="px-4 py-3 text-xs text-[#57534e]">
-                                                {c.areas?.join(', ') || '—'}
+                                                {isEditing ? (
+                                                    <textarea
+                                                        value={editingCupoAreas}
+                                                        onChange={(e) => setEditingCupoAreas(e.target.value)}
+                                                        rows={3}
+                                                        className="w-full min-w-[200px] rounded-lg border border-[#e5e5e5] bg-white px-2 py-1 text-xs outline-none focus:border-[#c2410c] resize-y"
+                                                        aria-label={`Áreas de especialización para ${c.name}`}
+                                                        placeholder="Una línea por área"
+                                                    />
+                                                ) : (
+                                                    <span className="whitespace-pre-wrap">{c.areas?.join(', ') || '—'}</span>
+                                                )}
                                             </td>
                                             <td className="px-4 py-3 text-center font-semibold text-[#1c1917]">
                                                 {c.active_projects}
@@ -598,6 +673,7 @@ export default function GestionProyectos() {
                                                         onClick={() => {
                                                             setEditingCupoId(c.id);
                                                             setEditingCupoValue(c.max_capacity);
+                                                            setEditingCupoAreas((c.areas ?? []).join('\n'));
                                                             setCupoError(null);
                                                         }}
                                                         className="inline-flex items-center gap-1 rounded-lg border border-[#e5e5e5] px-2.5 py-1.5 text-xs font-semibold text-[#c2410c] transition-colors hover:bg-[#fed7aa]"

@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useDirectores, type Director, type DirectorProyecto, type Bitacora } from '@/hooks/useDirectores';
@@ -91,8 +90,8 @@ function DirectorCard({ director, onViewBitacoras, onViewProyectos }: DirectorCa
 
             {director.areas.length > 0 && (
                 <div className="mb-4 flex flex-wrap gap-1.5">
-                    {director.areas.map((area) => (
-                        <StatusBadge key={area.id} variant="info">{area.name}</StatusBadge>
+                    {director.areas.map((area, idx) => (
+                        <StatusBadge key={idx} variant="info">{area}</StatusBadge>
                     ))}
                 </div>
             )}
@@ -128,7 +127,6 @@ interface ProjectCardProps {
 }
 
 function ProjectCard({ proyecto, mode, onSelect }: ProjectCardProps) {
-    const navigate = useNavigate();
     const isBitacoraMode = mode === 'bitacoras';
 
     return (
@@ -141,13 +139,13 @@ function ProjectCard({ proyecto, mode, onSelect }: ProjectCardProps) {
                         <span className="inline-flex items-center rounded-full bg-[#e7e5e4] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.03em] text-[#57534e]">
                             {proyecto.code}
                         </span>
-                        <StatusBadge variant={proyecto.status === 'active' ? 'success' : proyecto.status === 'at-risk' ? 'riesgo' : 'inactivo'}>
-                            {proyecto.status === 'active' ? 'Activo' : proyecto.status === 'at-risk' ? 'En Riesgo' : 'Completado'}
+                        <StatusBadge variant={proyecto.status === 'en_curso' ? 'success' : proyecto.status === 'en_riesgo' ? 'riesgo' : 'inactivo'}>
+                            {proyecto.status === 'en_curso' ? 'En Curso' : proyecto.status === 'en_riesgo' ? 'En Riesgo' : proyecto.status === 'completado' ? 'Completado' : 'Incumplimiento'}
                         </StatusBadge>
                     </div>
                     <h3 className="mt-2 text-sm font-bold text-[#1c1917]">{proyecto.title}</h3>
                     <p className="mt-1 text-xs text-[#78716c]">
-                        {proyecto.students.map((s) => s.name).join(', ')}
+                        {(proyecto.estudiantes ?? []).map((s) => s.name).join(', ')}
                     </p>
                 </div>
 
@@ -163,7 +161,7 @@ function ProjectCard({ proyecto, mode, onSelect }: ProjectCardProps) {
                         </button>
                     ) : (
                         <button
-                            onClick={() => navigate(`/dashboard/coordinador/proyecto/${proyecto.id}`)}
+                            onClick={() => onSelect(proyecto)}
                             className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-[#e5e5e5] bg-white px-3 py-1.5 text-xs font-semibold text-[#1c1917] transition-colors hover:border-[#c2410c] hover:bg-[#fed7aa] hover:text-[#c2410c] active:scale-[0.98]"
                             aria-label={`Ver supervisión de ${proyecto.title}`}
                         >
@@ -224,7 +222,6 @@ function BitacoraItem({ bitacora }: { bitacora: Bitacora }) {
 /* ── Main Component ── */
 
 export default function DirectoresPage() {
-    const navigate = useNavigate();
     const {
         directores,
         loading,
@@ -240,6 +237,8 @@ export default function DirectoresPage() {
         bitacoras,
         loadingBitacoras,
         errorBitacoras,
+        viewProyecto,
+        clearProyecto,
         reset,
     } = useDirectores();
 
@@ -269,10 +268,15 @@ export default function DirectoresPage() {
         setNivel(3);
     }
 
+    function handleViewSupervision(proyecto: DirectorProyecto) {
+        viewProyecto(proyecto);
+        setNivel(3);
+    }
+
     function handleBack() {
         if (nivel === 3) {
             setNivel(2);
-            setSelectedProyecto(null);
+            clearProyecto();
         } else if (nivel === 2) {
             setNivel(1);
             reset();
@@ -366,7 +370,7 @@ export default function DirectoresPage() {
                                     key={proyecto.id}
                                     proyecto={proyecto}
                                     mode={drillMode}
-                                    onSelect={handleSelectProyecto}
+                                    onSelect={drillMode === 'proyectos' ? handleViewSupervision : handleSelectProyecto}
                                 />
                             ))}
                         </div>
@@ -409,6 +413,7 @@ export default function DirectoresPage() {
                 <SupervisionReadOnly
                     projectCode={selectedProyecto.code}
                     projectTitle={selectedProyecto.title}
+                    projectId={selectedProyecto.id}
                 />
             )}
         </div>

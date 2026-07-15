@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { Loader2, ArrowLeft, Calendar, User, Paperclip, FileDown, FileText } from 'lucide-react';
+import { Loader2, ArrowLeft, Calendar, User, Paperclip, FileDown, FileText, AlertCircle } from 'lucide-react';
+import { apiFetch } from '@/lib/utils';
 
 interface Attachment {
     name: string;
@@ -18,31 +19,29 @@ interface AnnouncementDetail {
     attachments?: Attachment[];
 }
 
-const MOCK_DETAIL: Record<number, AnnouncementDetail> = {
-    1: {
-        id: 1,
-        title: 'Cronograma de sustentaciones',
-        category: 'importante',
-        date: '28/06/2026',
-        author: 'Coordinación de Proyectos de Grado',
-        body: 'Se informa a la comunidad académica del programa de Ingeniería de Sistemas que las sustentaciones de proyectos de grado correspondientes al ciclo 2026-S1 se realizarán durante la primera semana de agosto de 2026.\n\nLos estudiantes deben asegurarse de haber cargado la versión final de su proyecto y contar con la aprobación de su director antes de inscribirse en la agenda de sustentaciones.\n\nLas fechas específicas por proyecto serán publicadas en los próximos días. Cualquier cambio será notificado oportunamente a través de este medio.',
-        attachments: [
-            { name: 'calendario_sustentaciones_2026.pdf', size: '245 KB' },
-            { name: 'formato_acta_sustentacion.docx', size: '120 KB' },
-        ],
-    },
-    2: {
-        id: 2,
-        title: 'Recordatorio: Entrega de informes finales',
-        category: 'recordatorio',
-        date: '25/06/2026',
-        author: 'Coordinación de Proyectos de Grado',
-        body: 'Se recuerda a todos los estudiantes de proyectos de grado que el plazo para la entrega de informes finales del ciclo 2026-S1 vence el próximo 15 de julio de 2026.\n\nLa entrega debe realizarse a través de la plataforma, adjuntando el documento en formato PDF junto con los anexos correspondientes. Es responsabilidad del estudiante verificar que el archivo cargado sea legible y esté completo.\n\nLos informes que no cumplan con los requisitos de formato establecidos en la guía serán devueltos para corrección.',
-        attachments: [
-            { name: 'guia_informe_final_2026.pdf', size: '310 KB' },
-        ],
-    },
-};
+/** Shape returned by GET /api/anuncios/{id} */
+interface ApiAnnouncement {
+    id: number;
+    title: string;
+    content: string;
+    published_at: string | null;
+    is_active: boolean;
+    author: { id: number; name: string } | null;
+}
+
+function fromApi(a: ApiAnnouncement): AnnouncementDetail {
+    return {
+        id: a.id,
+        title: a.title,
+        category: 'informativo',
+        date: a.published_at
+            ? new Date(a.published_at).toLocaleDateString('es-CO')
+            : '—',
+        author: a.author?.name ?? '—',
+        body: a.content,
+        attachments: [],
+    };
+}
 
 const categoryVariant: Record<string, 'error' | 'warning' | 'info'> = {
     importante: 'error',
@@ -60,19 +59,39 @@ export default function AnuncioDetalle() {
     const { id } = useParams<{ id: string }>();
     const [anuncio, setAnuncio] = useState<AnnouncementDetail | null>(null);
     const [loading, setLoading] = useState(true);
-    const [notFound, setNotFound] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            const data = MOCK_DETAIL[Number(id)];
-            if (data) {
-                setAnuncio(data);
-            } else {
-                setNotFound(true);
+        let cancelled = false;
+
+        async function load() {
+            setLoading(true);
+            setError(null);
+            setAnuncio(null);
+            try {
+                const res = await apiFetch(`/api/anuncios/${id}`);
+                if (!res.ok) {
+                    if (res.status === 404) throw new Error('El anuncio no existe o ha sido eliminado.');
+                    throw new Error('Error al cargar el anuncio');
+                }
+                const body = await res.json();
+                if (!cancelled) {
+                    setAnuncio(fromApi(body.data));
+                }
+            } catch (err) {
+                if (!cancelled) {
+                    setError(err instanceof Error ? err.message : 'Error desconocido');
+                }
+            } finally {
+                if (!cancelled) setLoading(false);
             }
-            setLoading(false);
-        }, 400);
-        return () => clearTimeout(timer);
+        }
+
+        load();
+
+        return () => {
+            cancelled = true;
+        };
     }, [id]);
 
     if (loading) {
@@ -83,16 +102,16 @@ export default function AnuncioDetalle() {
         );
     }
 
-    if (notFound || !anuncio) {
+    if (error || !anuncio) {
         return (
             <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-surface-alt">
-                    <FileText className="h-6 w-6 text-text-subtle" />
+                    <AlertCircle className="h-6 w-6 text-text-subtle" />
                 </div>
                 <div className="flex flex-col gap-1">
                     <h3 className="text-base font-semibold text-text">Anuncio no encontrado</h3>
                     <p className="text-sm text-text-muted">
-                        El anuncio que buscas no existe o ha sido eliminado.
+                        {error ?? 'El anuncio que buscas no existe o ha sido eliminado.'}
                     </p>
                 </div>
                 <Link

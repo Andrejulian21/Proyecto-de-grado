@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Admin\AuditLogController;
+use App\Http\Controllers\Admin\DirectorCupoController;
 use App\Http\Controllers\Admin\EntregaController;
 use App\Http\Controllers\Admin\ProyectoController;
 use App\Http\Controllers\Admin\SemestreController;
@@ -108,6 +109,8 @@ Route::middleware([
     // Anuncios — todos los roles pueden ver (T-020)
     Route::get('/anuncios', [\App\Http\Controllers\Api\AnuncioController::class, 'index'])
         ->name('anuncios.index');
+    Route::get('/anuncios/{anuncio}', [\App\Http\Controllers\Api\AnuncioController::class, 'show'])
+        ->name('anuncios.show');
 
     // Recursos — todos los roles pueden ver (T-021)
     Route::get('/recursos', [\App\Http\Controllers\Api\RecursoController::class, 'index'])
@@ -163,7 +166,7 @@ Route::middleware(['auth:sanctum', 'single_session', 'activity', 'ensure_passwor
 
         // Proyectos CRUD (T-002).
         Route::apiResource('proyectos', ProyectoController::class)
-            ->only(['index', 'store']);
+            ->only(['index', 'store', 'show']);
 
         // Semestres CRUD (T-001).
         Route::apiResource('semestres', SemestreController::class)
@@ -196,6 +199,25 @@ Route::middleware(['auth:sanctum', 'single_session', 'activity', 'ensure_passwor
             ->name('recursos.update');
         Route::delete('/recursos/{recurso}', [\App\Http\Controllers\Api\RecursoController::class, 'destroy'])
             ->name('recursos.destroy');
+
+        // Director quota management — cupos (Sprint 5).
+        Route::get('/directores/cupos', [DirectorCupoController::class, 'index'])
+            ->name('directores.cupos');
+        Route::put('/directores/{director}/cupo', [DirectorCupoController::class, 'update'])
+            ->whereNumber('director')
+            ->name('directores.cupo.update');
+
+        // Directores list + sus proyectos (para la página /directores).
+        Route::get('/directores', [DirectorCupoController::class, 'directores'])
+            ->name('directores.index');
+        Route::get('/directores/{director}/proyectos', [DirectorCupoController::class, 'directorProyectos'])
+            ->whereNumber('director')
+            ->name('directores.proyectos');
+
+        // Bitácoras por proyecto (para la página /directores).
+        Route::get('/proyectos/{proyecto}/bitacoras', [\App\Http\Controllers\Api\BitacoraController::class, 'porProyecto'])
+            ->whereNumber('proyecto')
+            ->name('proyectos.bitacoras');
     });
 
 // Entregas — accessible by all authenticated roles (controller handles RBAC)

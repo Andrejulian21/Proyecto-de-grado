@@ -14,13 +14,16 @@ class RecursoController extends Controller
 {
     public function index(): JsonResponse
     {
-        $recursos = RecursoInformativo::orderByDesc('created_at')->get();
+        $recursos = RecursoInformativo::with('author:id,name')
+            ->orderByDesc('created_at')
+            ->get();
 
         return response()->json(['data' => $recursos]);
     }
 
     public function show(RecursoInformativo $recurso): JsonResponse
     {
+        $recurso->load('author:id,name');
         $recurso->increment('access_count');
 
         return response()->json(['data' => $recurso->fresh()]);

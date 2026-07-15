@@ -69,7 +69,7 @@ export function StudentAutocomplete({
     return (
         <div ref={wrapperRef} className="flex flex-col gap-1.5">
             <label className="text-sm font-semibold text-[#1c1917]">
-                Estudiantes <span className="text-[#dc2626]">*</span>
+                Estudiantes (mínimo 1, máximo {max}) <span className="text-[#dc2626]">*</span>
             </label>
 
             {/* Selected chips */}

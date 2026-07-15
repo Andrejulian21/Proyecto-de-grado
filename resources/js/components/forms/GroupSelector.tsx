@@ -15,7 +15,9 @@ export function GroupSelector({ value, onChange, error, readonly = false }: Grou
     const [open, setOpen] = useState(false);
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [newName, setNewName] = useState('');
-    const [newPeriod, setNewPeriod] = useState('');
+    const [newStartDate, setNewStartDate] = useState('');
+    const [newEndDate, setNewEndDate] = useState('');
+    const [newIsActive, setNewIsActive] = useState(true);
     const [creating, setCreating] = useState(false);
     const [createError, setCreateError] = useState<string | null>(null);
 
@@ -36,10 +38,14 @@ export function GroupSelector({ value, onChange, error, readonly = false }: Grou
         try {
             const nuevo = await crear({
                 name: newName.trim(),
-                period: newPeriod.trim() || undefined,
+                start_date: newStartDate,
+                end_date: newEndDate,
+                is_active: newIsActive,
             });
             setNewName('');
-            setNewPeriod('');
+            setNewStartDate('');
+            setNewEndDate('');
+            setNewIsActive(true);
             setShowCreateForm(false);
             onChange(nuevo.id);
         } catch (err) {
@@ -47,7 +53,7 @@ export function GroupSelector({ value, onChange, error, readonly = false }: Grou
         } finally {
             setCreating(false);
         }
-    }, [newName, newPeriod, crear, onChange]);
+    }, [newName, newStartDate, newEndDate, newIsActive, crear, onChange]);
 
     // Read-only mode: just show the selected group name
     if (readonly) {
@@ -106,7 +112,14 @@ export function GroupSelector({ value, onChange, error, readonly = false }: Grou
                                                 value === grupo.id ? 'bg-[#fed7aa] font-semibold text-[#9a330a]' : 'text-[#1c1917]'
                                             }`}
                                         >
-                                            <span>{grupo.name}</span>
+                                            <span className="flex items-center gap-2">
+                                                {grupo.name}
+                                                {grupo.is_active && (
+                                                    <span className="rounded-full bg-[#dcfce7] px-2 py-0.5 text-[10px] font-bold text-[#166534]">
+                                                        Activo
+                                                    </span>
+                                                )}
+                                            </span>
                                             {value === grupo.id && <Check className="h-4 w-4" />}
                                         </button>
                                     </li>
@@ -127,12 +140,32 @@ export function GroupSelector({ value, onChange, error, readonly = false }: Grou
                                     <div className="relative">
                                         <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#78716c]" />
                                         <input
-                                            type="month"
-                                            value={newPeriod}
-                                            onChange={(e) => setNewPeriod(e.target.value)}
+                                            type="date"
+                                            value={newStartDate}
+                                            onChange={(e) => setNewStartDate(e.target.value)}
                                             className="w-full rounded-lg border border-[#e5e5e5] bg-white pl-9 pr-3 py-2 text-sm outline-none focus:border-[#c2410c]"
+                                            placeholder="Fecha inicio"
                                         />
                                     </div>
+                                    <div className="relative">
+                                        <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#78716c]" />
+                                        <input
+                                            type="date"
+                                            value={newEndDate}
+                                            onChange={(e) => setNewEndDate(e.target.value)}
+                                            className="w-full rounded-lg border border-[#e5e5e5] bg-white pl-9 pr-3 py-2 text-sm outline-none focus:border-[#c2410c]"
+                                            placeholder="Fecha fin"
+                                        />
+                                    </div>
+                                    <label className="flex items-center gap-2 text-sm text-[#1c1917]">
+                                        <input
+                                            type="checkbox"
+                                            checked={newIsActive}
+                                            onChange={(e) => setNewIsActive(e.target.checked)}
+                                            className="h-4 w-4 rounded border-[#e5e5e5] text-[#c2410c] accent-[#c2410c] focus:ring-[#c2410c]"
+                                        />
+                                        Semestre activo
+                                    </label>
                                     {createError && (
                                         <span className="text-xs text-[#dc2626]">{createError}</span>
                                     )}
@@ -140,7 +173,7 @@ export function GroupSelector({ value, onChange, error, readonly = false }: Grou
                                         <button
                                             type="button"
                                             onClick={handleCreateGroup}
-                                            disabled={!newName.trim() || creating}
+                                            disabled={!newName.trim() || !newStartDate || !newEndDate || creating}
                                             className="inline-flex items-center gap-1 rounded-lg bg-[#c2410c] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#9a330a] disabled:cursor-not-allowed disabled:opacity-60"
                                         >
                                             {creating ? (

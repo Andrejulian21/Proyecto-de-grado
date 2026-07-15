@@ -32,9 +32,7 @@ const navConfig: Record<string, { to: string; icon: typeof LayoutDashboard; labe
         { to: '/anuncios/admin', label: 'Anuncios Admin', icon: Megaphone },
         { to: '/alertas', label: 'Alertas', icon: Bell },
         { to: '/coordinador/entregas', label: 'Entregas', icon: FolderKanban },
-        { to: '/coordinador/bitacoras', label: 'Bitácoras', icon: ScrollText },
-        { to: '/semestre', label: 'Semestre', icon: Calendar },
-        { to: '/reportes', label: 'Reportes', icon: BarChart3 },
+
         { to: '/recursos/admin', label: 'Recursos Admin', icon: FolderKanban },
     ],
     Director: [

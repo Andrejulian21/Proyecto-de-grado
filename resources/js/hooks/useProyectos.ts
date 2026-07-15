@@ -5,16 +5,17 @@ export interface Proyecto {
     id: number;
     code: string;
     title: string;
-    students: { id: number; name: string }[];
-    director: { id: number; name: string };
-    phase: 'Anteproyecto' | 'Presentacion' | 'Desarrollo' | 'Final';
-    status: 'active' | 'at-risk' | 'completed' | 'inscribed';
-    grupo_id: number;
+    estudiantes: { id: number; name: string; email?: string }[];
+    director: { id: number; name: string } | null;
+    current_phase: string | null;
+    status: string;
+    semester_id: number;
+    created_at?: string;
 }
 
 export interface CreateProyectoPayload {
     title: string;
-    grupo_id: number;
+    semester_id: number;
     director_id: number;
     student_ids: number[];
 }

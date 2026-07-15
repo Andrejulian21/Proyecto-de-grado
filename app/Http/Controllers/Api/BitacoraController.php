@@ -205,6 +205,32 @@ class BitacoraController extends Controller
     }
 
     /**
+     * GET /api/admin/proyectos/{proyecto}/bitacoras
+     *
+     * Devuelve las bitácoras de un proyecto para la vista de directores.
+     * Accesible solo por coordinadores (ruta en grupo admin).
+     */
+    public function porProyecto(int $proyectoId): JsonResponse
+    {
+        $proyecto = Proyecto::with('director')->findOrFail($proyectoId);
+
+        $bitacoras = Bitacora::where('proyecto_id', $proyectoId)
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(function ($bitacora) use ($proyecto) {
+                return [
+                    'id' => $bitacora->id,
+                    'fecha' => $bitacora->created_at->toISO8601String(),
+                    'contenido' => $bitacora->notes ?? '',
+                    'firmada' => $bitacora->signature_status->value === EstadoFirma::Completada->value,
+                    'director_name' => $proyecto->director?->name ?? 'Sin asignar',
+                ];
+            });
+
+        return response()->json(['data' => $bitacoras]);
+    }
+
+    /**
      * GET /api/director/proyectos/{id}/horas
      *
      * T-014: Total accumulated bitácora hours for a project.

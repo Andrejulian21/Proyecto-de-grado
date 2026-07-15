@@ -25,6 +25,18 @@ class ProyectoController extends Controller
         return response()->json(['data' => $proyectos]);
     }
 
+    public function show(Proyecto $proyecto): JsonResponse
+    {
+        $proyecto->load([
+            'semestre',
+            'director:id,name',
+            'estudiantes:id,name',
+            'entregas',
+        ]);
+
+        return response()->json(['data' => $proyecto]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [

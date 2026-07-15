@@ -34,7 +34,6 @@ const AsignacionEvaluadores = lazy(() => import('@/pages/coordinador/AsignacionE
 const CoordinadorEntregas = lazy(() => import('@/pages/coordinador/CoordinadorEntregas'));
 const CoordinadorBitacoras = lazy(() => import('@/pages/coordinador/CoordinadorBitacoras'));
 const GestionAlertas = lazy(() => import('@/pages/coordinador/GestionAlertas'));
-const ReportesConsolidados = lazy(() => import('@/pages/coordinador/ReportesConsolidados'));
 const RecursosAdmin = lazy(() => import('@/pages/coordinador/RecursosAdmin'));
 const DirectoresPage = lazy(() => import('@/pages/coordinador/DirectoresPage'));
 const EvaluarProyecto = lazy(() => import('@/pages/evaluador/EvaluarProyecto'));
@@ -126,8 +125,7 @@ function App() {
                                 <Route path="/coordinador/entregas" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><CoordinadorEntregas /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/coordinador/bitacoras" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><CoordinadorBitacoras /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/alertas" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><GestionAlertas /></SuspenseWrapper></ProtectedRoute>} />
-                                {/* PR12: Coordinador reports */}
-                                <Route path="/reportes" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><ReportesConsolidados /></SuspenseWrapper></ProtectedRoute>} />
+                                {/* PR12: Coordinador reports (removed) */}
                                 <Route path="/recursos/admin" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><RecursosAdmin /></SuspenseWrapper></ProtectedRoute>} />
                                 {/* PR13: Evaluador */}
                                 <Route path="/evaluaciones/:id" element={<ProtectedRoute allowedRoles={['Director', 'EvaluadorExterno']}><SuspenseWrapper><EvaluarProyecto /></SuspenseWrapper></ProtectedRoute>} />

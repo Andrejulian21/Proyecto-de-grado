@@ -215,7 +215,7 @@ export default function RecursosAdmin() {
 
             {/* Toast notification */}
             {toastMsg && (
-                <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg bg-[#1c1917] px-4 py-3 text-sm text-white shadow-lg animate-in slide-in-from-bottom-2">
+                <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg bg-[#1c1917] px-4 py-3 text-sm text-white shadow-lg">
                     {mutationError ? (
                         <AlertCircle className="h-4 w-4 shrink-0 text-[#dc2626]" />
                     ) : (

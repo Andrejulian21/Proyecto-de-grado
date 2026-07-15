@@ -43,6 +43,9 @@ $RECYCLE.BIN/
 /public/build/
 /resources/js/.tsbuildinfo
 
+# Token optimizer dashboard artifacts
+/token-optimizer/
+
 # Playwright / E2E
 /test-results/
 /playwright-report/

@@ -82,6 +82,12 @@ Route::middleware([
         ->whereNumber('id')
         ->name('director.proyectos.horas');
 
+    // Estudiante — proyecto y entregas propias
+    Route::get('/estudiante/proyecto', [\App\Http\Controllers\Api\EstudianteController::class, 'proyecto'])
+        ->name('estudiante.proyecto');
+    Route::get('/estudiante/entregas', [\App\Http\Controllers\Api\EstudianteController::class, 'entregas'])
+        ->name('estudiante.entregas');
+
     // Entregas — versiones (accessible by authenticated students and directors)
     Route::get('/entregas/{id}/versiones', [EntregaController::class, 'versiones'])
         ->whereNumber('id')

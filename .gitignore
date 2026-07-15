@@ -74,3 +74,4 @@ testsprite_tests\tmp\config.json
 cookies.txt
 proyecto_grado
 response*.txt
+playwright-test.mjs

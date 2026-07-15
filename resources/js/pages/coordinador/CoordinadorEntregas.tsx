@@ -1,20 +1,19 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { GroupSelector } from '@/components/forms/GroupSelector';
-import { useEntregas, FASE_SEQUENCE, type Fase, type Entrega } from '@/hooks/useEntregas';
+import { useEntregas, FASE_SEQUENCE, type Fase, type Entrega, type UpdateEntregaPayload } from '@/hooks/useEntregas';
 import {
     Search,
     FileText,
     Plus,
     Loader2,
-    ChevronDown,
-    ChevronRight,
     Calendar,
-    Clock,
     AlertCircle,
+    Pencil,
     Trash2,
+    X,
+    AlertTriangle,
 } from 'lucide-react';
 
 const FASE_LABELS: Record<Fase, string> = {
@@ -24,20 +23,39 @@ const FASE_LABELS: Record<Fase, string> = {
     presentacion_final: 'Presentación Final',
 };
 
+function formatDate(dateStr: string): string {
+    if (!dateStr) return '—';
+    try {
+        return new Date(dateStr).toLocaleDateString('es-CO', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+        });
+    } catch {
+        return dateStr;
+    }
+}
+
 export default function CoordinadorEntregas() {
     const [selectedGroup, setSelectedGroup] = useState<number | null>(null);
     const [faseFilter, setFaseFilter] = useState<string>('');
     const [searchQuery, setSearchQuery] = useState('');
     const [showCreateForm, setShowCreateForm] = useState(false);
 
-    const { data: entregas, loading, error, refetch, crear, mutationLoading, mutationError, getNextFase } =
-        useEntregas(
-            selectedGroup != null
-                ? { grupo_id: selectedGroup, fase: faseFilter || null }
-                : undefined,
-        );
+    const {
+        data: entregas, loading, error, refetch,
+        crear, actualizar, eliminar,
+        mutationLoading, mutationError, getNextFase,
+    } = useEntregas(
+        selectedGroup != null
+            ? { grupo_id: selectedGroup, fase: faseFilter || null }
+            : undefined,
+    );
 
-    // Determine next fase when group changes
+    // ── Ref guard: evita doble envío del formulario ──────────────
+    const creatingRef = useRef(false);
+
+    // ── Determine next fase when group changes ───────────────────
     const [nextFase, setNextFase] = useState<Fase>('anteproyecto');
     useEffect(() => {
         if (selectedGroup != null) {
@@ -47,15 +65,15 @@ export default function CoordinadorEntregas() {
         }
     }, [selectedGroup, getNextFase]);
 
-    // Create form state
+    // ── Create form state ────────────────────────────────────────
     const [formFase, setFormFase] = useState<Fase>('anteproyecto');
+    const [formTitulo, setFormTitulo] = useState('');
     const [formDesc, setFormDesc] = useState('');
     const [formFecha, setFormFecha] = useState('');
     const [formHora, setFormHora] = useState('');
     const [formCriterios, setFormCriterios] = useState('');
     const [createError, setCreateError] = useState<string | null>(null);
 
-    // Update form fase when nextFase changes
     useEffect(() => {
         setFormFase(nextFase);
     }, [nextFase]);
@@ -63,17 +81,21 @@ export default function CoordinadorEntregas() {
     const handleCreate = useCallback(
         async (e: React.FormEvent) => {
             e.preventDefault();
-            if (!selectedGroup || !formDesc.trim() || !formFecha) return;
+            if (creatingRef.current) return; // ← guard contra doble click
+            if (!selectedGroup || !formTitulo.trim() || !formDesc.trim() || !formFecha) return;
+            creatingRef.current = true;
             setCreateError(null);
             try {
                 await crear({
                     grupo_id: selectedGroup,
                     fase: formFase,
+                    titulo: formTitulo.trim(),
                     descripcion: formDesc.trim(),
                     fecha_limite: formFecha,
+                    criterios: formCriterios.trim() || undefined,
                     hora_maxima: formHora || undefined,
-                    criterios_aceptacion: formCriterios.trim() || undefined,
                 });
+                setFormTitulo('');
                 setFormDesc('');
                 setFormFecha('');
                 setFormHora('');
@@ -81,16 +103,89 @@ export default function CoordinadorEntregas() {
                 setShowCreateForm(false);
             } catch (err) {
                 setCreateError(err instanceof Error ? err.message : 'Error al crear entrega');
+            } finally {
+                creatingRef.current = false;
             }
         },
-        [selectedGroup, formFase, formDesc, formFecha, formHora, formCriterios, crear],
+        [selectedGroup, formFase, formTitulo, formDesc, formFecha, crear],
     );
 
+    // ── Edit modal state ─────────────────────────────────────────
+    const [editingEntrega, setEditingEntrega] = useState<Entrega | null>(null);
+    const [editFecha, setEditFecha] = useState('');
+    const [editTitulo, setEditTitulo] = useState('');
+    const [editDesc, setEditDesc] = useState('');
+    const [editHora, setEditHora] = useState('');
+    const [editCriterios, setEditCriterios] = useState('');
+    const [editFase, setEditFase] = useState<string>('');
+    const [editGrupoId, setEditGrupoId] = useState<number | null>(null);
+    const [editError, setEditError] = useState<string | null>(null);
+
+    const openEditModal = useCallback((entrega: Entrega) => {
+        setEditingEntrega(entrega);
+        try {
+            setEditFecha(new Date(entrega.due_date).toISOString().slice(0, 10));
+        } catch {
+            setEditFecha('');
+        }
+        setEditTitulo(entrega.title || '');
+        setEditDesc(entrega.description || '');
+        setEditHora(entrega.hora_maxima ?? '');
+        setEditCriterios(entrega.acceptance_criteria ?? '');
+        setEditFase(entrega.phase);
+        setEditGrupoId(entrega.grupo_id);
+        setEditError(null);
+    }, []);
+
+    const closeEditModal = useCallback(() => {
+        setEditingEntrega(null);
+        setEditError(null);
+    }, []);
+
+    const handleUpdate = useCallback(async () => {
+        if (!editingEntrega) return;
+        if (!editFecha) {
+            setEditError('La fecha límite es obligatoria.');
+            return;
+        }
+        setEditError(null);
+        try {
+            const payload: UpdateEntregaPayload = {
+                due_date: editFecha,
+                titulo: editTitulo.trim(),
+                description: editDesc.trim(),
+                acceptance_criteria: editCriterios.trim() || null,
+                hora_maxima: editHora || null,
+                phase: editFase,
+            };
+            await actualizar(editingEntrega.id, payload);
+            closeEditModal();
+        } catch (err) {
+            setEditError(err instanceof Error ? err.message : 'Error al actualizar');
+        }
+    }, [editingEntrega, editFecha, editTitulo, editDesc, editHora, editCriterios, editFase, actualizar, closeEditModal]);
+
+    // ── Delete confirmation state ────────────────────────────────
+    const [deletingId, setDeletingId] = useState<number | null>(null);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
+
+    const confirmDelete = useCallback(async () => {
+        if (deletingId == null) return;
+        setDeleteError(null);
+        try {
+            await eliminar(deletingId);
+            setDeletingId(null);
+        } catch (err) {
+            setDeleteError(err instanceof Error ? err.message : 'Error al eliminar');
+        }
+    }, [deletingId, eliminar]);
+
+    // ── Filtering ────────────────────────────────────────────────
     const filtered = entregas.filter((e) => {
         if (searchQuery) {
             const q = searchQuery.toLowerCase();
-            const matchDesc = e.descripcion?.toLowerCase().includes(q) ?? false;
-            const matchFase = FASE_LABELS[e.fase]?.toLowerCase().includes(q) ?? false;
+            const matchDesc = e.description?.toLowerCase().includes(q) ?? false;
+            const matchFase = FASE_LABELS[e.phase]?.toLowerCase().includes(q) ?? false;
             if (!matchDesc && !matchFase) return false;
         }
         return true;
@@ -114,7 +209,7 @@ export default function CoordinadorEntregas() {
                 }
             />
 
-            {/* Filters row */}
+            {/* ── Filters row ─────────────────────────────────── */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <GroupSelector
                     value={selectedGroup}
@@ -139,21 +234,23 @@ export default function CoordinadorEntregas() {
                     </select>
                 </div>
 
-                {/* Search */}
-                <div className="relative">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#78716c]" />
-                    <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Buscar entregas..."
-                        className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white pl-9 pr-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
-                        aria-label="Buscar entregas"
-                    />
+                <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-semibold text-[#1c1917]">Buscar</label>
+                    <div className="relative">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#78716c]" />
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Buscar entregas..."
+                            className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white pl-9 pr-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                            aria-label="Buscar entregas"
+                        />
+                    </div>
                 </div>
             </div>
 
-            {/* Create form */}
+            {/* ── Create form ─────────────────────────────────── */}
             {showCreateForm && (
                 <form
                     onSubmit={handleCreate}
@@ -161,7 +258,6 @@ export default function CoordinadorEntregas() {
                 >
                     <h3 className="mb-4 text-base font-bold text-[#1c1917]">Nueva Entrega</h3>
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        {/* Group (read-only) */}
                         <div className="sm:col-span-2">
                             <GroupSelector
                                 value={selectedGroup}
@@ -170,7 +266,20 @@ export default function CoordinadorEntregas() {
                             />
                         </div>
 
-                        {/* Phase (auto-computed) */}
+                        <div className="flex flex-col gap-1.5 sm:col-span-2">
+                            <label className="text-sm font-semibold text-[#1c1917]">
+                                Título de la entrega <span className="text-[#dc2626]">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={formTitulo}
+                                onChange={(e) => setFormTitulo(e.target.value)}
+                                placeholder="Ej: Entrega parcial de anteproyecto"
+                                className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                required
+                            />
+                        </div>
+
                         <div className="flex flex-col gap-1.5">
                             <label className="text-sm font-semibold text-[#1c1917]">
                                 Fase <span className="text-[#dc2626]">*</span>
@@ -196,7 +305,33 @@ export default function CoordinadorEntregas() {
                             </div>
                         </div>
 
-                        {/* Date */}
+                        <div className="flex flex-col gap-1.5 sm:col-span-2">
+                            <label className="text-sm font-semibold text-[#1c1917]">
+                                Descripción <span className="text-[#dc2626]">*</span>
+                            </label>
+                            <textarea
+                                value={formDesc}
+                                onChange={(e) => setFormDesc(e.target.value)}
+                                rows={3}
+                                placeholder="Descripción de la entrega"
+                                className="w-full min-h-[60px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y"
+                                required
+                            />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5 sm:col-span-2">
+                            <label className="text-sm font-semibold text-[#1c1917]">
+                                Criterios de aceptación
+                            </label>
+                            <textarea
+                                value={formCriterios}
+                                onChange={(e) => setFormCriterios(e.target.value)}
+                                rows={3}
+                                placeholder="Criterios que debe cumplir la entrega para ser aprobada"
+                                className="w-full min-h-[60px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y"
+                            />
+                        </div>
+
                         <div className="flex flex-col gap-1.5">
                             <label className="text-sm font-semibold text-[#1c1917]">
                                 Fecha límite <span className="text-[#dc2626]">*</span>
@@ -213,46 +348,15 @@ export default function CoordinadorEntregas() {
                             </div>
                         </div>
 
-                        {/* Hora máxima */}
                         <div className="flex flex-col gap-1.5">
-                            <label className="text-sm font-semibold text-[#1c1917]">Hora máxima (opcional)</label>
-                            <div className="relative">
-                                <Clock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#78716c]" />
-                                <input
-                                    type="time"
-                                    value={formHora}
-                                    onChange={(e) => setFormHora(e.target.value)}
-                                    className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white pl-9 pr-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Descripción */}
-                        <div className="flex flex-col gap-1.5 sm:col-span-2">
                             <label className="text-sm font-semibold text-[#1c1917]">
-                                Descripción <span className="text-[#dc2626]">*</span>
+                                Hora máxima
                             </label>
-                            <textarea
-                                value={formDesc}
-                                onChange={(e) => setFormDesc(e.target.value)}
-                                rows={3}
-                                placeholder="Descripción de la entrega"
-                                className="w-full min-h-[60px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y"
-                                required
-                            />
-                        </div>
-
-                        {/* Criterios de aceptación */}
-                        <div className="flex flex-col gap-1.5 sm:col-span-2">
-                            <label className="text-sm font-semibold text-[#1c1917]">
-                                Criterios de aceptación (opcional)
-                            </label>
-                            <textarea
-                                value={formCriterios}
-                                onChange={(e) => setFormCriterios(e.target.value)}
-                                rows={2}
-                                placeholder="Criterios que debe cumplir la entrega"
-                                className="w-full min-h-[60px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y"
+                            <input
+                                type="time"
+                                value={formHora}
+                                onChange={(e) => setFormHora(e.target.value)}
+                                className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
                             />
                         </div>
                     </div>
@@ -264,7 +368,7 @@ export default function CoordinadorEntregas() {
                         </div>
                     )}
 
-                    {mutationError && (
+                    {mutationError && !createError && (
                         <div className="mt-3 flex items-center gap-2 rounded-lg bg-[#fee2e2] px-4 py-2 text-sm text-[#dc2626]">
                             <AlertCircle className="h-4 w-4 shrink-0" />
                             {mutationError}
@@ -274,7 +378,7 @@ export default function CoordinadorEntregas() {
                     <div className="mt-5 flex items-center gap-3">
                         <button
                             type="submit"
-                            disabled={mutationLoading || !selectedGroup}
+                            disabled={mutationLoading || !selectedGroup || creatingRef.current}
                             className="inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             {mutationLoading ? (
@@ -282,7 +386,7 @@ export default function CoordinadorEntregas() {
                             ) : (
                                 <Plus className="h-4 w-4" />
                             )}
-                            Crear Entrega
+                            {mutationLoading ? 'Creando...' : 'Crear Entrega'}
                         </button>
                         <button
                             type="button"
@@ -298,7 +402,7 @@ export default function CoordinadorEntregas() {
                 </form>
             )}
 
-            {/* Error banner */}
+            {/* ── Error banner ────────────────────────────────── */}
             {error && (
                 <div className="flex items-center gap-2 rounded-lg border border-[#fecaca] bg-[#fee2e2] px-4 py-3 text-sm text-[#dc2626]">
                     <AlertCircle className="h-4 w-4 shrink-0" />
@@ -312,7 +416,7 @@ export default function CoordinadorEntregas() {
                 </div>
             )}
 
-            {/* Loading skeleton */}
+            {/* ── Loading skeleton ────────────────────────────── */}
             {loading && (
                 <div className="flex flex-col gap-3">
                     {[1, 2, 3].map((i) => (
@@ -324,9 +428,9 @@ export default function CoordinadorEntregas() {
                 </div>
             )}
 
-            {/* Entregas table */}
+            {/* ── Entregas cards ───────────────────────────────── */}
             {!loading && !error && (
-                <div className="overflow-hidden rounded-xl border border-[#e5e5e5] bg-white shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
+                <div>
                     {filtered.length === 0 ? (
                         <div className="flex flex-col items-center gap-3 py-16 text-center">
                             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#f5f5f4]">
@@ -342,69 +446,320 @@ export default function CoordinadorEntregas() {
                             </p>
                         </div>
                     ) : (
-                        <table className="w-full" aria-describedby="tabla-entregas">
-                            <caption id="tabla-entregas" className="sr-only">
-                                Lista de entregas por grupo y fase
-                            </caption>
-                            <thead>
-                                <tr className="border-b border-[#e5e5e5] bg-[#fafaf9]">
-                                    <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.05em] text-[#78716c]">
-                                        Fase
-                                    </th>
-                                    <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.05em] text-[#78716c]">
-                                        Descripción
-                                    </th>
-                                    <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.05em] text-[#78716c]">
-                                        Fecha Límite
-                                    </th>
-                                    <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-[0.05em] text-[#78716c]">
-                                        Grupo ID
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-[#e5e5e5]">
-                                {filtered.map((entrega) => (
-                                    <tr
-                                        key={entrega.id}
-                                        className="transition-colors hover:bg-[#fafaf9]"
-                                    >
-                                        <td className="px-5 py-4">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                            {filtered.map((entrega) => (
+                                <div
+                                    key={entrega.id}
+                                    className="flex flex-col rounded-xl border border-[#e5e5e5] bg-white shadow-[0_1px_2px_rgba(28,25,23,0.05)] transition-all hover:shadow-[0_4px_12px_rgba(28,25,23,0.08)]"
+                                >
+                                    {/* Card header */}
+                                    <div className="border-b border-[#e5e5e5] px-4 py-3">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="min-w-0 flex-1">
+                                                <h3 className="truncate text-sm font-semibold text-[#1c1917]">
+                                                    {entrega.title || '—'}
+                                                </h3>
+                                                <p className="text-xs text-[#78716c]">
+                                                    {entrega.semestre_nombre ?? '—'}
+                                                </p>
+                                            </div>
                                             <StatusBadge variant="info">
-                                                {FASE_LABELS[entrega.fase] ?? entrega.fase}
+                                                {FASE_LABELS[entrega.phase] ?? entrega.phase}
                                             </StatusBadge>
-                                        </td>
-                                        <td className="px-5 py-4">
-                                            <div className="flex flex-col gap-0.5">
-                                                <span className="text-sm font-medium text-[#1c1917]">
-                                                    {entrega.descripcion || '—'}
+                                        </div>
+                                    </div>
+
+                                    {/* Card body */}
+                                    <div className="flex flex-col gap-2 px-4 py-3 text-xs text-[#57534e]">
+                                        {/* Fecha límite */}
+                                        <div className="flex items-center gap-2">
+                                            <Calendar className="h-3.5 w-3.5 shrink-0 text-[#78716c]" />
+                                            <span>{formatDate(entrega.due_date)}</span>
+                                        </div>
+
+                                        {/* Hora máxima */}
+                                        {entrega.hora_maxima && (
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-medium text-[#78716c]">Hora máx.:</span>
+                                                <span>{entrega.hora_maxima}</span>
+                                            </div>
+                                        )}
+
+                                        {/* Semestre */}
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-medium text-[#78716c]">Semestre:</span>
+                                            <span>{entrega.semestre_nombre || '—'}</span>
+                                        </div>
+
+                                        {/* Proyectos vinculados */}
+                                        {entrega.proyectos_count != null && (
+                                            <div className="group relative flex items-center gap-2">
+                                                <span className="font-medium text-[#78716c]">Proyectos:</span>
+                                                <span
+                                                    className="cursor-help rounded-full bg-[#f5f5f4] px-2 py-0.5 text-xs font-semibold text-[#c2410c]"
+                                                    title={
+                                                        entrega.proyectos_list?.length
+                                                            ? entrega.proyectos_list.join('\n')
+                                                            : undefined
+                                                    }
+                                                >
+                                                    {entrega.proyectos_count} vinculado{entrega.proyectos_count !== 1 ? 's' : ''}
                                                 </span>
-                                                {entrega.criterios_aceptacion && (
-                                                    <span className="text-xs text-[#57534e] line-clamp-1">
-                                                        {entrega.criterios_aceptacion}
-                                                    </span>
+                                                {entrega.proyectos_list && entrega.proyectos_list.length > 0 && (
+                                                    <div className="absolute bottom-full left-0 z-10 mb-2 hidden w-64 rounded-lg border border-[#e5e5e5] bg-white p-2 shadow-lg group-hover:block">
+                                                        {entrega.proyectos_list.map((p, i) => (
+                                                            <p key={i} className="truncate text-xs text-[#57534e]">
+                                                                {p}
+                                                            </p>
+                                                        ))}
+                                                    </div>
                                                 )}
                                             </div>
-                                        </td>
-                                        <td className="px-5 py-4">
-                                            <div className="flex items-center gap-2 text-sm text-[#57534e]">
-                                                <Calendar className="h-3.5 w-3.5 text-[#78716c]" />
-                                                {entrega.fecha_limite}
-                                                {entrega.hora_maxima && (
-                                                    <>
-                                                        <Clock className="ml-1 h-3.5 w-3.5 text-[#78716c]" />
-                                                        {entrega.hora_maxima}
-                                                    </>
-                                                )}
+                                        )}
+
+                                        {/* Descripción */}
+                                        {entrega.description && (
+                                            <div>
+                                                <span className="font-medium text-[#78716c]">Descripción:</span>
+                                                <p className="mt-0.5 line-clamp-2 text-[#1c1917]">
+                                                    {entrega.description}
+                                                </p>
                                             </div>
-                                        </td>
-                                        <td className="px-5 py-4 text-sm text-[#57534e] tabular-nums">
-                                            #{entrega.grupo_id}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                        )}
+
+                                        {/* Criterios de aceptación */}
+                                        {entrega.acceptance_criteria && (
+                                            <div>
+                                                <span className="font-medium text-[#78716c]">Criterios:</span>
+                                                <p className="mt-0.5 line-clamp-2 text-[#1c1917]">
+                                                    {entrega.acceptance_criteria}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Card footer — acciones */}
+                                    <div className="mt-auto flex items-center justify-end gap-1 border-t border-[#e5e5e5] px-4 py-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => openEditModal(entrega)}
+                                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#f5f5f4] hover:text-[#c2410c]"
+                                            aria-label="Editar entrega"
+                                        >
+                                            <Pencil className="h-4 w-4" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setDeletingId(entrega.id)}
+                                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#fee2e2] hover:text-[#dc2626]"
+                                            aria-label="Eliminar entrega"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     )}
+                </div>
+            )}
+
+            {/* ── Edit Modal ──────────────────────────────────── */}
+            {editingEntrega && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+                    <div className="w-full max-w-lg rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-xl">
+                        <div className="mb-4 flex items-center justify-between">
+                            <h3 className="text-base font-bold text-[#1c1917]">Editar Entrega</h3>
+                            <button
+                                type="button"
+                                onClick={closeEditModal}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#78716c] transition-colors hover:bg-[#f5f5f4]"
+                                aria-label="Cerrar"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        <div className="flex flex-col gap-4">
+                            {/* Grupo (read-only) */}
+                            <GroupSelector value={editGrupoId} onChange={() => {}} readonly error={undefined} />
+
+                            {/* Título */}
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-sm font-semibold text-[#1c1917]">
+                                    Título de la entrega <span className="text-[#dc2626]">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={editTitulo}
+                                    onChange={(e) => setEditTitulo(e.target.value)}
+                                    placeholder="Ej: Entrega parcial de anteproyecto"
+                                    className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                />
+                            </div>
+
+                            {/* Fase */}
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-sm font-semibold text-[#1c1917]">
+                                    Fase <span className="text-[#dc2626]">*</span>
+                                </label>
+                                <select
+                                    value={editFase}
+                                    onChange={(e) => setEditFase(e.target.value)}
+                                    className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                    aria-label="Fase de la entrega"
+                                >
+                                    {FASE_SEQUENCE.map((f) => (
+                                        <option key={f} value={f}>
+                                            {FASE_LABELS[f]}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Descripción */}
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-sm font-semibold text-[#1c1917]">
+                                    Descripción <span className="text-[#dc2626]">*</span>
+                                </label>
+                                <textarea
+                                    value={editDesc}
+                                    onChange={(e) => setEditDesc(e.target.value)}
+                                    rows={3}
+                                    placeholder="Descripción de la entrega"
+                                    className="w-full min-h-[60px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y"
+                                />
+                            </div>
+
+                            {/* Criterios de aceptación */}
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-sm font-semibold text-[#1c1917]">
+                                    Criterios de aceptación
+                                </label>
+                                <textarea
+                                    value={editCriterios}
+                                    onChange={(e) => setEditCriterios(e.target.value)}
+                                    rows={3}
+                                    placeholder="Criterios que debe cumplir la entrega para ser aprobada"
+                                    className="w-full min-h-[60px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y"
+                                />
+                            </div>
+
+                            {/* Fecha límite */}
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-sm font-semibold text-[#1c1917]">
+                                    Fecha límite <span className="text-[#dc2626]">*</span>
+                                </label>
+                                <div className="relative">
+                                    <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#78716c]" />
+                                    <input
+                                        type="date"
+                                        value={editFecha}
+                                        onChange={(e) => setEditFecha(e.target.value)}
+                                        className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white pl-9 pr-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Hora máxima */}
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-sm font-semibold text-[#1c1917]">
+                                    Hora máxima
+                                </label>
+                                <input
+                                    type="time"
+                                    value={editHora}
+                                    onChange={(e) => setEditHora(e.target.value)}
+                                    className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                />
+                            </div>
+                        </div>
+
+                        {editError && (
+                            <div className="mt-3 flex items-center gap-2 rounded-lg bg-[#fee2e2] px-4 py-2 text-sm text-[#dc2626]">
+                                <AlertCircle className="h-4 w-4 shrink-0" />
+                                {editError}
+                            </div>
+                        )}
+
+                        {mutationError && !editError && (
+                            <div className="mt-3 flex items-center gap-2 rounded-lg bg-[#fee2e2] px-4 py-2 text-sm text-[#dc2626]">
+                                <AlertCircle className="h-4 w-4 shrink-0" />
+                                {mutationError}
+                            </div>
+                        )}
+
+                        <div className="mt-5 flex items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={handleUpdate}
+                                disabled={mutationLoading}
+                                className="inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                {mutationLoading ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Pencil className="h-4 w-4" />
+                                )}
+                                Guardar Cambios
+                            </button>
+                            <button
+                                type="button"
+                                onClick={closeEditModal}
+                                className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-transparent px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:bg-[#f5f5f4]"
+                            >
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Delete Confirmation ─────────────────────────── */}
+            {deletingId != null && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+                    <div className="w-full max-w-sm rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-xl">
+                        <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[#fee2e2]">
+                            <AlertTriangle className="h-5 w-5 text-[#dc2626]" />
+                        </div>
+                        <h3 className="mb-1 text-base font-bold text-[#1c1917]">Eliminar Entrega</h3>
+                        <p className="mb-4 text-sm text-[#57534e]">
+                            ¿Estás seguro de que deseas eliminar esta entrega? Esta acción no se puede deshacer.
+                        </p>
+
+                        {deleteError && (
+                            <div className="mb-3 flex items-center gap-2 rounded-lg bg-[#fee2e2] px-4 py-2 text-sm text-[#dc2626]">
+                                <AlertCircle className="h-4 w-4 shrink-0" />
+                                {deleteError}
+                            </div>
+                        )}
+
+                        <div className="flex items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={confirmDelete}
+                                disabled={mutationLoading}
+                                className="inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-[#dc2626] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#b91c1c] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                {mutationLoading ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Trash2 className="h-4 w-4" />
+                                )}
+                                Eliminar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setDeletingId(null);
+                                    setDeleteError(null);
+                                }}
+                                className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-transparent px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:bg-[#f5f5f4]"
+                            >
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

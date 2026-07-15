@@ -18,6 +18,7 @@ import {
     X,
     Eye,
     CheckCircle2,
+    ExternalLink,
 } from 'lucide-react';
 
 const typeConfig: Record<string, { icon: typeof FileText; bgClass: string; iconColor: string; label: string }> = {
@@ -109,7 +110,7 @@ export default function RecursosAdmin() {
                 await crear({
                     title: formTitle.trim(),
                     description: formDesc.trim(),
-                    type: formType,
+                    category: formType,
                     file: formFile ?? undefined,
                 });
                 setUploadSuccess(true);
@@ -151,7 +152,7 @@ export default function RecursosAdmin() {
                 await actualizar(editingId, {
                     title: editTitle.trim(),
                     description: editDesc.trim(),
-                    type: editType,
+                    category: editType,
                     file: editFile ?? undefined,
                 });
                 showToast('Recurso actualizado correctamente');
@@ -495,6 +496,17 @@ export default function RecursosAdmin() {
                                         </div>
                                         <h3 className="text-sm font-bold text-[#1c1917]">{res.title}</h3>
                                         <p className="mt-1 text-xs text-[#57534e] line-clamp-2">{res.description}</p>
+                                        {res.file_path && (
+                                            <a
+                                                href={`/storage/${res.file_path}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-[#c2410c] transition-colors hover:text-[#9a330a]"
+                                            >
+                                                <ExternalLink className="h-3.5 w-3.5" />
+                                                Ver archivo
+                                            </a>
+                                        )}
                                         <div className="mt-3 flex items-center justify-between gap-2 border-t border-[#e5e5e5] pt-3">
                                             <div className="flex items-center gap-2 text-xs text-[#78716c]">
                                                 <Download className="h-3 w-3" />

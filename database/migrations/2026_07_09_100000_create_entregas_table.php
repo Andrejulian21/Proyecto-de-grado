@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('entregas', function (Blueprint $table): void {
             $table->bigIncrements('id');
-            $table->unsignedBigInteger('proyecto_id');
+            $table->unsignedBigInteger('proyecto_id')->nullable();
             $table->string('phase', 50);
             $table->string('title', 500);
             $table->text('description')->nullable();

@@ -127,18 +127,18 @@ it('no puede marcar leida notificacion de otro usuario (403)', function () {
 
 // -- Notificaciones automáticas al crear entrega --------------------------
 
-it('al crear entrega se genera notificacion para el director', function () {
+it('al crear entrega NO se genera notificacion automatica (ahora es por grupo)', function () {
     $this->actingAs($this->coordinador)
         ->postJson('/api/admin/entregas', [
-            'proyecto_id' => $this->proyecto->id,
-            'phase' => 'anteproyecto',
-            'title' => 'Entrega Test',
-            'due_date' => '2026-03-01',
+            'grupo_id' => $this->semestre->id,
+            'fase' => 'anteproyecto',
+            'titulo' => 'Entrega Test',
+            'descripcion' => 'Descripción de la entrega',
+            'fecha_limite' => '2026-03-01',
         ]);
 
     $notificaciones = Notificacion::where('user_id', $this->director->id)->get();
-    expect($notificaciones)->toHaveCount(1);
-    expect($notificaciones[0]->type)->toBe('entrega.creada');
+    expect($notificaciones)->toHaveCount(0);
 });
 
 // -- Notificaciones automáticas al revisar entrega ------------------------

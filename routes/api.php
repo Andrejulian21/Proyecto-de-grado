@@ -177,7 +177,11 @@ Route::middleware(['auth:sanctum', 'single_session', 'activity', 'ensure_passwor
             ->name('evaluador-proyecto.index');
         Route::post('/evaluador-proyecto', [\App\Http\Controllers\Admin\EvaluadorProyectoController::class, 'store'])
             ->name('evaluador-proyecto.store');
-        Route::delete('/evaluador-proyecto', [\App\Http\Controllers\Admin\EvaluadorProyectoController::class, 'destroy'])
+        Route::put('/evaluador-proyecto/{id}', [\App\Http\Controllers\Admin\EvaluadorProyectoController::class, 'update'])
+            ->whereNumber('id')
+            ->name('evaluador-proyecto.update');
+        Route::delete('/evaluador-proyecto/{id}', [\App\Http\Controllers\Admin\EvaluadorProyectoController::class, 'destroy'])
+            ->whereNumber('id')
             ->name('evaluador-proyecto.destroy');
 
         // Reporte consolidado (T-018).
@@ -193,6 +197,8 @@ Route::middleware(['auth:sanctum', 'single_session', 'activity', 'ensure_passwor
             ->name('anuncios.destroy');
 
         // Recursos CRUD (T-021) — solo coordinador
+        Route::get('/recursos', [\App\Http\Controllers\Api\RecursoController::class, 'index'])
+            ->name('recursos.admin');
         Route::post('/recursos', [\App\Http\Controllers\Api\RecursoController::class, 'store'])
             ->name('recursos.store');
         Route::put('/recursos/{recurso}', [\App\Http\Controllers\Api\RecursoController::class, 'update'])
@@ -237,4 +243,10 @@ Route::middleware(['auth:sanctum', 'single_session', 'activity'])
         Route::put('/entregas/{id}/habilitar', [EntregaController::class, 'habilitar'])
             ->whereNumber('id')
             ->name('entregas.habilitar');
+        Route::put('/entregas/{id}', [EntregaController::class, 'update'])
+            ->whereNumber('id')
+            ->name('entregas.update');
+        Route::delete('/entregas/{id}', [EntregaController::class, 'destroy'])
+            ->whereNumber('id')
+            ->name('entregas.destroy');
     });

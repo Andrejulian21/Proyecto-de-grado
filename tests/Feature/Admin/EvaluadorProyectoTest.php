@@ -108,7 +108,7 @@ describe('T-016: CRUD asignacion evaluador-proyecto', function () {
 
         $response->assertOk();
         expect($response->json('data'))->toHaveCount(1);
-        expect($response->json('data')[0]['evaluador_id'])->toBe($this->evaluador->id);
+        expect($response->json('data')[0]['evaluador_principal_id'])->toBe($this->evaluador->id);
     });
 
     it('coordinador puede asignar evaluador a proyecto', function () {

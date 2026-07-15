@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { UserPlus, Users, CalendarDays, Search, Loader2, Pencil, Trash2, X } from 'lucide-react';
+import { UserPlus, Users, CalendarDays, Search, Loader2, Pencil, Trash2, X, AlertTriangle, GraduationCap, UserCheck } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatCard } from '@/components/ui/StatCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -7,12 +7,12 @@ import { DataTable, type Column } from '@/components/ui/DataTable';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { CalendarGrid, type CalendarAssignment } from '@/components/calendar/CalendarGrid';
 import { ResultsTable } from '@/components/tables/ResultsTable';
-import { useEvaluadorProyecto, type EvaluadorProyecto, type CreateEvaluadorPayload, type UpdateEvaluadorPayload } from '@/hooks/useEvaluadorProyecto';
+import { useEvaluadorProyecto, useEvaluadorUsers, type EvaluadorProyecto, type CreateEvaluadorPayload, type UpdateEvaluadorPayload } from '@/hooks/useEvaluadorProyecto';
 import { useEvaluaciones } from '@/hooks/useEvaluaciones';
 import { useProyectos } from '@/hooks/useProyectos';
 import { cn } from '@/lib/utils';
 
-/* ── Modal Component ── */
+/* ── Edit Modal ── */
 
 function EditModal({
     open,
@@ -20,30 +20,29 @@ function EditModal({
     onSave,
     onClose,
     saving,
+    existingAssignments,
 }: {
     open: boolean;
     assignment: EvaluadorProyecto | null;
     onSave: (id: number, payload: UpdateEvaluadorPayload) => void;
     onClose: () => void;
     saving: boolean;
+    existingAssignments: EvaluadorProyecto[];
 }) {
     const [fase, setFase] = useState<'Anteproyecto' | 'Final'>('Anteproyecto');
     const [fecha, setFecha] = useState('');
-    const [hora, setHora] = useState('');
+    const [horaInicio, setHoraInicio] = useState('');
+    const [horaFin, setHoraFin] = useState('');
+    const [editError, setEditError] = useState<string | null>(null);
 
     useEffect(() => {
         if (assignment) {
             setFase(assignment.fase);
-            // Normalize date for input
-            if (assignment.fecha) {
-                const parts = assignment.fecha.split('/');
-                if (parts.length === 3) {
-                    setFecha(`${parts[2]}-${parts[1]}-${parts[0]}`);
-                } else {
-                    setFecha(assignment.fecha);
-                }
-            }
-            setHora(assignment.hora || '');
+            // Normalize date for input (assignment.fecha comes as "YYYY-MM-DD")
+            setFecha(assignment.fecha || '');
+            setHoraInicio(assignment.hora_inicio || '');
+            setHoraFin(assignment.hora_fin || '');
+            setEditError(null);
         }
     }, [assignment]);
 
@@ -51,7 +50,31 @@ function EditModal({
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSave(assignment.id, { fase, fecha, hora });
+        setEditError(null);
+
+        if (horaFin && horaInicio && horaFin <= horaInicio) {
+            setEditError('La hora fin debe ser posterior a la hora inicio.');
+            return;
+        }
+
+        // Validate no time conflict: overlap — nuevoInicio < existenteFin && nuevoFin > existenteInicio (exclude current assignment)
+        const hasOverlap = existingAssignments.some(
+            (a) => a.id !== assignment.id
+                && a.fecha === fecha
+                && horaInicio < a.hora_fin
+                && horaFin > a.hora_inicio,
+        );
+        if (hasOverlap) {
+            setEditError('Ya existe una asignación programada que se superpone con este horario. Por favor, seleccione un horario diferente.');
+            return;
+        }
+
+        onSave(assignment.id, {
+            fase,
+            fecha,
+            hora_inicio: horaInicio,
+            hora_fin: horaFin,
+        });
     };
 
     return (
@@ -75,6 +98,7 @@ function EditModal({
                 </div>
 
                 <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                    {/* Project (read-only) */}
                     <div className="flex flex-col gap-1.5">
                         <label className="text-sm font-semibold text-[#1c1917]">Proyecto</label>
                         <p className="rounded-lg border border-[#e5e5e5] bg-[#f5f5f4] px-3 py-2 text-sm text-[#57534e]">
@@ -82,6 +106,15 @@ function EditModal({
                         </p>
                     </div>
 
+                    {/* Evaluators (read-only) */}
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-sm font-semibold text-[#1c1917]">Evaluadores</label>
+                        <p className="rounded-lg border border-[#e5e5e5] bg-[#f5f5f4] px-3 py-2 text-sm text-[#57534e]">
+                            {assignment.evaluadores_list.map((e) => e.name).join(', ')}
+                        </p>
+                    </div>
+
+                    {/* Fase */}
                     <div className="flex flex-col gap-1.5">
                         <label htmlFor="edit-fase" className="text-sm font-semibold text-[#1c1917]">Fase</label>
                         <select
@@ -95,6 +128,7 @@ function EditModal({
                         </select>
                     </div>
 
+                    {/* Fecha */}
                     <div className="flex flex-col gap-1.5">
                         <label htmlFor="edit-fecha" className="text-sm font-semibold text-[#1c1917]">Fecha</label>
                         <input
@@ -107,17 +141,39 @@ function EditModal({
                         />
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
-                        <label htmlFor="edit-hora" className="text-sm font-semibold text-[#1c1917]">Hora</label>
-                        <input
-                            id="edit-hora"
-                            type="time"
-                            value={hora}
-                            onChange={(e) => setHora(e.target.value)}
-                            className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
-                            required
-                        />
+                    {/* Hora inicio / Hora fin */}
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                            <label htmlFor="edit-hora-inicio" className="text-sm font-semibold text-[#1c1917]">Hora Inicio</label>
+                            <input
+                                id="edit-hora-inicio"
+                                type="time"
+                                value={horaInicio}
+                                onChange={(e) => { setHoraInicio(e.target.value); setEditError(null); }}
+                                className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                required
+                            />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                            <label htmlFor="edit-hora-fin" className="text-sm font-semibold text-[#1c1917]">Hora Fin</label>
+                            <input
+                                id="edit-hora-fin"
+                                type="time"
+                                value={horaFin}
+                                onChange={(e) => { setHoraFin(e.target.value); setEditError(null); }}
+                                className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                required
+                            />
+                        </div>
                     </div>
+
+                    {/* Validation error */}
+                    {editError && (
+                        <div className="flex items-start gap-2 rounded-lg border border-[#fee2e2] bg-[#fef2f2] p-3 text-sm text-[#dc2626]">
+                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                            {editError}
+                        </div>
+                    )}
 
                     <div className="mt-2 flex items-center justify-end gap-2">
                         <button
@@ -151,7 +207,6 @@ export default function AsignacionEvaluadores() {
         error,
         mutationLoading,
         mutationError,
-        refetch,
         crear,
         actualizar,
         eliminar,
@@ -163,9 +218,17 @@ export default function AsignacionEvaluadores() {
     } = useEvaluaciones();
 
     const {
+        data: evaluadores,
+        loading: loadingEvalUsers,
+    } = useEvaluadorUsers();
+
+    /* ── Proyectos de semestres activos ── */
+    const {
         data: proyectos,
         loading: loadingProyectos,
-    } = useProyectos();
+    } = useProyectos(null, {
+        semestre_activo: true,
+    });
 
     /* ── Local state ── */
     const [showRegisterForm, setShowRegisterForm] = useState(false);
@@ -180,21 +243,17 @@ export default function AsignacionEvaluadores() {
     // Registration form
     const [formProyectoId, setFormProyectoId] = useState('');
     const [formFase, setFormFase] = useState<'Anteproyecto' | 'Final'>('Anteproyecto');
-    const [formEvalPrincipal, setFormEvalPrincipal] = useState('');
-    const [formEvalSecundario, setFormEvalSecundario] = useState('');
-    const [formEvalTercero, setFormEvalTercero] = useState('');
+    const [formEvalIds, setFormEvalIds] = useState<number[]>([]);
     const [formFecha, setFormFecha] = useState('');
-    const [formHora, setFormHora] = useState('');
+    const [formHoraInicio, setFormHoraInicio] = useState('');
+    const [formHoraFin, setFormHoraFin] = useState('');
+    const [formError, setFormError] = useState<string | null>(null);
 
-    /* ── Evaluadores disponibles (mock hasta que haya endpoint) ── */
-    // TODO: reemplazar con fetch a /api/admin/evaluadores
-    const evaluadoresDisponibles = useMemo(() => [
-        { id: 1, name: 'Dr. Pedro Castillo' },
-        { id: 2, name: 'Dra. Sofía Vargas' },
-        { id: 3, name: 'Dr. Miguel Ángel Ruiz' },
-        { id: 4, name: 'Dra. Laura Mendoza' },
-        { id: 5, name: 'Dr. Andrés Felipe Ríos' },
-    ], []);
+    /* ── Derive selected project director ── */
+    const selectedProyecto = useMemo(() => {
+        if (!formProyectoId) return null;
+        return proyectos.find((p) => p.id === Number(formProyectoId)) ?? null;
+    }, [formProyectoId, proyectos]);
 
     /* ── Filters ── */
     const filtered = useMemo(() => {
@@ -204,7 +263,7 @@ export default function AsignacionEvaluadores() {
             a.proyecto_codigo.toLowerCase().includes(q) ||
             a.proyecto_nombre.toLowerCase().includes(q) ||
             a.estudiantes.some((e) => e.name.toLowerCase().includes(q)) ||
-            a.evaluador_principal_nombre.toLowerCase().includes(q),
+            a.evaluadores_list.some((ev) => ev.name.toLowerCase().includes(q)),
         );
     }, [asignaciones, search]);
 
@@ -212,24 +271,20 @@ export default function AsignacionEvaluadores() {
     const calendarAssignments: CalendarAssignment[] = useMemo(() =>
         asignaciones.map((a) => ({
             date: a.fecha,
-            label: `${a.proyecto_codigo}`,
+            label: `${a.proyecto_codigo} ${a.hora_inicio}${a.hora_fin ? '-' + a.hora_fin : ''}`,
         })),
     [asignaciones]);
 
     /* ── Stats ── */
-    const scheduledCount = asignaciones.filter((a) => a.fecha && new Date(a.fecha) >= new Date()).length;
+    const scheduledCount = asignaciones.filter((a) => a.fecha && new Date(a.fecha + 'T12:00:00') >= new Date()).length;
     const completedCount = resultados.length;
 
     /* ── Formatters ── */
     function formatEvaluadores(asig: EvaluadorProyecto): string {
-        const list = [asig.evaluador_principal_nombre];
-        if (asig.evaluador_secundario_nombre) list.push(asig.evaluador_secundario_nombre);
-        if (asig.evaluador_tercero_nombre) list.push(asig.evaluador_tercero_nombre);
-        return list.join(', ');
+        return asig.evaluadores_list.map((e) => e.name).join(', ');
     }
 
     function formatDate(dateStr: string): string {
-        // Convert YYYY-MM-DD to DD/MM/YYYY
         if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
             const [y, m, d] = dateStr.split('-');
             return `${d}/${m}/${y}`;
@@ -237,35 +292,81 @@ export default function AsignacionEvaluadores() {
         return dateStr;
     }
 
+    function formatHoraRange(asig: EvaluadorProyecto): string {
+        if (asig.hora_inicio && asig.hora_fin) {
+            return `${asig.hora_inicio} - ${asig.hora_fin}`;
+        }
+        return asig.hora_inicio || asig.hora || '—';
+    }
+
     /* ── Handlers ── */
+    const handleEvaluadorToggle = useCallback((evaluadorId: number) => {
+        setFormError(null);
+        setFormEvalIds((prev) => {
+            if (prev.includes(evaluadorId)) {
+                return prev.filter((id) => id !== evaluadorId);
+            }
+            if (prev.length >= 3) return prev;
+            return [...prev, evaluadorId];
+        });
+    }, []);
+
     const handleRegister = useCallback(async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formProyectoId || !formEvalPrincipal || !formEvalSecundario || !formFecha || !formHora) return;
+        setFormError(null);
+
+        if (!formProyectoId || formEvalIds.length < 2 || !formFecha || !formHoraInicio || !formHoraFin) {
+            setFormError('Complete todos los campos obligatorios (proyecto, mínimo 2 evaluadores, fecha, hora inicio y hora fin).');
+            return;
+        }
+
+        if (formHoraFin <= formHoraInicio) {
+            setFormError('La hora fin debe ser posterior a la hora inicio.');
+            return;
+        }
+
+        // Validate director no evalúa su propio proyecto
+        if (selectedProyecto?.director) {
+            const directorId = selectedProyecto.director.id;
+            if (formEvalIds.includes(directorId)) {
+                setFormError('Un director no puede evaluar su propio proyecto.');
+                return;
+            }
+        }
+
+        // Validate no time conflict: overlap — nuevoInicio < existenteFin && nuevoFin > existenteInicio
+        const hasOverlap = asignaciones.some(
+            (a) => a.fecha === formFecha
+                && formHoraInicio < a.hora_fin
+                && formHoraFin > a.hora_inicio,
+        );
+        if (hasOverlap) {
+            setFormError('Ya existe una asignación programada que se superpone con este horario. Por favor, seleccione un horario diferente.');
+            return;
+        }
 
         const payload: CreateEvaluadorPayload = {
             proyecto_id: Number(formProyectoId),
-            fase: formFase,
-            evaluador_principal_id: Number(formEvalPrincipal),
-            evaluador_secundario_id: Number(formEvalSecundario),
-            evaluador_tercero_id: formEvalTercero ? Number(formEvalTercero) : null,
+            evaluador_ids: formEvalIds,
             fecha: formFecha,
-            hora: formHora,
+            hora_inicio: formHoraInicio,
+            hora_fin: formHoraFin,
+            fase: formFase,
         };
 
         try {
             await crear(payload);
             setFormProyectoId('');
             setFormFase('Anteproyecto');
-            setFormEvalPrincipal('');
-            setFormEvalSecundario('');
-            setFormEvalTercero('');
+            setFormEvalIds([]);
             setFormFecha('');
-            setFormHora('');
+            setFormHoraInicio('');
+            setFormHoraFin('');
             setShowRegisterForm(false);
         } catch {
             // error is handled by mutationError in the hook
         }
-    }, [formProyectoId, formFase, formEvalPrincipal, formEvalSecundario, formEvalTercero, formFecha, formHora, crear]);
+    }, [formProyectoId, formEvalIds, formFecha, formHoraInicio, formHoraFin, formFase, selectedProyecto, crear]);
 
     const handleEdit = useCallback(async (id: number, payload: UpdateEvaluadorPayload) => {
         try {
@@ -335,10 +436,10 @@ export default function AsignacionEvaluadores() {
             ),
         },
         {
-            key: 'hora',
-            label: 'Hora',
+            key: 'horario',
+            label: 'Horario',
             render: (row) => (
-                <span className="text-[#78716c]">{row.hora || '—'}</span>
+                <span className="text-[#78716c]">{formatHoraRange(row)}</span>
             ),
         },
         {
@@ -405,16 +506,23 @@ export default function AsignacionEvaluadores() {
                 <form onSubmit={handleRegister} className="rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                     <h3 className="mb-4 text-base font-bold text-[#1c1917]">Registrar Asignación</h3>
 
+                    {formError && (
+                        <div className="mb-4 flex items-start gap-2 rounded-lg border border-[#fee2e2] bg-[#fef2f2] p-3 text-sm text-[#dc2626]">
+                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                            {formError}
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {/* Project */}
-                        <div className="flex flex-col gap-1.5">
+                        {/* Project selector */}
+                        <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-1">
                             <label htmlFor="reg-proyecto" className="text-sm font-semibold text-[#1c1917]">
                                 Proyecto <span className="text-[#dc2626]">*</span>
                             </label>
                             <select
                                 id="reg-proyecto"
                                 value={formProyectoId}
-                                onChange={(e) => setFormProyectoId(e.target.value)}
+                                onChange={(e) => { setFormProyectoId(e.target.value); setFormError(null); }}
                                 className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
                                 required
                             >
@@ -422,13 +530,15 @@ export default function AsignacionEvaluadores() {
                                 {loadingProyectos ? (
                                     <option value="" disabled>Cargando proyectos...</option>
                                 ) : (
-                                    proyectos
-                                        .filter((p) => p.status === 'active' || p.status === 'inscribed')
-                                        .map((p) => (
-                                            <option key={p.id} value={p.id}>
-                                                {p.code} — {p.title}
-                                            </option>
-                                        ))
+                                    proyectos.map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                            {p.code} — {p.title}
+                                            {p.director ? ` (Dir: ${p.director.name})` : ''}
+                                            {p.estudiantes.length > 0
+                                                ? ` | ${p.estudiantes.map((e) => e.name).join(', ')}`
+                                                : ''}
+                                        </option>
+                                    ))
                                 )}
                             </select>
                         </div>
@@ -464,64 +574,6 @@ export default function AsignacionEvaluadores() {
                             </div>
                         </div>
 
-                        {/* Evaluador Principal */}
-                        <div className="flex flex-col gap-1.5">
-                            <label htmlFor="reg-eval1" className="text-sm font-semibold text-[#1c1917]">
-                                Evaluador Principal <span className="text-[#dc2626]">*</span>
-                            </label>
-                            <select
-                                id="reg-eval1"
-                                value={formEvalPrincipal}
-                                onChange={(e) => setFormEvalPrincipal(e.target.value)}
-                                className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
-                                required
-                            >
-                                <option value="">Seleccione evaluador</option>
-                                {evaluadoresDisponibles.map((ev) => (
-                                    <option key={ev.id} value={ev.id}>{ev.name}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {/* Evaluador Secundario */}
-                        <div className="flex flex-col gap-1.5">
-                            <label htmlFor="reg-eval2" className="text-sm font-semibold text-[#1c1917]">
-                                Evaluador Secundario <span className="text-[#dc2626]">*</span>
-                            </label>
-                            <select
-                                id="reg-eval2"
-                                value={formEvalSecundario}
-                                onChange={(e) => setFormEvalSecundario(e.target.value)}
-                                className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
-                                required
-                            >
-                                <option value="">Seleccione evaluador</option>
-                                {evaluadoresDisponibles.filter((ev) => ev.id !== Number(formEvalPrincipal)).map((ev) => (
-                                    <option key={ev.id} value={ev.id}>{ev.name}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {/* Evaluador Tercero (opcional) */}
-                        <div className="flex flex-col gap-1.5">
-                            <label htmlFor="reg-eval3" className="text-sm font-semibold text-[#1c1917]">
-                                Evaluador Adicional <span className="text-[#78716c]">(opcional)</span>
-                            </label>
-                            <select
-                                id="reg-eval3"
-                                value={formEvalTercero}
-                                onChange={(e) => setFormEvalTercero(e.target.value)}
-                                className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
-                            >
-                                <option value="">Sin evaluador adicional</option>
-                                {evaluadoresDisponibles
-                                    .filter((ev) => ev.id !== Number(formEvalPrincipal) && ev.id !== Number(formEvalSecundario))
-                                    .map((ev) => (
-                                        <option key={ev.id} value={ev.id}>{ev.name}</option>
-                                    ))}
-                            </select>
-                        </div>
-
                         {/* Date */}
                         <div className="flex flex-col gap-1.5">
                             <label htmlFor="reg-fecha" className="text-sm font-semibold text-[#1c1917]">
@@ -537,19 +589,137 @@ export default function AsignacionEvaluadores() {
                             />
                         </div>
 
-                        {/* Time */}
+                        {/* Hora Inicio */}
                         <div className="flex flex-col gap-1.5">
-                            <label htmlFor="reg-hora" className="text-sm font-semibold text-[#1c1917]">
-                                Hora <span className="text-[#dc2626]">*</span>
+                            <label htmlFor="reg-hora-inicio" className="text-sm font-semibold text-[#1c1917]">
+                                Hora Inicio <span className="text-[#dc2626]">*</span>
                             </label>
                             <input
-                                id="reg-hora"
+                                id="reg-hora-inicio"
                                 type="time"
-                                value={formHora}
-                                onChange={(e) => setFormHora(e.target.value)}
+                                value={formHoraInicio}
+                                onChange={(e) => { setFormHoraInicio(e.target.value); setFormError(null); }}
                                 className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
                                 required
                             />
+                        </div>
+
+                        {/* Hora Fin */}
+                        <div className="flex flex-col gap-1.5">
+                            <label htmlFor="reg-hora-fin" className="text-sm font-semibold text-[#1c1917]">
+                                Hora Fin <span className="text-[#dc2626]">*</span>
+                            </label>
+                            <input
+                                id="reg-hora-fin"
+                                type="time"
+                                value={formHoraFin}
+                                onChange={(e) => { setFormHoraFin(e.target.value); setFormError(null); }}
+                                className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                required
+                            />
+                        </div>
+
+                        {/* Evaluadores selector */}
+                        <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-1">
+                            <label className="text-sm font-semibold text-[#1c1917]">
+                                Evaluadores <span className="text-[#dc2626]">*</span>
+                                <span className="font-normal text-[#78716c]"> (seleccione 2-3)</span>
+                            </label>
+                            {loadingEvalUsers ? (
+                                <div className="flex items-center gap-2 text-sm text-[#78716c] py-2">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Cargando evaluadores...
+                                </div>
+                            ) : (
+                                <div className="max-h-[240px] overflow-y-auto rounded-lg border border-[#e5e5e5] bg-white">
+                                    {evaluadores.length === 0 ? (
+                                        <p className="p-3 text-sm text-[#78716c]">No hay evaluadores disponibles.</p>
+                                    ) : (
+                                        <>
+                                            {/* Directores */}
+                                            {evaluadores.filter((ev) => ev.role === 'Director').length > 0 && (
+                                                <div className="border-b border-[#e5e5e5]">
+                                                    <div className="flex items-center gap-2 px-3 pt-2.5 pb-1.5 text-xs font-semibold uppercase tracking-wider text-[#78716c]">
+                                                        <UserCheck className="h-3.5 w-3.5" />
+                                                        Directores
+                                                    </div>
+                                                    {evaluadores
+                                                        .filter((ev) => ev.role === 'Director')
+                                                        .map((ev) => {
+                                                            const selected = formEvalIds.includes(ev.id);
+                                                            const isDirectorPropio = selectedProyecto?.director?.id === ev.id;
+                                                            return (
+                                                                <label
+                                                                    key={ev.id}
+                                                                    className={cn(
+                                                                        'flex items-center gap-3 px-3 py-2 text-sm cursor-pointer transition-colors',
+                                                                        selected
+                                                                            ? 'bg-[#fed7aa] text-[#1c1917]'
+                                                                            : 'hover:bg-[#f5f5f4] text-[#1c1917]',
+                                                                        isDirectorPropio && selected && 'bg-[#fee2e2]',
+                                                                    )}
+                                                                >
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={selected}
+                                                                        onChange={() => handleEvaluadorToggle(ev.id)}
+                                                                        className="accent-[#c2410c]"
+                                                                    />
+                                                                    <div className="flex flex-1 items-center justify-between gap-2">
+                                                                        <div className="truncate">
+                                                                            <span>{ev.name}</span>
+                                                                            <span className="ml-2 text-[#78716c]">({ev.email})</span>
+                                                                        </div>
+                                                                        <StatusBadge variant="info">Director</StatusBadge>
+                                                                    </div>
+                                                                </label>
+                                                            );
+                                                        })}
+                                                </div>
+                                            )}
+                                            {/* Evaluadores Externos */}
+                                            {evaluadores.filter((ev) => ev.role === 'EvaluadorExterno').length > 0 && (
+                                                <div>
+                                                    <div className="flex items-center gap-2 px-3 pt-2.5 pb-1.5 text-xs font-semibold uppercase tracking-wider text-[#78716c]">
+                                                        <GraduationCap className="h-3.5 w-3.5" />
+                                                        Evaluadores Externos
+                                                    </div>
+                                                    {evaluadores
+                                                        .filter((ev) => ev.role === 'EvaluadorExterno')
+                                                        .map((ev) => {
+                                                            const selected = formEvalIds.includes(ev.id);
+                                                            return (
+                                                                <label
+                                                                    key={ev.id}
+                                                                    className={cn(
+                                                                        'flex items-center gap-3 px-3 py-2 text-sm cursor-pointer transition-colors',
+                                                                        selected
+                                                                            ? 'bg-[#fed7aa] text-[#1c1917]'
+                                                                            : 'hover:bg-[#f5f5f4] text-[#1c1917]',
+                                                                    )}
+                                                                >
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={selected}
+                                                                        onChange={() => handleEvaluadorToggle(ev.id)}
+                                                                        className="accent-[#c2410c]"
+                                                                    />
+                                                                    <div className="flex flex-1 items-center justify-between gap-2">
+                                                                        <div className="truncate">
+                                                                            <span>{ev.name}</span>
+                                                                            <span className="ml-2 text-[#78716c]">({ev.email})</span>
+                                                                        </div>
+                                                                        <StatusBadge variant="inactivo">Evaluador</StatusBadge>
+                                                                    </div>
+                                                                </label>
+                                                            );
+                                                        })}
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -618,6 +788,7 @@ export default function AsignacionEvaluadores() {
                 onSave={handleEdit}
                 onClose={() => setEditTarget(null)}
                 saving={mutationLoading}
+                existingAssignments={asignaciones}
             />
 
             {/* Delete Confirmation */}

@@ -6,7 +6,7 @@ export interface Proyecto {
     code: string;
     title: string;
     estudiantes: { id: number; name: string; email?: string }[];
-    director: { id: number; name: string } | null;
+    director: { id: number; name: string; email?: string } | null;
     current_phase: string | null;
     status: string;
     semester_id: number;
@@ -82,7 +82,7 @@ function reducer(state: State, action: Action): State {
     }
 }
 
-export function useProyectos(grupoId?: number | null) {
+export function useProyectos(grupoId?: number | null, filters?: { search?: string; semestre_activo?: boolean }) {
     const [state, dispatch] = useReducer(reducer, {
         data: [],
         loading: true,
@@ -94,10 +94,18 @@ export function useProyectos(grupoId?: number | null) {
     const fetchData = useCallback(async () => {
         dispatch({ type: 'FETCH_START' });
         try {
-            const url =
-                grupoId != null
-                    ? `/api/admin/proyectos?grupo_id=${grupoId}`
-                    : '/api/admin/proyectos';
+            const params = new URLSearchParams();
+            if (grupoId != null) {
+                params.set('grupo_id', String(grupoId));
+            }
+            if (filters?.search) {
+                params.set('search', filters.search);
+            }
+            if (filters?.semestre_activo) {
+                params.set('semestre_activo', 'true');
+            }
+            const qs = params.toString();
+            const url = `/api/admin/proyectos${qs ? '?' + qs : ''}`;
             const res = await apiFetch(url);
             if (!res.ok) {
                 const body = await res.json().catch(() => null);
@@ -109,7 +117,7 @@ export function useProyectos(grupoId?: number | null) {
             const message = err instanceof Error ? err.message : 'Error desconocido';
             dispatch({ type: 'FETCH_ERROR', payload: message });
         }
-    }, [grupoId]);
+    }, [grupoId, filters?.search, filters?.semestre_activo]);
 
     useEffect(() => {
         fetchData();

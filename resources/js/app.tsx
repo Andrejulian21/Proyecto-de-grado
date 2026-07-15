@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { AppShell } from '@/components/layout/AppShell';
 import LoginInstitucional from '@/pages/auth/LoginInstitucional';
@@ -74,6 +74,11 @@ function ProtectedRoute({ children, allowedRoles }: {
     return <>{children}</>;
 }
 
+function SupervisionReadOnlyWrapper() {
+    const { id } = useParams<{ id: string }>();
+    return <SupervisionReadOnly projectId={id ? Number(id) : undefined} />;
+}
+
 function App() {
     return (
         <Routes>
@@ -94,7 +99,7 @@ function App() {
                                 <Route path="/dashboard/coordinador" element={<CoordinadorDashboard />} />
                                 <Route path="/dashboard/coordinador/proyecto/:id" element={
                                     <ProtectedRoute allowedRoles={['Coordinador']}>
-                                        <SuspenseWrapper><SupervisionReadOnly /></SuspenseWrapper>
+                                        <SuspenseWrapper><SupervisionReadOnlyWrapper /></SuspenseWrapper>
                                     </ProtectedRoute>
                                 } />
                                 <Route path="/dashboard/evaluador-externo" element={<EvaluadorDashboard />} />

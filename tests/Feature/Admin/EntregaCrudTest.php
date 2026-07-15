@@ -81,19 +81,21 @@ it('estudiante ve solo sus entregas', function () {
 
 it('coordinador puede crear entrega', function () {
     $payload = [
-        'proyecto_id' => $this->proyecto->id,
-        'phase' => 'anteproyecto',
-        'title' => 'Entrega Anteproyecto',
-        'description' => 'Descripción de la entrega',
-        'due_date' => '2026-03-15',
+        'grupo_id' => $this->semestre->id,
+        'fase' => 'anteproyecto',
+        'titulo' => 'Entrega Anteproyecto',
+        'descripcion' => 'Descripción detallada del anteproyecto',
+        'fecha_limite' => '2026-03-15',
     ];
 
     $response = $this->actingAs($this->coordinador)
         ->postJson('/api/admin/entregas', $payload);
 
     $response->assertCreated()
-        ->assertJson(['data' => ['title' => 'Entrega Anteproyecto']]);
+        ->assertJsonStructure(['data' => ['id', 'semester_id', 'phase', 'title', 'status']]);
     expect(Entrega::count())->toBe(1);
+    expect($response->json('data.title'))->toBe('Entrega Anteproyecto');
+    expect($response->json('data.semester_id'))->toBe($this->semestre->id);
 });
 
 it('crear entrega valida campos requeridos', function () {
@@ -106,10 +108,10 @@ it('crear entrega valida campos requeridos', function () {
 it('estudiante NO puede crear entrega (403)', function () {
     $response = $this->actingAs($this->estudiante)
         ->postJson('/api/admin/entregas', [
-            'proyecto_id' => $this->proyecto->id,
-            'phase' => 'anteproyecto',
-            'title' => 'Hack',
-            'due_date' => '2026-03-01',
+            'grupo_id' => $this->semestre->id,
+            'fase' => 'anteproyecto',
+            'descripcion' => 'Hack',
+            'fecha_limite' => '2026-03-01',
         ]);
 
     $response->assertStatus(403);

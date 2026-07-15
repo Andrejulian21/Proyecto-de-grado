@@ -71,6 +71,12 @@ class Proyecto extends Model
         return $this->hasMany(Entrega::class);
     }
 
+    public function entregasPivot(): BelongsToMany
+    {
+        return $this->belongsToMany(Entrega::class, 'entrega_proyecto', 'proyecto_id', 'entrega_id')
+            ->withTimestamps();
+    }
+
     public function bitacoras(): HasMany
     {
         return $this->hasMany(Bitacora::class);

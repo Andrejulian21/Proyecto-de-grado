@@ -15,14 +15,14 @@ export interface Recurso {
 export interface CreateRecursoPayload {
     title: string;
     description: string;
-    type: string;
+    category: string;
     file?: File | null;
 }
 
 export interface UpdateRecursoPayload {
     title?: string;
     description?: string;
-    type?: string;
+    category?: string;
     file?: File | null;
 }
 
@@ -128,7 +128,7 @@ export function useRecursos() {
             const formData = new FormData();
             formData.append('title', payload.title);
             formData.append('description', payload.description);
-            formData.append('type', payload.type);
+            formData.append('category', payload.category);
             if (payload.file) {
                 formData.append('file', payload.file);
             }
@@ -158,7 +158,7 @@ export function useRecursos() {
             const formData = new FormData();
             if (payload.title !== undefined) formData.append('title', payload.title);
             if (payload.description !== undefined) formData.append('description', payload.description);
-            if (payload.type !== undefined) formData.append('type', payload.type);
+            if (payload.category !== undefined) formData.append('category', payload.category);
             if (payload.file) {
                 formData.append('file', payload.file);
             }

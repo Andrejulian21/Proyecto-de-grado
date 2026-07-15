@@ -1,36 +1,60 @@
-import { useEffect, useCallback, useReducer } from 'react';
+import { useState, useEffect, useCallback, useReducer } from 'react';
 import { apiFetch } from '@/lib/utils';
 
 /* ── Types ── */
+
+export interface EvaluadorInfo {
+    id: number;
+    name: string;
+    email: string;
+    role: string;
+    assignment_id: number;
+}
 
 export interface EvaluadorProyecto {
     id: number;
     proyecto_id: number;
     proyecto_codigo: string;
     proyecto_nombre: string;
+    proyecto_director_id: number | null;
+    proyecto_director_nombre: string;
     estudiantes: { id: number; name: string }[];
     fase: 'Anteproyecto' | 'Final';
+    fecha: string;
+    hora_inicio: string;
+    hora_fin: string;
+    hora: string; // backward-compat alias
+    evaluadores_list: EvaluadorInfo[];
     evaluador_principal_id: number;
     evaluador_principal_nombre: string;
     evaluador_secundario_id: number | null;
     evaluador_secundario_nombre: string | null;
     evaluador_tercero_id: number | null;
     evaluador_tercero_nombre: string | null;
-    fecha: string;
-    hora: string;
+}
+
+export interface EvaluadorUser {
+    id: number;
+    name: string;
+    email: string;
+    role: string;
 }
 
 export interface CreateEvaluadorPayload {
     proyecto_id: number;
-    fase: 'Anteproyecto' | 'Final';
-    evaluador_principal_id: number;
-    evaluador_secundario_id: number;
-    evaluador_tercero_id?: number | null;
+    evaluador_ids: number[];
     fecha: string;
-    hora: string;
+    hora_inicio: string;
+    hora_fin: string;
+    fase: 'Anteproyecto' | 'Final';
 }
 
-export type UpdateEvaluadorPayload = Partial<CreateEvaluadorPayload>;
+export type UpdateEvaluadorPayload = Partial<{
+    fecha: string;
+    hora_inicio: string;
+    hora_fin: string;
+    fase: 'Anteproyecto' | 'Final';
+}>;
 
 /* ── State & Reducer ── */
 
@@ -132,7 +156,10 @@ export function useEvaluadorProyecto() {
             });
             if (!res.ok) {
                 const body = await res.json().catch(() => null);
-                throw new Error(body?.message ?? `Error ${res.status}`);
+                const msg = body?.error ?? body?.errors
+                    ? Object.values(body.errors).flat().join('. ')
+                    : `Error ${res.status}`;
+                throw new Error(msg);
             }
             const json = await res.json();
             const created: EvaluadorProyecto = json.data ?? json;
@@ -155,7 +182,10 @@ export function useEvaluadorProyecto() {
             });
             if (!res.ok) {
                 const body = await res.json().catch(() => null);
-                throw new Error(body?.message ?? `Error ${res.status}`);
+                const msg = body?.error ?? body?.errors
+                    ? Object.values(body.errors).flat().join('. ')
+                    : `Error ${res.status}`;
+                throw new Error(msg);
             }
             const json = await res.json();
             const updated: EvaluadorProyecto = json.data ?? json;
@@ -194,4 +224,68 @@ export function useEvaluadorProyecto() {
         actualizar,
         eliminar,
     };
+}
+
+/* ── EvaluadorUsers hook ── */
+
+export interface UseEvaluadorUsersResult {
+    data: EvaluadorUser[];
+    loading: boolean;
+    error: string | null;
+}
+
+export function useEvaluadorUsers(): UseEvaluadorUsersResult {
+    const [data, setData] = useState<EvaluadorUser[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    const fetchUsers = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            // Fetch both evaluadores externos and directores for the selector
+            const [evalRes, dirRes] = await Promise.all([
+                apiFetch('/api/admin/usuarios?role=evaluadorexterno&per_page=500'),
+                apiFetch('/api/admin/usuarios?role=director&per_page=500'),
+            ]);
+
+            // Deduplicate by email using a Map
+            const resultsMap = new Map<string, EvaluadorUser>();
+
+            if (evalRes.ok) {
+                const json = await evalRes.json();
+                const raw = Array.isArray(json) ? json : json.data ?? [];
+                for (const u of raw) {
+                    const email = u.email ?? '';
+                    if (!resultsMap.has(email)) {
+                        resultsMap.set(email, { id: u.id, name: u.name ?? '', email, role: u.role ?? 'EvaluadorExterno' });
+                    }
+                }
+            }
+
+            if (dirRes.ok) {
+                const json = await dirRes.json();
+                const raw = Array.isArray(json) ? json : json.data ?? [];
+                for (const u of raw) {
+                    const email = u.email ?? '';
+                    if (!resultsMap.has(email)) {
+                        resultsMap.set(email, { id: u.id, name: u.name ?? '', email, role: u.role ?? 'Director' });
+                    }
+                }
+            }
+
+            setData(Array.from(resultsMap.values()));
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Error desconocido';
+            setError(message);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchUsers();
+    }, [fetchUsers]);
+
+    return { data, loading, error };
 }

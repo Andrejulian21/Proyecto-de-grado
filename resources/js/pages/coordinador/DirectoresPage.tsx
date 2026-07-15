@@ -296,33 +296,39 @@ export default function DirectoresPage() {
 
     return (
         <div className="flex flex-col gap-6" aria-label={nivelLabel}>
-            {/* Header */}
-            <PageHeader
-                eyebrow="Coordinación"
-                title={
-                    nivel === 1
-                        ? 'Directores'
-                        : nivel === 2
-                          ? `Proyectos de ${selectedDirector?.name ?? ''}`
-                          : `Bitácoras — ${selectedProyecto?.title ?? ''}`
-                }
-                subtitle={
-                    nivel === 1
-                        ? 'Consulta la información de directores, sus proyectos y bitácoras.'
-                        : undefined
-                }
-                actions={
-                    nivel > 1 ? (
-                        <button
-                            onClick={handleBack}
-                            className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-transparent px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:border-[#c2410c] hover:bg-[#fed7aa] hover:text-[#c2410c] active:scale-[0.98]"
-                        >
-                            <ArrowLeft className="h-4 w-4" />
-                            Volver
-                        </button>
-                    ) : undefined
-                }
-            />
+            {/* Header — no header in supervision mode since SupervisionReadOnly has its own */}
+            {nivel === 3 && drillMode === 'proyectos' ? null : (
+                <PageHeader
+                    eyebrow={
+                        nivel === 1
+                            ? 'Coordinación'
+                            : 'Coordinación'
+                    }
+                    title={
+                        nivel === 1
+                            ? 'Directores'
+                            : nivel === 2
+                              ? `Proyectos de ${selectedDirector?.name ?? ''}`
+                              : `Bitácoras — ${selectedProyecto?.title ?? ''}`
+                    }
+                    subtitle={
+                        nivel === 1
+                            ? 'Consulta la información de directores, sus proyectos y bitácoras.'
+                            : undefined
+                    }
+                    actions={
+                        nivel > 1 ? (
+                            <button
+                                onClick={handleBack}
+                                className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-transparent px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:border-[#c2410c] hover:bg-[#fed7aa] hover:text-[#c2410c] active:scale-[0.98]"
+                            >
+                                <ArrowLeft className="h-4 w-4" />
+                                Volver
+                            </button>
+                        ) : undefined
+                    }
+                />
+            )}
 
             {/* Level 1: Director Cards */}
             {nivel === 1 && (
@@ -414,6 +420,7 @@ export default function DirectoresPage() {
                     projectCode={selectedProyecto.code}
                     projectTitle={selectedProyecto.title}
                     projectId={selectedProyecto.id}
+                    onBack={handleBack}
                 />
             )}
         </div>

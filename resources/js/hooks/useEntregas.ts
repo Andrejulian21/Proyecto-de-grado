@@ -10,25 +10,51 @@ export const FASE_SEQUENCE = [
 
 export type Fase = (typeof FASE_SEQUENCE)[number];
 
+export interface ProyectoResumen {
+    id: number;
+    code: string;
+    title: string;
+    semester_id: number;
+}
+
 export interface Entrega {
     id: number;
+    proyecto_id: number | null;
+    semester_id?: number | null;
     grupo_id: number;
-    fase: Fase;
-    titulo?: string;
-    descripcion: string;
-    fecha_limite: string;
+    phase: string;
+    title: string;
+    description: string;
+    due_date: string;
+    acceptance_criteria?: string;
     hora_maxima?: string;
-    criterios_aceptacion?: string;
+    status?: string;
     created_at?: string;
+    semestre_nombre?: string;
+    proyecto?: ProyectoResumen;
+    proyectos?: ProyectoResumen[];
+    proyectos_count?: number;
+    proyectos_list?: string[];
 }
 
 export interface CreateEntregaPayload {
     grupo_id: number;
-    fase: Fase;
+    fase: string;
+    titulo: string;
     descripcion: string;
     fecha_limite: string;
+    criterios?: string;
     hora_maxima?: string;
-    criterios_aceptacion?: string;
+}
+
+export interface UpdateEntregaPayload {
+    due_date?: string;
+    description?: string;
+    titulo?: string;
+    acceptance_criteria?: string | null;
+    hora_maxima?: string | null;
+    phase?: string;
+    proyecto_id?: number;
 }
 
 export interface EntregasFilters {
@@ -50,7 +76,10 @@ type Action =
     | { type: 'FETCH_SUCCESS'; payload: Entrega[] }
     | { type: 'FETCH_ERROR'; payload: string }
     | { type: 'MUTATION_START' }
-    | { type: 'CREATE_SUCCESS'; payload: Entrega }
+    | { type: 'MUTATION_END' }
+    | { type: 'CREATE_SUCCESS'; payload: Entrega[] }
+    | { type: 'UPDATE_SUCCESS'; payload: Entrega }
+    | { type: 'DELETE_SUCCESS'; payload: number }
     | { type: 'MUTATION_ERROR'; payload: string };
 
 function reducer(state: State, action: Action): State {
@@ -63,10 +92,26 @@ function reducer(state: State, action: Action): State {
             return { ...state, loading: false, error: action.payload };
         case 'MUTATION_START':
             return { ...state, mutationLoading: true, mutationError: null };
+        case 'MUTATION_END':
+            return { ...state, mutationLoading: false };
         case 'CREATE_SUCCESS':
             return {
                 ...state,
-                data: [...state.data, action.payload],
+                data: [...state.data, ...action.payload],
+                mutationLoading: false,
+            };
+        case 'UPDATE_SUCCESS':
+            return {
+                ...state,
+                data: state.data.map((e) =>
+                    e.id === action.payload.id ? action.payload : e,
+                ),
+                mutationLoading: false,
+            };
+        case 'DELETE_SUCCESS':
+            return {
+                ...state,
+                data: state.data.filter((e) => e.id !== action.payload),
                 mutationLoading: false,
             };
         case 'MUTATION_ERROR':
@@ -126,8 +171,48 @@ export function useEntregas(filters?: EntregasFilters) {
                 const body = await res.json().catch(() => null);
                 throw new Error(body?.message ?? `Error ${res.status}`);
             }
+            // Refetch to get fresh data including the new entrega
+            await fetchData();
+            dispatch({ type: 'MUTATION_END' });
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Error desconocido';
+            dispatch({ type: 'MUTATION_ERROR', payload: message });
+            throw err;
+        }
+    }, [fetchData]);
+
+    const actualizar = useCallback(async (id: number, payload: UpdateEntregaPayload) => {
+        dispatch({ type: 'MUTATION_START' });
+        try {
+            const res = await apiFetch(`/api/admin/entregas/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            if (!res.ok) {
+                const body = await res.json().catch(() => null);
+                throw new Error(body?.message ?? `Error ${res.status}`);
+            }
             const json = await res.json();
-            dispatch({ type: 'CREATE_SUCCESS', payload: json.data ?? json });
+            dispatch({ type: 'UPDATE_SUCCESS', payload: json.data ?? json });
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Error desconocido';
+            dispatch({ type: 'MUTATION_ERROR', payload: message });
+            throw err;
+        }
+    }, []);
+
+    const eliminar = useCallback(async (id: number) => {
+        dispatch({ type: 'MUTATION_START' });
+        try {
+            const res = await apiFetch(`/api/admin/entregas/${id}`, {
+                method: 'DELETE',
+            });
+            if (!res.ok) {
+                const body = await res.json().catch(() => null);
+                throw new Error(body?.message ?? `Error ${res.status}`);
+            }
+            dispatch({ type: 'DELETE_SUCCESS', payload: id });
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Error desconocido';
             dispatch({ type: 'MUTATION_ERROR', payload: message });
@@ -143,7 +228,7 @@ export function useEntregas(filters?: EntregasFilters) {
             // Find the highest index in the sequence among completed entregas
             let highestIdx = -1;
             for (const entrega of groupEntregas) {
-                const idx = FASE_SEQUENCE.indexOf(entrega.fase);
+                const idx = FASE_SEQUENCE.indexOf(entrega.phase as Fase);
                 if (idx > highestIdx) highestIdx = idx;
             }
 
@@ -164,6 +249,8 @@ export function useEntregas(filters?: EntregasFilters) {
         mutationError: state.mutationError,
         refetch: fetchData,
         crear,
+        actualizar,
+        eliminar,
         getNextFase,
     };
 }

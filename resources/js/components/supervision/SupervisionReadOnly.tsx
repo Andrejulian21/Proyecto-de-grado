@@ -49,13 +49,13 @@ const MOCK_DELIVERIES: Delivery[] = [
     { id: 4, name: 'Entrega Final', date: '30/11/2026', status: 'pending', grade: '—' },
 ];
 
-const STEP_LABELS = ['Inscripción', 'Avance 1', 'Avance 2', 'Avance 3', 'Final'];
+const STEP_LABELS = ['Anteproyecto', 'Presentación Anteproyecto', 'Desarrollo', 'Presentación Final'];
 
 const PHASE_STEP_MAP: Record<string, number> = {
-    'anteproyecto': 1,
-    'presentacion_anteproyecto': 2,
-    'desarrollo': 3,
-    'presentacion_final': 4,
+    'anteproyecto': 0,
+    'presentacion_anteproyecto': 1,
+    'desarrollo': 2,
+    'presentacion_final': 3,
 };
 
 const statusConfig: Record<string, { label: string; variant: 'success' | 'warning' | 'error' | 'info' | 'inactivo' }> = {
@@ -99,9 +99,11 @@ interface SupervisionReadOnlyProps {
     projectTitle?: string;
     /** When provided, fetches real project data from the API */
     projectId?: number;
+    /** Optional custom back handler; defaults to navigate(-1) */
+    onBack?: () => void;
 }
 
-export default function SupervisionReadOnly({ projectCode, projectTitle, projectId }: SupervisionReadOnlyProps) {
+export default function SupervisionReadOnly({ projectCode, projectTitle, projectId, onBack }: SupervisionReadOnlyProps) {
     const navigate = useNavigate();
     const [expandedDelivery, setExpandedDelivery] = useState<number | null>(null);
     const [projectInfo, setProjectInfo] = useState<ProjectInfo | null>(null);
@@ -168,7 +170,7 @@ export default function SupervisionReadOnly({ projectCode, projectTitle, project
                 subtitle={displayProject ? `${displayCode} · ${displayProject.students}` : undefined}
                 actions={
                     <button
-                        onClick={() => navigate(-1)}
+                        onClick={() => (onBack ? onBack() : navigate('/dashboard/coordinador'))}
                         className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-transparent px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:border-[#c2410c] hover:bg-[#fed7aa] hover:text-[#c2410c] active:scale-[0.98]"
                     >
                         <ArrowLeft className="h-4 w-4" />

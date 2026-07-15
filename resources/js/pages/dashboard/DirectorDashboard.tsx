@@ -1,3 +1,5 @@
+import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatCard } from '@/components/ui/StatCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -7,12 +9,18 @@ import {
     FolderKanban,
     FileText,
     CheckCircle,
-    Eye,
     Users,
     AlertTriangle,
+    ArrowRight,
 } from 'lucide-react';
+import {
+    MOCK_ASSIGNED_PROJECTS,
+    phaseLabel,
+    type AssignedProject,
+    type ReviewStatus,
+} from '@/lib/mock/project-data';
 
-/* ── Mock data ── */
+/* ── Mock KPIs ── */
 
 const MOCK_KPIS = [
     { icon: FolderKanban, label: 'Proyectos supervisando', value: 8, variant: 'default' as const },
@@ -36,71 +44,64 @@ const MOCK_PROGRESS: ProgressProject[] = [
     { id: 3, code: 'PG-2402', title: 'IoT ambiental', students: 'Pedro Sánchez', progress: 45, color: 'bg-warning' },
 ];
 
-interface Delivery {
-    id: number;
-    student: string;
-    project: string;
-    type: string;
-    date: string;
-    status: 'approved' | 'pending' | 'rejected';
-}
-
-const MOCK_DELIVERIES: Delivery[] = [
-    { id: 1, student: 'Ana Martínez', project: 'Microgrid solar IoT', type: 'Informe de Avance 1', date: '12/06/2026', status: 'pending' },
-    { id: 2, student: 'Pedro Sánchez', project: 'IoT ambiental', type: 'Presentación', date: '08/06/2026', status: 'approved' },
-    { id: 3, student: 'Diana Pardo', project: 'Sistema de deserción ML', type: 'Informe de Avance 2', date: '01/06/2026', status: 'pending' },
-];
+const reviewStatusConfig: Record<ReviewStatus, { label: string; variant: 'success' | 'warning' }> = {
+    pending_review: { label: 'Pendiente por revisar', variant: 'warning' },
+    no_pending: { label: 'Sin pendientes', variant: 'success' },
+};
 
 /* ── Columns ── */
 
-const deliveryColumns: Column<Delivery>[] = [
+const projectColumns: Column<AssignedProject>[] = [
     {
-        key: 'student',
-        label: 'Estudiante',
-        className: 'font-medium text-text',
-    },
-    {
-        key: 'project',
+        key: 'title',
         label: 'Proyecto',
-        className: 'text-text-muted',
-    },
-    {
-        key: 'type',
-        label: 'Tipo',
-        className: 'text-text-muted',
-    },
-    {
-        key: 'date',
-        label: 'Fecha',
-        className: 'text-text-muted tabular-nums',
-    },
-    {
-        key: 'status',
-        label: 'Estado',
-        render: (row: Delivery) => (
-            <StatusBadge
-                variant={row.status === 'approved' ? 'success' : row.status === 'pending' ? 'warning' : 'error'}
-            >
-                {row.status === 'approved' ? 'Aprobado' : row.status === 'pending' ? 'Pendiente' : 'Rechazado'}
-            </StatusBadge>
+        render: (row) => (
+            <div className="flex flex-col gap-0.5">
+                <span className="text-xs font-bold uppercase tracking-[0.05em] text-primary">{row.code}</span>
+                <span className="font-medium text-text">{row.title}</span>
+            </div>
         ),
+    },
+    {
+        key: 'students',
+        label: 'Estudiantes',
+        render: (row) => (
+            <span className="flex items-center gap-1.5 text-text-muted">
+                <Users className="h-3.5 w-3.5 shrink-0" />
+                {row.students.join(', ')}
+            </span>
+        ),
+    },
+    {
+        key: 'currentPhase',
+        label: 'Fase actual',
+        render: (row) => (
+            <span className="text-text-muted">{phaseLabel(row.currentPhase)}</span>
+        ),
+    },
+    {
+        key: 'reviewStatus',
+        label: 'Estado',
+        render: (row) => {
+            const config = reviewStatusConfig[row.reviewStatus];
+            return <StatusBadge variant={config.variant}>{config.label}</StatusBadge>;
+        },
     },
     {
         key: 'actions',
         label: 'Acciones',
         className: 'text-right',
-        render: () => (
-            <button
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-alt hover:text-primary"
-                aria-label="Revisar entrega"
+        render: (row) => (
+            <Link
+                to={`/supervision/${row.id}`}
+                className="inline-flex min-h-[36px] items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-text transition-colors hover:border-primary hover:bg-primary-container hover:text-primary"
             >
-                <Eye className="h-4 w-4" />
-            </button>
+                Supervisar
+                <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
         ),
     },
 ];
-
-/* ── Subcomponents ── */
 
 function ProgressCard({ code, title, students, progress, color }: ProgressProject) {
     return (
@@ -128,12 +129,9 @@ function ProgressCard({ code, title, students, progress, color }: ProgressProjec
     );
 }
 
-/* ── Main component ── */
-
 export default function DirectorDashboard() {
     return (
         <div className="flex flex-col gap-6">
-            {/* Bezel header */}
             <div className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-5 shadow-warm-sm sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-start gap-4">
                     <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary-container">
@@ -151,14 +149,12 @@ export default function DirectorDashboard() {
                 </div>
             </div>
 
-            {/* KPI row */}
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                 {MOCK_KPIS.map((kpi) => (
                     <StatCard key={kpi.label} icon={kpi.icon} label={kpi.label} value={kpi.value} variant={kpi.variant} />
                 ))}
             </div>
 
-            {/* Progress cards */}
             <section aria-labelledby="progress-heading">
                 <h2 id="progress-heading" className="mb-4 text-sm font-bold uppercase tracking-[0.05em] text-text-muted">
                     Avance de Proyectos
@@ -170,14 +166,13 @@ export default function DirectorDashboard() {
                 </div>
             </section>
 
-            {/* Deliveries table */}
-            <section aria-labelledby="deliveries-heading">
-                <h2 id="deliveries-heading" className="mb-4 text-sm font-bold uppercase tracking-[0.05em] text-text-muted">
-                    Últimas Entregas
+            <section aria-labelledby="projects-heading">
+                <h2 id="projects-heading" className="mb-4 text-sm font-bold uppercase tracking-[0.05em] text-text-muted">
+                    Proyectos Asignados
                 </h2>
-                <DataTable<Delivery>
-                    columns={deliveryColumns}
-                    data={MOCK_DELIVERIES}
+                <DataTable<AssignedProject>
+                    columns={projectColumns}
+                    data={MOCK_ASSIGNED_PROJECTS}
                     getRowKey={(row) => row.id}
                 />
             </section>

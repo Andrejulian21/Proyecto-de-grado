@@ -39,15 +39,11 @@ const navConfig: Record<string, { to: string; icon: typeof LayoutDashboard; labe
     ],
     Director: [
         { to: '/', label: 'Panel', icon: LayoutDashboard },
-        { to: '/supervision/:proyectoId', label: 'Supervisión', icon: FolderKanban },
         { to: '/bitacoras', label: 'Bitácoras', icon: ScrollText },
-        { to: '/bitacoras/proyectos', label: 'Bitácoras Proyectos', icon: ScrollText },
-        { to: '/evaluaciones', label: 'Evaluaciones', icon: ClipboardCheck },
         { to: '/anuncios', label: 'Anuncios', icon: Megaphone },
         { to: '/recursos', label: 'Recursos', icon: FolderKanban },
     ],
-    Estudiante: [
-        { to: '/', label: 'Panel', icon: LayoutDashboard },
+    Estudiante: [       
         { to: '/mi-proyecto', label: 'Mi Proyecto', icon: GraduationCap },
         { to: '/bitacora', label: 'Bitácora', icon: ScrollText },
         { to: '/anuncios', label: 'Anuncios', icon: Megaphone },

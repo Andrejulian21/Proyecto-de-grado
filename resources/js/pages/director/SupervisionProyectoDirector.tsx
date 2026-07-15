@@ -1,72 +1,129 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { useNavigate, useParams, Link } from 'react-router-dom';
+import {
+    GraduationCap,
+    Lock,
+    CheckCircle2,
+    Clock,
+    User,
+    Building,
+    ArrowLeft,
+    AlertCircle,
+} from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { ArrowLeft, ChevronDown, ChevronRight, Calendar, User, FileText, Clock, Award } from 'lucide-react';
+import { PhaseStepper } from '@/components/project/PhaseStepper';
+import {
+    DIRECTOR_PHASES,
+    getProjectById,
+    getDeliveriesByProject,
+    type PhaseId,
+    type ProjectDelivery,
+    type DeliveryStatus,
+} from '@/lib/mock/project-data';
 
-interface Delivery {
-    id: number;
-    name: string;
-    date: string;
-    status: 'approved' | 'pending' | 'corrections' | 'rejected';
-    grade: string;
+function DeliveryCard({ delivery, projectId }: { delivery: ProjectDelivery; projectId: number }) {
+    const statusIcon: Record<DeliveryStatus, React.ReactNode> = {
+        approved: <CheckCircle2 className="h-5 w-5 text-[#16a34a]" />,
+        pending: <Clock className="h-5 w-5 text-[#d97706]" />,
+        locked: <Lock className="h-5 w-5 text-[#78716c]" />,
+        rejected: <Clock className="h-5 w-5 text-[#dc2626]" />,
+    };
+
+    const statusLabel: Record<DeliveryStatus, string> = {
+        approved: 'Aprobado',
+        pending: 'Pendiente',
+        locked: 'Bloqueado',
+        rejected: 'Rechazado',
+    };
+
+    const statusVariant: Record<DeliveryStatus, 'success' | 'warning' | 'inactivo' | 'error'> = {
+        approved: 'success',
+        pending: 'warning',
+        locked: 'inactivo',
+        rejected: 'error',
+    };
+
+    return (
+        <div className="rounded-xl border border-[#e5e5e5] bg-white shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
+            <div className="flex w-full items-center gap-3 p-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#f5f5f4]">
+                    {statusIcon[delivery.status]}
+                </div>
+                <div className="flex flex-1 flex-col gap-0.5 min-w-0">
+                    <span className="text-sm font-semibold text-[#1c1917]">{delivery.label}</span>
+                    <span className="text-xs text-[#57534e]">
+                        {delivery.status === 'locked' ? `Disponible: ${delivery.deadline}` : `Límite: ${delivery.deadline}`}
+                        {delivery.grade !== null && ` · Nota: ${delivery.grade}`}
+                    </span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                    <StatusBadge variant={statusVariant[delivery.status]}>
+                        {statusLabel[delivery.status]}
+                    </StatusBadge>
+                </div>
+            </div>
+            <div className="border-t border-[#e5e5e5] px-4 py-3">
+                <Link
+                    to={`/supervision/${projectId}/entregas/${delivery.id}`}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a]"
+                >
+                    Revisar entrega
+                </Link>
+            </div>
+        </div>
+    );
 }
-
-interface ProjectInfo {
-    code: string;
-    title: string;
-    student: string;
-    type: string;
-    period: string;
-    startDate: string;
-    endDate: string;
-}
-
-const MOCK_PROJECT: ProjectInfo = {
-    code: 'PG-2026-014',
-    title: 'Sistema Centralizado de Proyectos de Grado',
-    student: 'Carlos Andrés Méndez',
-    type: 'Aplicación Web',
-    period: '2026-01',
-    startDate: '03/02/2026',
-    endDate: '30/11/2026',
-};
-
-const MOCK_DELIVERIES: Delivery[] = [
-    { id: 1, name: 'Avance 1 — Definición', date: '15/03/2026', status: 'approved', grade: '92' },
-    { id: 2, name: 'Avance 2 — Diseño', date: '30/04/2026', status: 'corrections', grade: '78' },
-    { id: 3, name: 'Avance 3 — Implementación', date: '15/06/2026', status: 'pending', grade: '—' },
-    { id: 4, name: 'Entrega Final', date: '30/11/2026', status: 'pending', grade: '—' },
-];
-
-const STEP_LABELS = [
-    'Inscripción',
-    'Avance 1',
-    'Avance 2',
-    'Avance 3',
-    'Final',
-];
-
-const statusConfig: Record<string, { label: string; variant: 'success' | 'warning' | 'error' | 'info' | 'inactivo' }> = {
-    approved: { label: 'Aprobado', variant: 'success' },
-    pending: { label: 'Pendiente', variant: 'warning' },
-    corrections: { label: 'Correcciones', variant: 'error' },
-    rejected: { label: 'Rechazado', variant: 'error' },
-};
 
 export default function SupervisionProyectoDirector() {
     const navigate = useNavigate();
-    const [expandedDelivery, setExpandedDelivery] = useState<number | null>(null);
-    const currentStep = 3;
+    const { proyectoId } = useParams<{ proyectoId: string }>();
+    const projectId = Number(proyectoId);
+    const project = getProjectById(projectId);
+
+    const [selectedPhaseId, setSelectedPhaseId] = useState<PhaseId>(
+        project?.currentPhase ?? 'presentacion',
+    );
+
+    const deliveries = useMemo(
+        () => (project ? getDeliveriesByProject(project.id) : []),
+        [project],
+    );
+
+    const selectedPhase = DIRECTOR_PHASES.find((p) => p.id === selectedPhaseId) ?? DIRECTOR_PHASES[0];
+
+    const filteredDeliveries = useMemo(
+        () => deliveries.filter((d) => d.phaseId === selectedPhaseId),
+        [deliveries, selectedPhaseId],
+    );
+
+    const pendingInPhase = filteredDeliveries.find((d) => d.status === 'pending');
+
+    if (!project) {
+        return (
+            <div className="flex flex-col gap-6">
+                <PageHeader eyebrow="Supervisión" title="Proyecto no encontrado" subtitle="El proyecto solicitado no existe." />
+                <button
+                    type="button"
+                    onClick={() => navigate('/dashboard/director')}
+                    className="inline-flex min-h-[40px] items-center gap-2 self-start rounded-lg border border-[#e5e5e5] px-4 py-2 text-sm font-semibold text-[#1c1917] hover:bg-[#f5f5f4]"
+                >
+                    <ArrowLeft className="h-4 w-4" />
+                    Volver al panel
+                </button>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col gap-6">
             <PageHeader
                 eyebrow="Supervisión"
-                title={MOCK_PROJECT.title}
-                subtitle={`${MOCK_PROJECT.code} · ${MOCK_PROJECT.student}`}
+                title={project.title}
+                subtitle={`${project.code} · ${project.students.join(', ')}`}
                 actions={
                     <button
+                        type="button"
                         onClick={() => navigate('/dashboard/director')}
                         className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-transparent px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:border-[#c2410c] hover:bg-[#fed7aa] hover:text-[#c2410c] active:scale-[0.98]"
                     >
@@ -76,165 +133,72 @@ export default function SupervisionProyectoDirector() {
                 }
             />
 
-            {/* Bezel Header */}
-            <div className="rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#fed7aa]">
-                            <Award className="h-7 w-7 text-[#c2410c]" />
+            <div className="rounded-xl border border-[#e5e5e5] bg-white p-5 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-4">
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#fed7aa]">
+                            <GraduationCap className="h-7 w-7 text-[#c2410c]" />
                         </div>
-                        <div>
+                        <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-2 flex-wrap">
-                                <span className="inline-flex items-center rounded-full bg-[#e7e5e4] px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.03em] text-[#57534e]">
-                                    {MOCK_PROJECT.code}
+                                <span className="text-xs font-bold uppercase tracking-[0.05em] text-[#c2410c]">
+                                    {project.code}
                                 </span>
-                                <StatusBadge variant="info">{MOCK_PROJECT.period}</StatusBadge>
+                                <StatusBadge variant="en-curso">En Curso</StatusBadge>
                             </div>
-                            <h2 className="mt-1 text-xl font-bold text-[#1c1917]">{MOCK_PROJECT.title}</h2>
-                        </div>
-                    </div>
-                </div>
-
-                <hr className="my-5 border-t border-[#e5e5e5]" />
-
-                {/* Info Cards */}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <div className="flex items-center gap-3 rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-3.5">
-                        <User className="h-5 w-5 text-[#c2410c]" />
-                        <div>
-                            <p className="text-xs text-[#78716c]">Estudiante</p>
-                            <p className="text-sm font-semibold text-[#1c1917]">{MOCK_PROJECT.student}</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3 rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-3.5">
-                        <FileText className="h-5 w-5 text-[#4f46e5]" />
-                        <div>
-                            <p className="text-xs text-[#78716c]">Tipo</p>
-                            <p className="text-sm font-semibold text-[#1c1917]">{MOCK_PROJECT.type}</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3 rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-3.5">
-                        <Calendar className="h-5 w-5 text-[#16a34a]" />
-                        <div>
-                            <p className="text-xs text-[#78716c]">Inicio</p>
-                            <p className="text-sm font-semibold text-[#1c1917]">{MOCK_PROJECT.startDate}</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3 rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-3.5">
-                        <Clock className="h-5 w-5 text-[#d97706]" />
-                        <div>
-                            <p className="text-xs text-[#78716c]">Fin</p>
-                            <p className="text-sm font-semibold text-[#1c1917]">{MOCK_PROJECT.endDate}</p>
+                            <h3 className="text-lg font-bold text-[#1c1917]">{project.title}</h3>
+                            <div className="flex items-center gap-4 text-sm text-[#57534e] flex-wrap">
+                                <span className="flex items-center gap-1.5">
+                                    <User className="h-3.5 w-3.5" />
+                                    Estudiantes: {project.students.join(', ')}
+                                </span>
+                                <span className="flex items-center gap-1.5">
+                                    <Building className="h-3.5 w-3.5" />
+                                    {project.faculty}
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Stepper */}
-            <div className="rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
-                <h3 className="mb-5 text-base font-bold text-[#1c1917]">Progreso del Proyecto</h3>
-                <div className="flex flex-col gap-1 sm:flex-row sm:items-center">
-                    {STEP_LABELS.map((label, idx) => {
-                        const isCompleted = idx < currentStep;
-                        const isCurrent = idx === currentStep;
-                        return (
-                            <div key={idx} className="flex items-center sm:flex-1">
-                                <div className="flex items-center gap-2 sm:flex-col sm:items-center sm:gap-1">
-                                    <div
-                                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-colors ${
-                                            isCompleted
-                                                ? 'bg-[#c2410c] text-white'
-                                                : isCurrent
-                                                ? 'border-2 border-[#c2410c] bg-white text-[#c2410c]'
-                                                : 'border-2 border-[#e5e5e5] bg-white text-[#78716c]'
-                                        }`}
-                                    >
-                                        {isCompleted ? (
-                                            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                                <polyline points="20 6 9 17 4 12" />
-                                            </svg>
-                                        ) : (
-                                            idx + 1
-                                        )}
-                                    </div>
-                                    <span
-                                        className={`text-xs font-semibold whitespace-nowrap ${
-                                            isCurrent ? 'text-[#c2410c]' : 'text-[#78716c]'
-                                        }`}
-                                    >
-                                        {label}
-                                    </span>
-                                </div>
-                                {idx < STEP_LABELS.length - 1 && (
-                                    <div
-                                        className={`mx-3 h-px flex-1 sm:mb-6 ${
-                                            idx < currentStep ? 'bg-[#c2410c]' : 'bg-[#e5e5e5]'
-                                        }`}
-                                    />
-                                )}
-                            </div>
-                        );
-                    })}
+            <PhaseStepper
+                phases={DIRECTOR_PHASES}
+                selectedPhaseId={selectedPhaseId}
+                onSelectPhase={setSelectedPhaseId}
+                deliveryCountByPhase={(phaseId) => deliveries.filter((d) => d.phaseId === phaseId).length}
+            />
+
+            <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                    <h3 className="text-sm font-bold uppercase tracking-[0.05em] text-[#57534e]">
+                        Entregas — {selectedPhase.label} ({filteredDeliveries.length})
+                    </h3>
+                    <p className="text-xs text-[#78716c]">
+                        Selecciona una fase arriba para ver sus entregas
+                    </p>
                 </div>
+
+                {filteredDeliveries.length > 0 ? (
+                    filteredDeliveries.map((del) => (
+                        <DeliveryCard key={del.id} delivery={del} projectId={project.id} />
+                    ))
+                ) : (
+                    <div className="rounded-xl border border-dashed border-[#d6d3d1] bg-white px-4 py-10 text-center text-sm text-[#78716c]">
+                        No hay entregas configuradas para la fase <strong>{selectedPhase.label}</strong>.
+                    </div>
+                )}
             </div>
 
-            {/* Deliveries */}
-            <div className="rounded-xl border border-[#e5e5e5] bg-white shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
-                <div className="border-b border-[#e5e5e5] px-6 py-4">
-                    <h3 className="text-base font-bold text-[#1c1917]">Entregas</h3>
+            {pendingInPhase && (
+                <div className="flex items-start gap-3 rounded-xl border border-[#dbeafe] bg-[#dbeafe]/40 p-4">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#2563eb]" />
+                    <p className="text-sm text-[#1e3a8a]">
+                        Hay una entrega pendiente de revisión en <strong>{selectedPhase.label}</strong>:{' '}
+                        <strong>{pendingInPhase.label}</strong>.
+                    </p>
                 </div>
-                <div className="divide-y divide-[#e5e5e5]">
-                    {MOCK_DELIVERIES.map((d) => {
-                        const config = statusConfig[d.status];
-                        const isExpanded = expandedDelivery === d.id;
-                        return (
-                            <div key={d.id}>
-                                <button
-                                    onClick={() => setExpandedDelivery(isExpanded ? null : d.id)}
-                                    className="flex w-full items-center justify-between gap-4 px-6 py-4 text-left transition-colors hover:bg-[#fafaf9]"
-                                >
-                                    <div className="flex items-center gap-4 min-w-0">
-                                        {isExpanded ? (
-                                            <ChevronDown className="h-4 w-4 shrink-0 text-[#78716c]" />
-                                        ) : (
-                                            <ChevronRight className="h-4 w-4 shrink-0 text-[#78716c]" />
-                                        )}
-                                        <div className="min-w-0">
-                                            <p className="text-sm font-semibold text-[#1c1917] truncate">{d.name}</p>
-                                            <p className="text-xs text-[#78716c]">{d.date}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-3 shrink-0">
-                                        <StatusBadge variant={config.variant}>{config.label}</StatusBadge>
-                                        <span className="text-sm font-bold text-[#1c1917] tabular-nums">{d.grade}</span>
-                                    </div>
-                                </button>
-                                {isExpanded && (
-                                    <div className="border-t border-[#e5e5e5] bg-[#fafaf9] px-6 py-4">
-                                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                            <p className="text-sm text-[#57534e]">
-                                                {d.status === 'pending'
-                                                    ? 'El estudiante aún no ha realizado esta entrega.'
-                                                    : d.status === 'corrections'
-                                                    ? 'Se solicitaron correcciones. Pendiente de re-entrega.'
-                                                    : 'Entrega revisada y aprobada.'}
-                                            </p>
-                                            <div className="flex items-center gap-2">
-                                                <button className="inline-flex min-h-[36px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-white px-3 py-1.5 text-xs font-semibold text-[#1c1917] transition-colors hover:bg-[#f5f5f4] active:scale-[0.98]">
-                                                    Ver entrega
-                                                </button>
-                                                <button className="inline-flex min-h-[36px] items-center gap-2 rounded-lg bg-[#c2410c] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#9a330a] active:scale-[0.98]">
-                                                    Revisar
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
+            )}
         </div>
     );
 }

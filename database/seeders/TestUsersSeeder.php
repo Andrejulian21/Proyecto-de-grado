@@ -15,37 +15,35 @@ class TestUsersSeeder extends Seeder
     public function run(): void
     {
         // ── 1. Coordinador (Google OAuth — via whitelist) ──
-        // Este usuario se loguea con Google @unab.edu.co.
-        // La whitelist permite que al hacer OAuth se le asigne rol Coordinador.
         AuthorizedEmail::create([
-            'email' => 'jarteaga145@unab.edu.co',
-            'name' => 'Juan Arteaga',
+            'email' => 'mafanador856@unab.edu.co',
+            'name' => 'Miguel Angel Afanador Quintero',
             'role' => UserRole::Coordinador,
         ]);
 
-        // También lo creamos en users para que pueda hacer login directo
-        // si ya pasó por el flujo de OAuth antes.
         User::create([
-            'name' => 'Juan Arteaga',
-            'email' => 'jarteaga145@unab.edu.co',
+            'name' => 'Miguel Angel Afanador Quintero',
+            'email' => 'mafanador856@unab.edu.co',
             'role' => UserRole::Coordinador,
             'es_externo' => false,
         ]);
 
         // ── 2. Estudiante (login externo con credenciales) ──
         User::create([
-            'name' => 'Julian Estudiante',
-            'email' => 'juliartega938@gmail.com',
+            'name' => 'Miguel Angel Estudiante',
+            'email' => 'miguelafanquin10@gmail.com',
             'password' => Hash::make('Pruebas123!'),
+            'password_changed_at' => now(),
             'role' => UserRole::Estudiante,
             'es_externo' => true,
         ]);
 
         // ── 3. Director (login externo con credenciales) ──
         User::create([
-            'name' => 'Julian Director',
-            'email' => 'julian21arteaga@gmail.com',
+            'name' => 'Miguel Angel Director',
+            'email' => 'miguelafanquin.director@gmail.com',
             'password' => Hash::make('Pruebas123!'),
+            'password_changed_at' => now(),
             'role' => UserRole::Director,
             'es_externo' => true,
         ]);

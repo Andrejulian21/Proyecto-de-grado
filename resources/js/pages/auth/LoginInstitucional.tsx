@@ -1,10 +1,10 @@
 import { AlertTriangle } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { oauthErrorMessage } from '@/lib/auth-routes';
 
-interface LoginInstitucionalProps {
-    error?: string | null;
-}
-
-export function LoginInstitucional({ error = null }: LoginInstitucionalProps) {
+export function LoginInstitucional() {
+    const [searchParams] = useSearchParams();
+    const error = oauthErrorMessage(searchParams.get('error'));
     return (
         <div
             className="flex min-h-screen flex-col items-center justify-center bg-[#fafaf9] px-4 py-8"

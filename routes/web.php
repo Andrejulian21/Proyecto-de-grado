@@ -27,6 +27,10 @@ Route::get('/up', fn () => response('OK', 200))->name('health');
 Route::get('/auth/redirect', [AuthController::class, 'redirectToGoogle'])->name('auth.google.redirect');
 Route::get('/auth/callback', [AuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
 
+// SPA entry points — named routes required by Laravel auth middleware (API 401 fallback).
+Route::get('/login', fn () => view('app'))->name('login');
+Route::get('/login/externo', fn () => view('app'))->name('login.externo');
+
 // SPA catch-all — anything that is not /api/* or an explicit route above
 // serves the Vite/React index.html so client-side routing works.
 // Static assets are served by the web server before reaching here.

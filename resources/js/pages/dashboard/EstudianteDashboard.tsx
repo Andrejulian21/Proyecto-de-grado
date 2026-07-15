@@ -1,16 +1,16 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
     GraduationCap,
-    CloudUpload,
     Lock,
     CheckCircle2,
     Clock,
-    FileText,
     ChevronDown,
     ChevronUp,
     AlertCircle,
     User,
     Building,
+    ArrowRight,
 } from 'lucide-react';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -61,6 +61,16 @@ const MOCK_DELIVERIES: Delivery[] = [
         versions: [],
     },
     {
+        id: 6,
+        type: 'presentacion',
+        label: 'Diapositivas de Presentación',
+        status: 'pending',
+        deadline: '20/04/2026',
+        versions: [
+            { version: 1, date: '05/04/2026', status: 'pending', fileName: 'slides_v1.pptx' },
+        ],
+    },
+    {
         id: 3,
         type: 'desarrollo',
         label: 'Informe de Avance 1',
@@ -74,6 +84,14 @@ const MOCK_DELIVERIES: Delivery[] = [
         label: 'Informe de Avance 2',
         status: 'locked',
         deadline: '15/08/2026',
+        versions: [],
+    },
+    {
+        id: 5,
+        type: 'final',
+        label: 'Documento Final de Grado',
+        status: 'locked',
+        deadline: '15/12/2026',
         versions: [],
     },
 ];
@@ -98,6 +116,7 @@ function DeliveryAccordion({ delivery }: { delivery: Delivery }) {
     return (
         <div className="rounded-xl border border-[#e5e5e5] bg-white shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
             <button
+                type="button"
                 onClick={() => setExpanded(!expanded)}
                 className="flex w-full items-center gap-3 p-4 text-left transition-colors hover:bg-[#f5f5f4]"
                 aria-expanded={expanded}
@@ -155,8 +174,20 @@ function DeliveryAccordion({ delivery }: { delivery: Delivery }) {
             {expanded && delivery.versions.length === 0 && (
                 <div className="border-t border-[#e5e5e5] px-4 py-6 text-center text-sm text-[#78716c]">
                     {delivery.status === 'pending'
-                        ? 'Aún no has subido ninguna versión. Usa la zona de carga para subir tu entrega.'
+                        ? 'Aún no hay versiones registradas para esta entrega.'
                         : 'Esta entrega no está disponible aún.'}
+                </div>
+            )}
+
+            {expanded && (
+                <div className="border-t border-[#e5e5e5] px-4 py-3">
+                    <Link
+                        to={`/mi-proyecto/entregas/${delivery.id}`}
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[#e5e5e5] bg-[#fafaf9] px-4 py-2.5 text-sm font-semibold text-[#1c1917] transition-colors hover:border-[#c2410c] hover:bg-[#fed7aa] hover:text-[#c2410c]"
+                    >
+                        Ver detalle de entrega
+                        <ArrowRight className="h-4 w-4" />
+                    </Link>
                 </div>
             )}
         </div>
@@ -166,6 +197,17 @@ function DeliveryAccordion({ delivery }: { delivery: Delivery }) {
 /* ── Main component ── */
 
 export default function EstudianteDashboard() {
+    const [selectedPhaseId, setSelectedPhaseId] = useState(MOCK_PROJECT.phase);
+
+    const selectedPhase = MOCK_PHASES.find((p) => p.id === selectedPhaseId) ?? MOCK_PHASES[0];
+
+    const filteredDeliveries = useMemo(
+        () => MOCK_DELIVERIES.filter((d) => d.type === selectedPhaseId),
+        [selectedPhaseId],
+    );
+
+    const pendingInPhase = filteredDeliveries.find((d) => d.status === 'pending');
+
     return (
         <div className="flex flex-col gap-6">
             <PageHeader
@@ -204,95 +246,100 @@ export default function EstudianteDashboard() {
                 </div>
             </div>
 
-            {/* ── Phase stepper ── */}
+            {/* ── Phase stepper (clickable) ── */}
             <div className="rounded-xl border border-[#e5e5e5] bg-white p-5 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                 <h3 className="mb-4 text-sm font-bold uppercase tracking-[0.05em] text-[#57534e]">
                     Fases del Proyecto
                 </h3>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    {MOCK_PHASES.map((phase, idx) => (
-                        <div key={phase.id} className="flex items-center gap-3 sm:flex-1 sm:flex-col sm:items-center sm:text-center">
-                            <div className="flex items-center gap-3 sm:flex-col sm:items-center sm:gap-1">
-                                <div
-                                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-colors ${
-                                        phase.status === 'done'
-                                            ? 'bg-[#dcfce7] text-[#16a34a]'
-                                            : phase.status === 'current'
-                                              ? 'bg-[#fed7aa] text-[#c2410c]'
-                                              : 'bg-[#e7e5e4] text-[#78716c]'
+                    {MOCK_PHASES.map((phase, idx) => {
+                        const isSelected = selectedPhaseId === phase.id;
+                        const count = MOCK_DELIVERIES.filter((d) => d.type === phase.id).length;
+
+                        return (
+                            <div key={phase.id} className="flex items-center gap-3 sm:flex-1 sm:flex-col sm:items-center sm:text-center">
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedPhaseId(phase.id)}
+                                    className={`flex items-center gap-3 rounded-xl p-2 transition-colors sm:flex-col sm:items-center sm:gap-1 ${
+                                        isSelected
+                                            ? 'bg-[#fed7aa]/60 ring-2 ring-[#c2410c]/30'
+                                            : 'hover:bg-[#f5f5f4]'
                                     }`}
+                                    aria-pressed={isSelected}
                                 >
-                                    {phase.status === 'done' ? (
-                                        <CheckCircle2 className="h-5 w-5" />
-                                    ) : (
-                                        <span>{idx + 1}</span>
-                                    )}
-                                </div>
-                                <span
-                                    className={`text-sm font-semibold ${
-                                        phase.status === 'current' ? 'text-[#c2410c]' : 'text-[#57534e]'
-                                    }`}
-                                >
-                                    {phase.label}
-                                </span>
+                                    <div
+                                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-colors ${
+                                            phase.status === 'done'
+                                                ? 'bg-[#dcfce7] text-[#16a34a]'
+                                                : phase.status === 'current'
+                                                  ? 'bg-[#fed7aa] text-[#c2410c]'
+                                                  : 'bg-[#e7e5e4] text-[#78716c]'
+                                        }`}
+                                    >
+                                        {phase.status === 'done' ? (
+                                            <CheckCircle2 className="h-5 w-5" />
+                                        ) : (
+                                            <span>{idx + 1}</span>
+                                        )}
+                                    </div>
+                                    <div className="flex flex-col items-start sm:items-center">
+                                        <span
+                                            className={`text-sm font-semibold ${
+                                                isSelected || phase.status === 'current'
+                                                    ? 'text-[#c2410c]'
+                                                    : 'text-[#57534e]'
+                                            }`}
+                                        >
+                                            {phase.label}
+                                        </span>
+                                        <span className="text-[11px] text-[#78716c]">
+                                            {count} {count === 1 ? 'entrega' : 'entregas'}
+                                        </span>
+                                    </div>
+                                </button>
+                                {idx < MOCK_PHASES.length - 1 && (
+                                    <div className="hidden h-px flex-1 bg-[#e5e5e5] sm:block" />
+                                )}
                             </div>
-                            {idx < MOCK_PHASES.length - 1 && (
-                                <div className="hidden h-px flex-1 bg-[#e5e5e5] sm:block" />
-                            )}
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
 
-            {/* ── Upload zone + Delivery accordions grid ── */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-                {/* Upload zone */}
-                <div className="lg:col-span-2">
-                    <div className="flex h-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-[#d6d3d1] bg-white p-8 text-center transition-colors hover:border-[#c2410c] hover:bg-[#fff7ed]">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#f5f5f4]">
-                            <CloudUpload className="h-6 w-6 text-[#c2410c]" />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                            <span className="text-sm font-semibold text-[#1c1917]">
-                                Subir nueva entrega
-                            </span>
-                            <span className="text-xs text-[#78716c]">
-                                Arrastra tu archivo aquí o haz clic para seleccionar
-                            </span>
-                            <span className="text-[10px] text-[#78716c]">
-                                PDF, DOCX, ZIP — Máx. 20 MB
-                            </span>
-                        </div>
-                        <button
-                            type="button"
-                            className="inline-flex items-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a]"
-                        >
-                            <CloudUpload className="h-4 w-4" />
-                            Seleccionar archivo
-                        </button>
-                    </div>
+            {/* ── Delivery list for selected phase ── */}
+            <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                    <h3 className="text-sm font-bold uppercase tracking-[0.05em] text-[#57534e]">
+                        Entregas — {selectedPhase.label} ({filteredDeliveries.length})
+                    </h3>
+                    <p className="text-xs text-[#78716c]">
+                        Selecciona una fase arriba para ver sus entregas
+                    </p>
                 </div>
 
-                {/* Delivery accordions */}
-                <div className="flex flex-col gap-3 lg:col-span-3">
-                    <h3 className="text-sm font-bold uppercase tracking-[0.05em] text-[#57534e]">
-                        Entregas ({MOCK_DELIVERIES.length})
-                    </h3>
-                    {MOCK_DELIVERIES.map((del) => (
+                {filteredDeliveries.length > 0 ? (
+                    filteredDeliveries.map((del) => (
                         <DeliveryAccordion key={del.id} delivery={del} />
-                    ))}
-                </div>
+                    ))
+                ) : (
+                    <div className="rounded-xl border border-dashed border-[#d6d3d1] bg-white px-4 py-10 text-center text-sm text-[#78716c]">
+                        No hay entregas configuradas para la fase <strong>{selectedPhase.label}</strong>.
+                    </div>
+                )}
             </div>
 
             {/* ── Activity hint ── */}
-            <div className="flex items-start gap-3 rounded-xl border border-[#dbeafe] bg-[#dbeafe]/40 p-4">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#2563eb]" />
-                <p className="text-sm text-[#1e3a8a]">
-                    Tienes una entrega pendiente por realizar. La fecha límite es el{' '}
-                    <strong>10 de abril de 2026</strong>. Recuerda que después de subir tu archivo,
-                    el director recibirá una notificación para su revisión.
-                </p>
-            </div>
+            {pendingInPhase && (
+                <div className="flex items-start gap-3 rounded-xl border border-[#dbeafe] bg-[#dbeafe]/40 p-4">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#2563eb]" />
+                    <p className="text-sm text-[#1e3a8a]">
+                        Tienes una entrega pendiente en <strong>{selectedPhase.label}</strong>:{' '}
+                        <strong>{pendingInPhase.label}</strong>. La fecha límite es el{' '}
+                        <strong>{pendingInPhase.deadline}</strong>. Usa la pantalla de detalle para gestionar versiones y revisión.
+                    </p>
+                </div>
+            )}
         </div>
     );
 }

@@ -22,7 +22,10 @@ const Recursos = lazy(() => import('@/pages/shared/Recursos'));
 const RecursoDetalle = lazy(() => import('@/pages/shared/RecursoDetalle'));
 const NuevaBitacora = lazy(() => import('@/pages/estudiante/NuevaBitacora'));
 const DetalleEntregaEstudiante = lazy(() => import('@/pages/estudiante/DetalleEntregaEstudiante'));
+const DetalleEntregaDirector = lazy(() => import('@/pages/director/DetalleEntregaDirector'));
 const SupervisionProyectoDirector = lazy(() => import('@/pages/director/SupervisionProyectoDirector'));
+const RevisionBitacoraDirector = lazy(() => import('@/pages/director/RevisionBitacora'));
+const RevisionBitacoraEstudiante = lazy(() => import('@/pages/estudiante/RevisionBitacora'));
 const SeleccionProyectosBitacoras = lazy(() => import('@/pages/director/SeleccionProyectosBitacoras'));
 const BitacorasDirector = lazy(() => import('@/pages/director/BitacorasDirector'));
 const DetalleFirmaBitacora = lazy(() => import('@/pages/director/DetalleFirmaBitacora'));
@@ -89,6 +92,7 @@ function App() {
                                 <Route path="/" element={<DashboardRouter />} />
                                 <Route path="/dashboard/estudiante" element={<EstudianteDashboard />} />
                                 <Route path="/bitacora" element={<BitacorasEstudiante />} />
+                                <Route path="/bitacora/:id/revision" element={<ProtectedRoute allowedRoles={['Estudiante']}><SuspenseWrapper><RevisionBitacoraEstudiante /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/dashboard/director" element={<DirectorDashboard />} />
                                 <Route path="/dashboard/coordinador" element={<CoordinadorDashboard />} />
                                 <Route path="/dashboard/evaluador-externo" element={<EvaluadorDashboard />} />
@@ -103,10 +107,12 @@ function App() {
                                 <Route path="/mi-proyecto/entregas/:id" element={<ProtectedRoute allowedRoles={['Estudiante']}><SuspenseWrapper><DetalleEntregaEstudiante /></SuspenseWrapper></ProtectedRoute>} />
                                 {/* PR6: Director pages */}
                                 <Route path="/supervision/:proyectoId" element={<ProtectedRoute allowedRoles={['Director']}><SuspenseWrapper><SupervisionProyectoDirector /></SuspenseWrapper></ProtectedRoute>} />
+                                <Route path="/supervision/:proyectoId/entregas/:id" element={<ProtectedRoute allowedRoles={['Director']}><SuspenseWrapper><DetalleEntregaDirector /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/bitacoras/proyectos" element={<ProtectedRoute allowedRoles={['Director']}><SuspenseWrapper><SeleccionProyectosBitacoras /></SuspenseWrapper></ProtectedRoute>} />
                                 {/* PR7: Director bitacoras */}
                                 <Route path="/bitacoras" element={<ProtectedRoute allowedRoles={['Director']}><SuspenseWrapper><BitacorasDirector /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/bitacoras/:id/firmar" element={<ProtectedRoute allowedRoles={['Director']}><SuspenseWrapper><DetalleFirmaBitacora /></SuspenseWrapper></ProtectedRoute>} />
+                                <Route path="/bitacoras/:id/revision" element={<ProtectedRoute allowedRoles={['Director']}><SuspenseWrapper><RevisionBitacoraDirector /></SuspenseWrapper></ProtectedRoute>} />
                                 {/* PR8: Director review */}
                                 <Route path="/entregas/:id/revisar" element={<ProtectedRoute allowedRoles={['Director']}><SuspenseWrapper><RevisionEntregaDirector /></SuspenseWrapper></ProtectedRoute>} />
                                 {/* PR9: Coordinador proyectos */}

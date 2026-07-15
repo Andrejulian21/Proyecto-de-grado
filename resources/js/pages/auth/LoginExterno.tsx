@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { AlertTriangle, Eye, EyeOff } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { bootstrapSanctumCsrf, dashboardPathForRole } from '@/lib/auth-routes';
 
 interface FieldError {
     email?: string;
@@ -11,7 +12,6 @@ interface FieldError {
 }
 
 export function LoginExterno() {
-    const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const { sessionCheck } = useAuth();
 
@@ -39,6 +39,8 @@ export function LoginExterno() {
         setIsSubmitting(true);
 
         try {
+            await bootstrapSanctumCsrf();
+
             const res = await apiFetch('/api/auth/externo/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
@@ -47,13 +49,14 @@ export function LoginExterno() {
 
             if (res.ok) {
                 const data = await res.json();
-                sessionStorage.setItem('auth_user', JSON.stringify(data.user));
-                const role = data?.user?.role?.toLowerCase() ?? 'estudiante';
-                window.location.href = `/dashboard/${role}`;
+                await sessionCheck();
+                window.location.href = dashboardPathForRole(data?.user?.role);
                 return;
             }
 
-            if (res.status === 401) {
+            if (res.status === 419) {
+                setErrors({ general: 'La sesión expiró. Recarga la página e intenta de nuevo.' });
+            } else if (res.status === 401) {
                 setErrors({ general: 'Credenciales inválidas. Verifica tu correo y contraseña.' });
             } else if (res.status === 423) {
                 setErrors({ general: 'Cuenta bloqueada. Contacta al administrador del sistema.' });

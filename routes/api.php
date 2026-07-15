@@ -38,6 +38,21 @@ Route::post('/auth/externo/login', [AuthController::class, 'loginExterno'])
     ->middleware('throttle:login')
     ->name('auth.externo.login');
 
+// -- authenticated session routes (no password-change gate) -----------
+// sessionCheck must stay reachable so the SPA can detect an active
+// session even when an external user still owes a password change.
+
+Route::middleware(['auth:sanctum', 'single_session', 'activity'])->group(function () {
+    Route::get('/auth/user', [AuthController::class, 'sessionCheck'])
+        ->name('auth.user');
+
+    Route::post('/auth/change-password', [AuthController::class, 'changePassword'])
+        ->name('auth.change_password');
+
+    Route::post('/auth/logout', [AuthController::class, 'logout'])
+        ->name('auth.logout');
+});
+
 // -- authenticated routes -------------------------------------------
 
 // Authenticated API routes are guarded by:
@@ -52,15 +67,6 @@ Route::middleware([
     'activity',
     'ensure_password_changed',
 ])->group(function () {
-    Route::get('/auth/user', [AuthController::class, 'sessionCheck'])
-        ->name('auth.user');
-
-    Route::post('/auth/change-password', [AuthController::class, 'changePassword'])
-        ->name('auth.change_password');
-
-    Route::post('/auth/logout', [AuthController::class, 'logout'])
-        ->name('auth.logout');
-
     // Bitácoras CRUD + firma (T-012)
     Route::get('/bitacoras', [\App\Http\Controllers\Api\BitacoraController::class, 'index'])
         ->name('bitacoras.index');

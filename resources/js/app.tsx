@@ -93,8 +93,8 @@ function App() {
                         <AppShell>
                             <Routes>
                                 <Route path="/" element={<DashboardRouter />} />
-                                <Route path="/dashboard/estudiante" element={<EstudianteDashboard />} />
-                                <Route path="/bitacora" element={<BitacorasEstudiante />} />
+                                <Route path="/dashboard/estudiante" element={<ProtectedRoute allowedRoles={['Estudiante']}><EstudianteDashboard /></ProtectedRoute>} />
+                                <Route path="/bitacora" element={<ProtectedRoute allowedRoles={['Estudiante']}><BitacorasEstudiante /></ProtectedRoute>} />
                                 <Route path="/dashboard/director" element={<DirectorDashboard />} />
                                 <Route path="/dashboard/coordinador" element={<CoordinadorDashboard />} />
                                 <Route path="/dashboard/coordinador/proyecto/:id" element={

@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { TOTPInput } from '@/components/ui/TOTPInput';
-import { ArrowLeft, Save, ShieldCheck, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Loader2 } from 'lucide-react';
+import { apiFetch } from '@/lib/utils';
 
 export default function NuevaBitacora() {
     const navigate = useNavigate();
@@ -11,37 +11,51 @@ export default function NuevaBitacora() {
     const [topic, setTopic] = useState('');
     const [description, setDescription] = useState('');
     const [duration, setDuration] = useState('1');
-    const [showTOTP, setShowTOTP] = useState(false);
-    const [totpCode, setTotpCode] = useState('');
-    const [totpError, setTotpError] = useState('');
     const [submitting, setSubmitting] = useState(false);
-
-    function handleTOTPComplete(code: string) {
-        setTotpCode(code);
-        setTotpError('');
-    }
+    const [error, setError] = useState('');
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
+        setError('');
+
         if (!date || !topic.trim() || !description.trim()) return;
-
-        if (!showTOTP) {
-            setShowTOTP(true);
-            return;
-        }
-
-        if (totpCode.length !== 6) {
-            setTotpError('Debe ingresar el código TOTP de 6 dígitos.');
-            return;
-        }
 
         setSubmitting(true);
         try {
-            // await apiFetch('/api/bitacoras', { ... })
-            await new Promise((r) => setTimeout(r, 800));
-            navigate('/bitacora');
+            // Get the student's project first
+            const proyRes = await apiFetch('/api/estudiante/proyecto');
+            if (!proyRes.ok) {
+                setError('No se pudo obtener tu proyecto. Verifica tu sesion.');
+                return;
+            }
+            const proyData = await proyRes.json();
+            const proyectoId = proyData.data?.id;
+            if (!proyectoId) {
+                setError('No tienes un proyecto asignado.');
+                return;
+            }
+
+            // Create the bitacora
+            const res = await apiFetch('/api/bitacoras', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    proyecto_id: proyectoId,
+                    topic: topic.trim(),
+                    notes: description.trim(),
+                    meeting_date: date,
+                    duration_hours: parseFloat(duration),
+                }),
+            });
+
+            if (res.status === 201 || res.ok) {
+                navigate('/bitacora');
+            } else {
+                const body = await res.json().catch(() => ({}));
+                setError(body.error || body.message || 'Error al crear la bitacora.');
+            }
         } catch {
-            setTotpError('Error al crear la bitácora. Intente de nuevo.');
+            setError('Error de conexion. Intente de nuevo.');
         } finally {
             setSubmitting(false);
         }
@@ -50,9 +64,9 @@ export default function NuevaBitacora() {
     return (
         <div className="flex flex-col gap-6">
             <PageHeader
-                eyebrow="Bitácora"
-                title="Nueva Bitácora"
-                subtitle="Registra una nueva sesión de trabajo de tu proyecto de grado"
+                eyebrow="Bitacora"
+                title="Nueva Bitacora"
+                subtitle="Registra una nueva sesion de trabajo de tu proyecto de grado"
                 actions={
                     <button
                         onClick={() => navigate('/bitacora')}
@@ -73,8 +87,15 @@ export default function NuevaBitacora() {
                             <line x1="16" y1="13" x2="8" y2="13" />
                             <line x1="16" y1="17" x2="8" y2="17" />
                         </svg>
-                        <h2 className="text-lg font-bold text-[#1c1917]">Detalles de la sesión</h2>
+                        <h2 className="text-lg font-bold text-[#1c1917]">Detalles de la sesion</h2>
                     </div>
+
+                    {/* Error banner */}
+                    {error && (
+                        <div className="mb-4 rounded-lg border border-[#fee2e2] bg-[#fee2e2] px-4 py-3 text-sm text-[#7f1d1d]">
+                            {error}
+                        </div>
+                    )}
 
                     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                         <div className="flex flex-col gap-1.5">
@@ -93,7 +114,7 @@ export default function NuevaBitacora() {
 
                         <div className="flex flex-col gap-1.5">
                             <label htmlFor="binnacle-duration" className="text-sm font-semibold text-[#1c1917]">
-                                Duración (horas) <span className="text-[#dc2626]">*</span>
+                                Duracion (horas) <span className="text-[#dc2626]">*</span>
                             </label>
                             <input
                                 id="binnacle-duration"
@@ -110,14 +131,14 @@ export default function NuevaBitacora() {
 
                         <div className="flex flex-col gap-1.5 sm:col-span-2">
                             <label htmlFor="binnacle-topic" className="text-sm font-semibold text-[#1c1917]">
-                                Tema de la sesión <span className="text-[#dc2626]">*</span>
+                                Tema de la sesion <span className="text-[#dc2626]">*</span>
                             </label>
                             <input
                                 id="binnacle-topic"
                                 type="text"
                                 value={topic}
                                 onChange={(e) => setTopic(e.target.value)}
-                                placeholder="Ej: Revisión de requisitos funcionales"
+                                placeholder="Ej: Revision de requisitos funcionales"
                                 className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
                                 required
                             />
@@ -125,14 +146,14 @@ export default function NuevaBitacora() {
 
                         <div className="flex flex-col gap-1.5 sm:col-span-2">
                             <label htmlFor="binnacle-desc" className="text-sm font-semibold text-[#1c1917]">
-                                Descripción detallada <span className="text-[#dc2626]">*</span>
+                                Descripcion detallada <span className="text-[#dc2626]">*</span>
                             </label>
                             <textarea
                                 id="binnacle-desc"
                                 rows={5}
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
-                                placeholder="Describa las actividades realizadas durante la sesión, acuerdos, decisiones tomadas, etc."
+                                placeholder="Describa las actividades realizadas durante la sesion, acuerdos, decisiones tomadas, etc."
                                 className="w-full min-h-[100px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y"
                                 required
                             />
@@ -141,42 +162,6 @@ export default function NuevaBitacora() {
                             </span>
                         </div>
                     </div>
-
-                    {/* Divider */}
-                    <hr className="my-6 border-t border-[#e5e5e5]" />
-
-                    {/* TOTP Section */}
-                    {showTOTP && (
-                        <div className="mb-6 rounded-lg border border-[#e0e7ff] bg-[#e0e7ff] p-4">
-                            <div className="flex items-start gap-3">
-                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#4f46e5] text-white">
-                                    <ShieldCheck className="h-4 w-4" />
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    <p className="text-sm font-semibold text-[#312e81]">
-                                        Verificación de Seguridad
-                                    </p>
-                                    <p className="text-xs text-[#312e81]">
-                                        Ingrese el código de 6 dígitos generado por su aplicación de autenticación.
-                                    </p>
-                                    <TOTPInput
-                                        onComplete={handleTOTPComplete}
-                                        error={totpError}
-                                        disabled={submitting}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {!showTOTP && (
-                        <div className="flex items-center gap-2 rounded-lg border border-[#fed7aa] bg-[#fed7aa] px-4 py-3">
-                            <ShieldCheck className="h-4 w-4 shrink-0 text-[#c2410c]" />
-                            <p className="text-xs font-medium text-[#7c2d12]">
-                                Al guardar, se solicitará un código de verificación TOTP para firmar la bitácora.
-                            </p>
-                        </div>
-                    )}
 
                     <div className="mt-6 flex items-center justify-end gap-3">
                         <button
@@ -196,7 +181,7 @@ export default function NuevaBitacora() {
                             ) : (
                                 <Save className="h-4 w-4" />
                             )}
-                            {showTOTP ? 'Firmar y Guardar Bitácora' : 'Guardar Bitácora'}
+                            Guardar Bitacora
                         </button>
                     </div>
                 </div>

@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { AppShell } from '@/components/layout/AppShell';
 import LoginInstitucional from '@/pages/auth/LoginInstitucional';
@@ -18,6 +18,7 @@ import { Loader2 } from 'lucide-react';
 
 const AnunciosPublica = lazy(() => import('@/pages/shared/AnunciosPublica'));
 const AnuncioDetalle = lazy(() => import('@/pages/shared/AnuncioDetalle'));
+const SupervisionReadOnly = lazy(() => import('@/components/supervision/SupervisionReadOnly'));
 const Recursos = lazy(() => import('@/pages/shared/Recursos'));
 const RecursoDetalle = lazy(() => import('@/pages/shared/RecursoDetalle'));
 const NuevaBitacora = lazy(() => import('@/pages/estudiante/NuevaBitacora'));
@@ -33,8 +34,8 @@ const AsignacionEvaluadores = lazy(() => import('@/pages/coordinador/AsignacionE
 const CoordinadorEntregas = lazy(() => import('@/pages/coordinador/CoordinadorEntregas'));
 const CoordinadorBitacoras = lazy(() => import('@/pages/coordinador/CoordinadorBitacoras'));
 const GestionAlertas = lazy(() => import('@/pages/coordinador/GestionAlertas'));
-const ReportesConsolidados = lazy(() => import('@/pages/coordinador/ReportesConsolidados'));
 const RecursosAdmin = lazy(() => import('@/pages/coordinador/RecursosAdmin'));
+const DirectoresPage = lazy(() => import('@/pages/coordinador/DirectoresPage'));
 const EvaluarProyecto = lazy(() => import('@/pages/evaluador/EvaluarProyecto'));
 const EvaluadorCalificar = lazy(() => import('@/pages/evaluador/EvaluadorCalificar'));
 const AnalisisAutomaticoEntregas = lazy(() => import('@/pages/estudiante/AnalisisAutomaticoEntregas'));
@@ -73,6 +74,11 @@ function ProtectedRoute({ children, allowedRoles }: {
     return <>{children}</>;
 }
 
+function SupervisionReadOnlyWrapper() {
+    const { id } = useParams<{ id: string }>();
+    return <SupervisionReadOnly projectId={id ? Number(id) : undefined} />;
+}
+
 function App() {
     return (
         <Routes>
@@ -87,10 +93,15 @@ function App() {
                         <AppShell>
                             <Routes>
                                 <Route path="/" element={<DashboardRouter />} />
-                                <Route path="/dashboard/estudiante" element={<EstudianteDashboard />} />
-                                <Route path="/bitacora" element={<BitacorasEstudiante />} />
+                                <Route path="/dashboard/estudiante" element={<ProtectedRoute allowedRoles={['Estudiante']}><EstudianteDashboard /></ProtectedRoute>} />
+                                <Route path="/bitacora" element={<ProtectedRoute allowedRoles={['Estudiante']}><BitacorasEstudiante /></ProtectedRoute>} />
                                 <Route path="/dashboard/director" element={<DirectorDashboard />} />
                                 <Route path="/dashboard/coordinador" element={<CoordinadorDashboard />} />
+                                <Route path="/dashboard/coordinador/proyecto/:id" element={
+                                    <ProtectedRoute allowedRoles={['Coordinador']}>
+                                        <SuspenseWrapper><SupervisionReadOnlyWrapper /></SuspenseWrapper>
+                                    </ProtectedRoute>
+                                } />
                                 <Route path="/dashboard/evaluador-externo" element={<EvaluadorDashboard />} />
                                 <Route path="/coordinador/usuarios" element={<ProtectedRoute allowedRoles={['Coordinador']}><GestionUsuarios /></ProtectedRoute>} />
                                 <Route path="/coordinador/audit-log" element={<ProtectedRoute allowedRoles={['Coordinador']}><AuditLog /></ProtectedRoute>} />
@@ -111,6 +122,7 @@ function App() {
                                 <Route path="/entregas/:id/revisar" element={<ProtectedRoute allowedRoles={['Director']}><SuspenseWrapper><RevisionEntregaDirector /></SuspenseWrapper></ProtectedRoute>} />
                                 {/* PR9: Coordinador proyectos */}
                                 <Route path="/proyectos" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><GestionProyectos /></SuspenseWrapper></ProtectedRoute>} />
+                                <Route path="/directores" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><DirectoresPage /></SuspenseWrapper></ProtectedRoute>} />
                                 {/* PR10: Coordinador admin */}
                                 <Route path="/anuncios/admin" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><AnunciosAdmin /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/evaluadores" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><AsignacionEvaluadores /></SuspenseWrapper></ProtectedRoute>} />
@@ -118,8 +130,7 @@ function App() {
                                 <Route path="/coordinador/entregas" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><CoordinadorEntregas /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/coordinador/bitacoras" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><CoordinadorBitacoras /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/alertas" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><GestionAlertas /></SuspenseWrapper></ProtectedRoute>} />
-                                {/* PR12: Coordinador reports */}
-                                <Route path="/reportes" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><ReportesConsolidados /></SuspenseWrapper></ProtectedRoute>} />
+                                {/* PR12: Coordinador reports (removed) */}
                                 <Route path="/recursos/admin" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><RecursosAdmin /></SuspenseWrapper></ProtectedRoute>} />
                                 {/* PR13: Evaluador */}
                                 <Route path="/evaluaciones/:id" element={<ProtectedRoute allowedRoles={['Director', 'EvaluadorExterno']}><SuspenseWrapper><EvaluarProyecto /></SuspenseWrapper></ProtectedRoute>} />

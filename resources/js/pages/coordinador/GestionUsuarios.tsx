@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { apiFetch } from '@/lib/utils';
 import {
@@ -10,6 +10,8 @@ import {
     UserPlus,
     Pencil,
     RefreshCw,
+    Search,
+    Users,
 } from 'lucide-react';
 
 interface User {
@@ -19,6 +21,7 @@ interface User {
     name?: string;
     created_by: { name: string } | null;
     created_at: string;
+    last_activity_at?: string | null;
 }
 
 interface PaginationMeta {
@@ -81,9 +84,10 @@ export default function GestionUsuarios() {
     const [estNombre, setEstNombre] = useState('');
     const [dirCorreo, setDirCorreo] = useState('');
     const [dirNombre, setDirNombre] = useState('');
+    const [dirAreas, setDirAreas] = useState('');
 
     // ── Sección 4: Roles ──
-    const [roleChanges, setRoleChanges] = useState<Record<number, string>>({});
+    const [roleChanges, setRoleChanges] = useState<Record<string, string>>({});
 
     // ── Modal / message ──
     const [modalOpen, setModalOpen] = useState(false);
@@ -93,12 +97,19 @@ export default function GestionUsuarios() {
     const [formRole, setFormRole] = useState('Estudiante');
     const [submitting, setSubmitting] = useState(false);
 
-    const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
+    const [editingIsWhitelist, setEditingIsWhitelist] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState<any>(null);
     const [deleteIsWhitelist, setDeleteIsWhitelist] = useState(false);
     const [deleting, setDeleting] = useState(false);
 
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [savingRoles, setSavingRoles] = useState(false);
+
+    // ── Paginación y filtros ──
+    const [page, setPage] = useState(1);
+    const pageSize = 10;
+    const [searchQuery, setSearchQuery] = useState('');
+    const [roleFilter, setRoleFilter] = useState('');
 
     const fetchUsers = useCallback(async () => {
         try {
@@ -135,6 +146,39 @@ export default function GestionUsuarios() {
         fetchWhitelist();
     }, [fetchWhitelist]);
 
+    const combinedEntries = useMemo(() => {
+        const map = new Map<string, any>();
+        for (const w of whitelistEntries) {
+            map.set(w.email, { ...w, _isUser: false });
+        }
+        for (const u of users) {
+            map.set(u.email, { ...u, _isUser: true });
+        }
+        return Array.from(map.values());
+    }, [users, whitelistEntries]);
+
+    const filteredEntries = useMemo(() => {
+        let result = combinedEntries;
+        if (searchQuery) {
+            const q = searchQuery.toLowerCase();
+            result = result.filter((e: any) =>
+                (e.name || '').toLowerCase().includes(q) ||
+                e.email.toLowerCase().includes(q)
+            );
+        }
+        if (roleFilter) {
+            result = result.filter((e: any) => e.role === roleFilter);
+        }
+        return result;
+    }, [combinedEntries, searchQuery, roleFilter]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredEntries.length / pageSize));
+    const paginatedEntries = filteredEntries.slice((page - 1) * pageSize, page * pageSize);
+
+    useEffect(() => {
+        setPage(1);
+    }, [searchQuery, roleFilter]);
+
     function showMsg(type: 'success' | 'error', text: string) {
         setMessage({ type, text });
         setTimeout(() => setMessage(null), 4000);
@@ -145,9 +189,13 @@ export default function GestionUsuarios() {
         if (submitting) return;
         setSubmitting(true);
         try {
-            const url = editingUser ? `/api/admin/usuarios/${editingUser.id}` : '/api/admin/whitelist';
+            const url = editingUser
+                ? (editingIsWhitelist ? `/api/admin/whitelist/${editingUser.id}` : `/api/admin/usuarios/${editingUser.id}`)
+                : '/api/admin/whitelist';
             const method = editingUser ? 'PUT' : 'POST';
-            const body = editingUser ? { role: formRole } : { email: formEmail.trim(), name: formName.trim() || null, role: formRole };
+            const body = editingUser
+                ? { name: formName.trim(), email: formEmail.trim(), role: formRole }
+                : { email: formEmail.trim(), name: formName.trim() || null, role: formRole };
             
             const res = await apiFetch(url, {
                 method,
@@ -163,9 +211,12 @@ export default function GestionUsuarios() {
             showMsg('success', editingUser ? 'Usuario actualizado' : 'Usuario creado');
             setModalOpen(false);
             setEditingUser(null);
+            setEditingIsWhitelist(false);
+            setFormName('');
             setFormEmail('');
             setFormRole('Estudiante');
             fetchUsers();
+            if (editingIsWhitelist) fetchWhitelist();
         } catch (err: any) {
             showMsg('error', err.message);
         } finally {
@@ -177,20 +228,35 @@ export default function GestionUsuarios() {
         if (!deleteTarget || deleting) return;
         setDeleting(true);
         try {
-            const endpoint = deleteIsWhitelist
-                ? `/api/admin/whitelist/${deleteTarget.id}`
-                : `/api/admin/usuarios/${deleteTarget.id}`;
-            const res = await apiFetch(endpoint, { method: 'DELETE' });
+            const isUser = deleteTarget._isUser;
+
+            // Primary delete
+            const primaryEndpoint = isUser
+                ? `/api/admin/usuarios/${deleteTarget.id}`
+                : `/api/admin/whitelist/${deleteTarget.id}`;
+
+            const res = await apiFetch(primaryEndpoint, { method: 'DELETE' });
             if (!res.ok) throw new Error('Error al eliminar');
-            showMsg('success', deleteIsWhitelist ? 'Correo eliminado de la whitelist' : 'Usuario eliminado');
+
+            // If it was a user, also try to remove from whitelist by email
+            if (isUser) {
+                const whitelistEntry = whitelistEntries.find((w: any) => w.email === deleteTarget.email);
+                if (whitelistEntry) {
+                    try {
+                        await apiFetch(`/api/admin/whitelist/${whitelistEntry.id}`, { method: 'DELETE' });
+                    } catch {
+                        // Non-critical: whitelist entry may not exist
+                    }
+                }
+            }
+
+            showMsg('success', isUser ? 'Usuario eliminado' : 'Correo eliminado de la whitelist');
             setDeleteTarget(null);
             setDeleteIsWhitelist(false);
-            if (deleteIsWhitelist) {
-                fetchWhitelist();
-                fetchUsers();
-            } else {
-                fetchUsers();
-            }
+
+            // Always refresh both lists regardless of type
+            fetchWhitelist();
+            fetchUsers();
         } catch {
             showMsg('error', 'Error al eliminar');
         } finally {
@@ -198,8 +264,10 @@ export default function GestionUsuarios() {
         }
     }
 
-    function openEdit(u: User) {
+    function openEdit(u: any, isWhitelist: boolean) {
         setEditingUser(u);
+        setEditingIsWhitelist(isWhitelist);
+        setFormName(u.name || '');
         setFormEmail(u.email);
         setFormRole(u.role);
         setModalOpen(true);
@@ -285,6 +353,7 @@ export default function GestionUsuarios() {
             setEstCorreo('');
             setEstNombre('');
             fetchWhitelist();
+            fetchUsers();
         } catch (err: any) {
             showMsg('error', err.message);
         }
@@ -296,7 +365,7 @@ export default function GestionUsuarios() {
             const res = await apiFetch('/api/admin/whitelist', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: dirCorreo.trim(), name: dirNombre.trim() || null, role: 'Director' }),
+                body: JSON.stringify({ email: dirCorreo.trim(), name: dirNombre.trim() || null, role: 'Director', areas: dirAreas.trim() || null }),
             });
             if (!res.ok) {
                 const err = await res.json().catch(() => null);
@@ -305,7 +374,9 @@ export default function GestionUsuarios() {
             showMsg('success', 'Director agregado');
             setDirCorreo('');
             setDirNombre('');
+            setDirAreas('');
             fetchWhitelist();
+            fetchUsers();
         } catch (err: any) {
             showMsg('error', err.message);
         }
@@ -367,112 +438,135 @@ export default function GestionUsuarios() {
                 </div>
             </div>
 
-            {/* ═══ SECCIÓN 1: Correos Autorizados (whitelist) ═══ */}
+            {/* ═══ SECCIÓN 1: Usuarios y Accesos (Fusionada) ═══ */}
             <section className="rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                 <div className="mb-5 flex items-center gap-2 flex-wrap">
-                    <svg viewBox="0 0 24 24" className="h-4 w-4 text-[#c2410c]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="2" y="4" width="20" height="16" rx="2" />
-                        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-                    </svg>
-                    <h2 className="text-lg font-bold text-text">Correos Autorizados</h2>
+                    <Users className="h-4 w-4 text-[#c2410c]" />
+                    <h2 className="text-lg font-bold text-text">Usuarios y Accesos</h2>
                     <span className="ml-auto rounded-full bg-[#e7e5e4] px-2.5 py-0.5 text-xs font-semibold text-[#57534e]">
-                        {whitelistMeta?.total ?? whitelistEntries.length} correos
+                        {filteredEntries.length} registros
                     </span>
                 </div>
 
+                {/* Filtros */}
+                <div className="mb-4 flex items-center gap-3 flex-wrap">
+                    <div className="relative flex-1 min-w-[200px]">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#78716c]" />
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Buscar por nombre o correo..."
+                            className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white pl-9 pr-3 py-2 text-sm text-text outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                        />
+                    </div>
+                    <select
+                        value={roleFilter}
+                        onChange={(e) => setRoleFilter(e.target.value)}
+                        className="min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-text outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                    >
+                        <option value="">Todos los roles</option>
+                        {ROLES.map((r) => (
+                            <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                        ))}
+                    </select>
+                </div>
+
                 <div className="w-full overflow-x-auto rounded-lg border border-[#e5e5e5] bg-white">
-                    {whitelistLoading ? (
-                        <div className="flex items-center justify-center py-16">
-                            <Loader2 className="h-6 w-6 animate-spin text-[#c2410c]" />
-                        </div>
-                    ) : whitelistEntries.length === 0 ? (
+                    {filteredEntries.length === 0 ? (
                         <div className="py-16 text-center text-sm text-[#57534e]">
-                            No hay correos autorizados. Agregue estudiantes o directores desde los formularios de abajo.
+                            No hay usuarios registrados. Agregue estudiantes o directores desde los formularios de abajo.
                         </div>
                     ) : (
-                        <>
-                            <table className="w-full text-left text-sm tabular-nums">
-                                <thead className="bg-[#f5f5f4] text-[11px] font-bold uppercase tracking-[0.05em] text-[#57534e]">
-                                    <tr>
-                                        <th className="whitespace-nowrap px-4 py-3">Correo</th>
-                                        <th className="whitespace-nowrap px-4 py-3">Nombre</th>
-                                        <th className="whitespace-nowrap px-4 py-3">Rol</th>
-                                        <th className="whitespace-nowrap px-4 py-3">Fecha de alta</th>
-                                        <th className="whitespace-nowrap px-4 py-3 text-right">Acciones</th>
+                        <table className="w-full text-left text-sm tabular-nums">
+                            <thead className="bg-[#f5f5f4] text-[11px] font-bold uppercase tracking-[0.05em] text-[#57534e]">
+                                <tr>
+                                    <th className="whitespace-nowrap px-4 py-3">Nombre</th>
+                                    <th className="whitespace-nowrap px-4 py-3">Correo</th>
+                                    <th className="whitespace-nowrap px-4 py-3">Rol</th>
+                                    <th className="whitespace-nowrap px-4 py-3">Último Acceso</th>
+                                    <th className="whitespace-nowrap px-4 py-3 text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                    {paginatedEntries.map((entry: any) => {
+                                    const k = (entry._isUser ? "u-" : "w-") + entry.id;
+                                    return (
+                                    <tr key={k} className="border-b border-[#e5e5e5] last:border-none">
+                                        <td className="px-4 py-3 font-medium text-text">{entry.name || entry.created_by?.name || "—"}</td>
+                                        <td className="px-4 py-3 text-text-muted">{entry.email}</td>
+                                        <td className="px-4 py-3">
+                                            <span className="inline-flex items-center rounded-full bg-[#f5f5f4] px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.03em] text-[#57534e]">
+                                                {ROLE_LABELS[entry.role] || entry.role}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-[#78716c] text-xs">
+                                            {entry._isUser && entry.last_activity_at
+                                                ? formatDate(entry.last_activity_at)
+                                                : entry._isUser ? formatDate(entry.created_at) : "—"}
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            <div className="inline-flex gap-0.5">
+                                                <button onClick={() => openEdit(entry, !entry._isUser)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#f5f5f4]" title="Editar">
+                                                    <Pencil className="h-4 w-4" />
+                                                </button>
+                                                <button onClick={() => { setDeleteTarget(entry); setDeleteIsWhitelist(!entry._isUser); }} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#fee2e2] hover:text-[#dc2626]" title={entry._isUser ? "Eliminar usuario" : "Eliminar de whitelist"}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                        </td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    {whitelistEntries.map((w) => (
-                                        <tr key={w.id} className="border-b border-[#e5e5e5] last:border-none">
-                                            <td className="px-4 py-3 font-medium text-text">{w.email}</td>
-                                            <td className="px-4 py-3 text-text-muted">
-                                                {(w as any).name || (w as any).created_by?.name || '—'}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <span className="inline-flex items-center rounded-full bg-[#f5f5f4] px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.03em] text-[#57534e]">
-                                                    {ROLE_LABELS[w.role] || w.role}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3 text-[#78716c] text-xs">{formatDate(w.created_at)}</td>
-                                            <td className="px-4 py-3 text-right">
-                                                <div className="inline-flex gap-0.5">
-                                                    <button
-                                                        onClick={() => { setDeleteTarget(w); setDeleteIsWhitelist(true); }}
-                                                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#fee2e2] hover:text-[#dc2626]"
-                                                        title="Eliminar de whitelist"
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                            {whitelistMeta && (
-                                <div className="flex items-center justify-between border-t border-[#e5e5e5] px-4 py-3 text-sm text-[#57534e] flex-wrap gap-3">
-                                    <span>Mostrando {whitelistMeta.total > 0 ? (whitelistMeta.current_page - 1) * 20 + 1 : 0}–{Math.min(whitelistMeta.current_page * 20, whitelistMeta.total)} de {whitelistMeta.total} resultados</span>
-                                    <div className="flex items-center gap-1">
-                                        <button
-                                            onClick={() => setWhitelistPage((p) => Math.max(1, p - 1))}
-                                            disabled={whitelistPage <= 1}
-                                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#e5e5e5] text-text transition-colors hover:bg-[#f5f5f4] disabled:cursor-not-allowed disabled:opacity-40"
-                                        >
-                                            <ChevronLeft className="h-4 w-4" />
-                                        </button>
-                                        {whitelistMeta.last_page > 1 && Array.from({ length: whitelistMeta.last_page }, (_, i) => i + 1).map((p) => (
-                                            <button
-                                                key={p}
-                                                onClick={() => setWhitelistPage(p)}
-                                                className={`inline-flex h-8 min-w-[32px] items-center justify-center rounded-lg border px-2 text-sm font-semibold transition-colors ${
-                                                    p === whitelistPage
-                                                        ? 'border-[#c2410c] bg-[#c2410c] text-white'
-                                                        : 'border-[#e5e5e5] text-text hover:bg-[#f5f5f4]'
-                                                }`}
-                                            >
-                                                {p}
-                                            </button>
-                                        ))}
-                                        <button
-                                            onClick={() => setWhitelistPage((p) => Math.min(whitelistMeta.last_page, p + 1))}
-                                            disabled={whitelistPage >= whitelistMeta.last_page}
-                                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#e5e5e5] text-text transition-colors hover:bg-[#f5f5f4] disabled:cursor-not-allowed disabled:opacity-40"
-                                        >
-                                            <ChevronRight className="h-4 w-4" />
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
                     )}
                 </div>
+
+                    {/* Paginación */}
+                    {totalPages > 1 && (
+                        <div className="flex items-center justify-between border-t border-[#e5e5e5] px-4 py-3">
+                            <p className="text-sm text-[#57534e]">
+                                Mostrando {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filteredEntries.length)} de {filteredEntries.length} resultados
+                            </p>
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={() => setPage(Math.max(1, page - 1))}
+                                    disabled={page === 1}
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#f5f5f4] disabled:cursor-not-allowed disabled:opacity-40"
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </button>
+                                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                                    <button
+                                        key={p}
+                                        onClick={() => setPage(p)}
+                                        className={`inline-flex h-8 w-8 items-center justify-center rounded-lg text-sm font-medium transition-colors ${
+                                            p === page
+                                                ? 'bg-[#c2410c] text-white'
+                                                : 'text-[#57534e] hover:bg-[#f5f5f4]'
+                                        }`}
+                                    >
+                                        {p}
+                                    </button>
+                                ))}
+                                <button
+                                    onClick={() => setPage(Math.min(totalPages, page + 1))}
+                                    disabled={page === totalPages}
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#f5f5f4] disabled:cursor-not-allowed disabled:opacity-40"
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </button>
+                            </div>
+                        </div>
+                    )}
             </section>
 
             {/* ═══ SECCIÓN 2: Evaluadores Externos — Crear Cuentas ═══ */}
             <section id="crear-evaluador" className="rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                 <div className="mb-5 flex items-center gap-2 flex-wrap">
                     <UserPlus className="h-4 w-4 text-[#c2410c]" />
-                    <h2 className="text-lg font-bold text-text">Evaluadores Externos — Crear Cuentas</h2>
+                    <h2 className="text-lg font-bold text-text">Evaluadores Externos - Crear Cuentas</h2>
                     <span className="ml-auto rounded-full bg-[#e7e5e4] px-2.5 py-0.5 text-xs font-semibold text-[#57534e]">
                         {evaluadores.length} cuentas
                     </span>
@@ -521,14 +615,6 @@ export default function GestionUsuarios() {
                                     className="flex-1 min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm font-mono text-text outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
                                     required
                                 />
-                                <button
-                                    type="button"
-                                    onClick={() => setEvalPass(genPassword())}
-                                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#e5e5e5] text-[#57534e] transition-colors hover:bg-[#f5f5f4] hover:text-[#c2410c]"
-                                    title="Generar contraseña"
-                                >
-                                    <RefreshCw className="h-4 w-4" />
-                                </button>
                             </div>
                         </div>
                         <div className="flex flex-col gap-1.5">
@@ -640,20 +726,20 @@ export default function GestionUsuarios() {
                 </div>
             </section>
 
-            {/* ═══ SECCIÓN 3: Agregar Correos Autorizados ═══ */}
+            {/* ═══ SECCIÓN 3: Agregar Usuarios ═══ */}
             <section className="rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                 <div className="mb-5 flex items-center gap-2 flex-wrap">
                     <svg viewBox="0 0 24 24" className="h-4 w-4 text-[#c2410c]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <rect x="2" y="4" width="20" height="16" rx="2" />
                         <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
                     </svg>
-                    <h2 className="text-lg font-bold text-text">Agregar Correos Autorizados</h2>
+                    <h2 className="text-lg font-bold text-text">Agregar Usuarios</h2>
                     <span className="ml-auto rounded-full bg-[#e7e5e4] px-2.5 py-0.5 text-xs font-semibold text-[#57534e]">
-                        Estudiantes y Directores
+                        Nuevos usuarios
                     </span>
                 </div>
                 <p className="mb-4 text-sm text-[#57534e]">
-                    Registre los correos institucionales de estudiantes y directores para que puedan acceder al sistema.
+                    Registre los correos institucionales para crear cuentas de estudiantes y directores. Podrán acceder al sistema usando su correo institucional (Google OAuth).
                 </p>
 
                 <div className="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -734,6 +820,17 @@ export default function GestionUsuarios() {
                                     placeholder="Ej: Dr. Ricardo Gómez"
                                 />
                             </div>
+                            <div className="flex flex-col gap-1.5 mb-4">
+                                <label htmlFor="areas-dir" className="text-sm font-semibold text-text">Áreas de especialización</label>
+                                <textarea
+                                    id="areas-dir"
+                                    rows={3}
+                                    value={dirAreas}
+                                    onChange={(e) => setDirAreas(e.target.value)}
+                                    className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-text outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y"
+                                    placeholder="Ej: Inteligencia Artificial, Desarrollo Web, Seguridad..."
+                                />
+                            </div>
                             <button
                                 type="submit"
                                 className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#4f46e5] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#4338ca]"
@@ -746,117 +843,6 @@ export default function GestionUsuarios() {
                 </div>
             </section>
 
-            {/* ═══ SECCIÓN 4: Gestión de Roles ═══ */}
-            <section className="rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
-                <div className="mb-5 flex items-center gap-2 flex-wrap">
-                    <svg viewBox="0 0 24 24" className="h-4 w-4 text-[#c2410c]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="3" />
-                        <circle cx="19" cy="5" r="2" />
-                        <circle cx="5" cy="19" r="2" />
-                        <path d="M10 14l2-2 4-4" />
-                        <path d="M15 5l1-1 3 3" />
-                        <path d="M5 15l-1 1 3 3" />
-                    </svg>
-                    <h2 className="text-lg font-bold text-text">Gestión de Roles</h2>
-                    <span className="ml-auto rounded-full bg-[#e7e5e4] px-2.5 py-0.5 text-xs font-semibold text-[#57534e]">
-                        {users.length} usuarios
-                    </span>
-                </div>
-                <p className="mb-4 text-sm text-[#57534e]">
-                    Asigne o cambie el rol de los usuarios registrados en el sistema.
-                </p>
-
-                <div className="w-full overflow-x-auto rounded-lg border border-[#e5e5e5] bg-white">
-                    <table className="w-full text-left text-sm tabular-nums">
-                        <thead className="bg-[#f5f5f4] text-[11px] font-bold uppercase tracking-[0.05em] text-[#57534e]">
-                            <tr>
-                                <th className="whitespace-nowrap px-4 py-3">Correo</th>
-                                <th className="whitespace-nowrap px-4 py-3">Nombre</th>
-                                <th className="whitespace-nowrap px-4 py-3">Rol Actual</th>
-                                <th className="whitespace-nowrap px-4 py-3">Último Acceso</th>
-                                <th className="whitespace-nowrap px-4 py-3 text-right">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {users.length === 0 ? (
-                                <tr>
-                                    <td colSpan={5} className="px-4 py-12 text-center text-sm text-[#57534e]">
-                                        No hay usuarios registrados.
-                                    </td>
-                                </tr>
-                            ) : (
-                                users.map((u) => (
-                                    <tr key={u.id} className="border-b border-[#e5e5e5] last:border-none">
-                                        <td className="px-4 py-3 font-medium text-text">{u.email}</td>
-                                        <td className="px-4 py-3 text-text-muted">
-                                            {(u as any).name || u.created_by?.name || '—'}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <select
-                                                value={roleChanges[u.id] ?? u.role}
-                                                onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                                                className="min-w-[140px] rounded-lg border border-[#e5e5e5] bg-white px-2.5 py-1.5 text-xs font-semibold text-text outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
-                                            >
-                                                {ROLES.map((r) => (
-                                                    <option key={r} value={r}>{ROLE_LABELS[r]}</option>
-                                                ))}
-                                            </select>
-                                        </td>
-                                        <td className="px-4 py-3 text-xs text-[#78716c]">{formatDate(u.created_at)}</td>
-                                        <td className="px-4 py-3 text-right">
-                                            <div className="inline-flex gap-0.5">
-                                                <button
-                                                    onClick={() => {
-                                                        const newRole = roleChanges[u.id] ?? u.role;
-                                                        if (newRole !== u.role) {
-                                                            handleRoleChange(u.id, u.role);
-                                                            setRoleChanges((prev) => ({ ...prev, [u.id]: newRole }));
-                                                            saveAllRoles();
-                                                        }
-                                                    }}
-                                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#f5f5f4] hover:text-[#c2410c]"
-                                                    title="Guardar cambio de rol"
-                                                >
-                                                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                                                        <polyline points="17 21 17 13 7 13 7 21" />
-                                                        <polyline points="7 3 7 8 15 8" />
-                                                    </svg>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-
-                <div className="mt-5 flex items-center justify-between gap-3 border-t border-[#e5e5e5] pt-4 flex-wrap">
-                    <p className="flex items-center gap-2 text-xs text-[#57534e] m-0">
-                        <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10" />
-                            <line x1="12" y1="16" x2="12" y2="12" />
-                            <line x1="12" y1="8" x2="12.01" y2="8" />
-                        </svg>
-                        Los cambios de rol se aplican inmediatamente después de guardar.
-                    </p>
-                    <button
-                        onClick={saveAllRoles}
-                        disabled={Object.keys(roleChanges).length === 0 || savingRoles}
-                        className="inline-flex items-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a] disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                        {savingRoles && <Loader2 className="h-4 w-4 animate-spin" />}
-                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                            <polyline points="17 21 17 13 7 13 7 21" />
-                            <polyline points="7 3 7 8 15 8" />
-                        </svg>
-                        Guardar cambios
-                    </button>
-                </div>
-            </section>
-
             {/* ═══ MODAL: Nuevo / Editar usuario ═══ */}
             {modalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -866,15 +852,13 @@ export default function GestionUsuarios() {
                                 {editingUser ? 'Cambiar rol' : 'Nuevo usuario'}
                             </h2>
                             <button
-                                onClick={() => { setModalOpen(false); setEditingUser(null); }}
+                                onClick={() => { setModalOpen(false); setEditingUser(null); setEditingIsWhitelist(false); }}
                                 className="rounded-lg p-1.5 text-text-muted transition hover:bg-[#f5f5f4] hover:text-text"
                             >
                                 <X className="h-5 w-5" />
                             </button>
                         </div>
                         <form onSubmit={handleSubmit} className="space-y-4">
-                            {!editingUser && (
-                                <>
                                     <div>
                                         <label className="mb-1.5 block text-sm font-semibold text-text">Nombre completo</label>
                                         <input
@@ -896,8 +880,6 @@ export default function GestionUsuarios() {
                                             className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3.5 py-2.5 text-sm text-text outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
                                         />
                                     </div>
-                                </>
-                            )}
                             <div>
                                 <label className="mb-1.5 block text-sm font-semibold text-text">Rol</label>
                                 <select
@@ -913,7 +895,7 @@ export default function GestionUsuarios() {
                             <div className="flex justify-end gap-3 pt-2">
                                 <button
                                     type="button"
-                                    onClick={() => { setModalOpen(false); setEditingUser(null); }}
+                                    onClick={() => { setModalOpen(false); setEditingUser(null); setEditingIsWhitelist(false); }}
                                     className="rounded-lg border border-[#e5e5e5] px-4 py-2.5 text-sm font-medium text-text transition hover:bg-[#f5f5f4]"
                                 >
                                     Cancelar

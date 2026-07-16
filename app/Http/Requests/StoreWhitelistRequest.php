@@ -46,9 +46,10 @@ class StoreWhitelistRequest extends FormRequest
                 'email:rfc',
                 'max:255',
                 'ends_with:@unab.edu.co',
-                'unique:authorized_emails,email',
+                Rule::unique('authorized_emails', 'email')->whereNull('deleted_at'),
             ],
             'name' => ['nullable', 'string', 'max:255'],
+            'areas' => ['nullable', 'string', 'max:1000'],
             'role' => [
                 'required',
                 'string',

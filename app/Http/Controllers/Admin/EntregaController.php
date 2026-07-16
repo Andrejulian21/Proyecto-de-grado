@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\EstadoEntrega;
+use App\Enums\EstadoProyecto;
 use App\Enums\FaseProyecto;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
@@ -37,26 +38,135 @@ class EntregaController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
-        $query = Entrega::query()->with('proyecto:id,code,title');
+        $query = Entrega::query()->with([
+            'semestre:id,name',
+            'proyecto:id,code,title,semester_id',
+            'proyecto.semestre:id,name',
+            'proyectos:id,code,title',
+        ]);
 
-        // Role-based scoping
+        // Role-based scoping — check via pivot table AND direct proyecto_id
         if ($user->role->value === 'Director') {
-            $query->whereHas('proyecto', fn ($q) => $q->where('director_id', $user->id));
+            $query->where(function ($q) use ($user) {
+                $q->whereHas('proyecto', fn ($sq) => $sq->where('director_id', $user->id))
+                  ->orWhereHas('proyectos', fn ($sq) => $sq->where('director_id', $user->id));
+            });
         } elseif ($user->role->value === 'Estudiante') {
-            $query->whereHas('proyecto.estudiantes', fn ($q) => $q->where('user_id', $user->id));
+            $query->where(function ($q) use ($user) {
+                $q->whereHas('proyecto.estudiantes', fn ($sq) => $sq->where('user_id', $user->id))
+                  ->orWhereHas('proyectos.estudiantes', fn ($sq) => $sq->where('user_id', $user->id));
+            });
+        }
+
+        // Filter by grupo_id (semester): direct filter on semester_id
+        if ($request->filled('grupo_id')) {
+            $query->where('semester_id', $request->integer('grupo_id'));
         }
 
         if ($request->filled('proyecto_id')) {
-            $query->where('proyecto_id', $request->integer('proyecto_id'));
+            $query->where(function ($q) use ($request) {
+                $pid = $request->integer('proyecto_id');
+                $q->where('proyecto_id', $pid)
+                  ->orWhereHas('proyectos', fn ($sq) => $sq->where('proyecto_id', $pid));
+            });
         }
 
         if ($request->filled('fase')) {
             $query->where('phase', $request->input('fase'));
         }
 
+        $entregas = $query->orderByDesc('created_at')->get();
+
+        // Attach semestre_nombre and project info to each entrega
+        $data = $entregas->map(function (Entrega $e) {
+            $arr = $e->toArray();
+            $arr['semestre_nombre'] = $e->semestre?->name ?? $e->proyecto?->semestre?->name ?? '—';
+            $arr['proyectos_count'] = $e->proyectos->count();
+            $arr['proyectos_list'] = $e->proyectos->map(fn ($p) => "{$p->code} - {$p->title}");
+            return $arr;
+        });
+
         return response()->json([
-            'data' => $query->orderByDesc('created_at')->get(),
+            'data' => $data,
         ]);
+    }
+
+    /**
+     * PUT /api/admin/entregas/{id}
+     *
+     * Actualizar todos los campos editables de una entrega (coordinador).
+     */
+    public function update(Request $request, int $id): JsonResponse
+    {
+        if ($request->user()->role->value !== 'Coordinador') {
+            return response()->json(['error' => 'No autorizado.'], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'due_date' => 'sometimes|required|date',
+            'description' => 'sometimes|required|string|max:500',
+            'titulo' => 'sometimes|required|string|max:255',
+            'acceptance_criteria' => 'sometimes|nullable|string',
+            'hora_maxima' => 'sometimes|nullable|string|max:10',
+            'phase' => 'sometimes|required|string|max:50',
+            'proyecto_id' => 'sometimes|required|exists:proyectos,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $entrega = Entrega::findOrFail($id);
+        $data = $validator->validated();
+
+        if (isset($data['due_date'])) {
+            $entrega->due_date = $data['due_date'];
+        }
+        if (isset($data['description'])) {
+            $entrega->description = $data['description'];
+        }
+        if (isset($data['titulo'])) {
+            $entrega->title = $data['titulo'];
+        }
+        if (array_key_exists('acceptance_criteria', $data)) {
+            $entrega->acceptance_criteria = $data['acceptance_criteria'];
+        }
+        if (array_key_exists('hora_maxima', $data)) {
+            $entrega->hora_maxima = $data['hora_maxima'];
+        }
+        if (isset($data['phase'])) {
+            $entrega->phase = $data['phase'];
+        }
+        if (isset($data['proyecto_id'])) {
+            $entrega->proyecto_id = $data['proyecto_id'];
+        }
+        $entrega->save();
+
+        $entrega->load('proyecto:id,code,title,semester_id', 'proyecto.semestre:id,name', 'proyectos:id,code,title');
+
+        $arr = $entrega->toArray();
+        $arr['semestre_nombre'] = $entrega->proyecto?->semestre?->name ?? '—';
+        $arr['proyectos_count'] = $entrega->proyectos->count();
+        $arr['proyectos_list'] = $entrega->proyectos->map(fn ($p) => "{$p->code} - {$p->title}");
+
+        return response()->json(['data' => $arr]);
+    }
+
+    /**
+     * DELETE /api/admin/entregas/{id}
+     *
+     * Eliminar una entrega (coordinador).
+     */
+    public function destroy(Request $request, int $id): JsonResponse
+    {
+        if ($request->user()->role->value !== 'Coordinador') {
+            return response()->json(['error' => 'No autorizado.'], 403);
+        }
+
+        $entrega = Entrega::findOrFail($id);
+        $entrega->delete();
+
+        return response()->json(['message' => 'Entrega eliminada correctamente.']);
     }
 
     /**
@@ -72,11 +182,13 @@ class EntregaController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'proyecto_id' => 'required|exists:proyectos,id',
-            'phase' => 'required|string|max:50',
-            'title' => 'required|string|max:500',
-            'description' => 'nullable|string',
-            'due_date' => 'required|date',
+            'grupo_id' => 'required|exists:semestres,id',
+            'fase' => 'required|string|max:50',
+            'titulo' => 'required|string|max:255',
+            'descripcion' => 'required|string|max:500',
+            'fecha_limite' => 'required|date',
+            'criterios' => 'nullable|string',
+            'hora_maxima' => 'nullable|string|max:10',
         ]);
 
         if ($validator->fails()) {
@@ -86,27 +198,24 @@ class EntregaController extends Controller
         $data = $validator->validated();
 
         $entrega = Entrega::create([
-            'proyecto_id' => $data['proyecto_id'],
-            'phase' => $data['phase'],
-            'title' => $data['title'],
-            'description' => $data['description'] ?? null,
-            'due_date' => $data['due_date'],
+            'semester_id' => $data['grupo_id'],
+            'phase' => $data['fase'],
+            'title' => $data['titulo'],
+            'description' => $data['descripcion'],
+            'due_date' => $data['fecha_limite'],
+            'hora_maxima' => $data['hora_maxima'] ?? null,
+            'acceptance_criteria' => $data['criterios'] ?? null,
             'status' => EstadoEntrega::Creada->value,
         ]);
 
-        $entrega->load('proyecto:id,code,title,director_id');
+        // Link to all active projects in the semester
+        $proyectos = Proyecto::where('semester_id', $data['grupo_id'])
+            ->whereIn('status', [EstadoProyecto::EnCurso->value, EstadoProyecto::EnRiesgo->value, EstadoProyecto::Completado->value])
+            ->pluck('id');
 
-        // T-022: Notificar al director del proyecto
-        if ($entrega->proyecto->director_id) {
-            Notificacion::create([
-                'user_id' => $entrega->proyecto->director_id,
-                'sender_id' => $request->user()->id,
-                'type' => 'entrega.creada',
-                'title' => "Nueva entrega: {$entrega->title}",
-                'content' => "Se ha creado una nueva entrega para el proyecto {$entrega->proyecto->title}.",
-                'sent_at' => now(),
-            ]);
-        }
+        $entrega->proyectos()->attach($proyectos);
+
+        $entrega->load('semestre:id,name', 'proyectos:id,code,title');
 
         return response()->json(['data' => $entrega], 201);
     }
@@ -128,11 +237,9 @@ class EntregaController extends Controller
             ], 422);
         }
 
-        // Verify the user is a student of this project
+        // Verify the user is a student of any linked project
         $userId = $request->user()->id;
-        $esEstudiante = $entrega->proyecto->estudiantes()
-            ->where('user_id', $userId)
-            ->exists();
+        $esEstudiante = $this->esEstudianteDeEntrega($entrega, $userId);
 
         if (! $esEstudiante) {
             return response()->json(['error' => 'No eres estudiante de este proyecto.'], 403);
@@ -201,9 +308,7 @@ class EntregaController extends Controller
         $entrega = Entrega::findOrFail($id);
 
         $user = $request->user();
-        $esEstudiante = $entrega->proyecto->estudiantes()
-            ->where('user_id', $user->id)
-            ->exists();
+        $esEstudiante = $this->esEstudianteDeEntrega($entrega, $user->id);
 
         if (! $esEstudiante) {
             return response()->json(['error' => 'No eres estudiante de este proyecto.'], 403);
@@ -244,7 +349,7 @@ class EntregaController extends Controller
         $entrega = Entrega::findOrFail($id);
 
         $user = $request->user();
-        if ($entrega->proyecto->director_id !== $user->id) {
+        if (! $this->esDirectorDeEntrega($entrega, $user->id)) {
             return response()->json(['error' => 'No eres el director de este proyecto.'], 403);
         }
 
@@ -285,9 +390,7 @@ class EntregaController extends Controller
         // Scope by role
         $user = $request->user();
         if ($user->role->value === 'Estudiante') {
-            $esEstudiante = $entrega->proyecto->estudiantes()
-                ->where('user_id', $user->id)
-                ->exists();
+            $esEstudiante = $this->esEstudianteDeEntrega($entrega, $user->id);
 
             if (! $esEstudiante) {
                 return response()->json(['error' => 'No autorizado.'], 403);
@@ -310,9 +413,9 @@ class EntregaController extends Controller
     {
         $entrega = Entrega::findOrFail($id);
 
-        // Verify the user is the director of this project
+        // Verify the user is the director of any linked project
         $user = $request->user();
-        if ($entrega->proyecto->director_id !== $user->id) {
+        if (! $this->esDirectorDeEntrega($entrega, $user->id)) {
             return response()->json(['error' => 'No eres el director de este proyecto.'], 403);
         }
 
@@ -350,19 +453,27 @@ class EntregaController extends Controller
             $this->autoAdvancePhase($entrega);
         }
 
-        $entrega->load('proyecto:id,code,title,current_phase');
+        $entrega->load('proyecto:id,code,title,current_phase', 'proyectos:id,code,title,current_phase');
 
-        // T-022: Notificar a los estudiantes del proyecto
-        $estudiantes = $entrega->proyecto->estudiantes()->pluck('user_id');
-        foreach ($estudiantes as $estudianteId) {
-            Notificacion::create([
-                'user_id' => $estudianteId,
-                'sender_id' => $user->id,
-                'type' => 'entrega.revisada',
-                'title' => "Entrega {$data['status']}: {$entrega->title}",
-                'content' => "Tu entrega '{$entrega->title}' ha sido {$data['status']}.",
-                'sent_at' => now(),
-            ]);
+        // T-022: Notificar a los estudiantes de todos los proyectos vinculados
+        $proyectos = $entrega->proyectos->isNotEmpty() ? $entrega->proyectos : collect([$entrega->proyecto])->filter();
+        $notifiedUserIds = collect();
+        foreach ($proyectos as $proyecto) {
+            $estudiantes = $proyecto->estudiantes()->pluck('user_id');
+            foreach ($estudiantes as $estudianteId) {
+                if ($notifiedUserIds->has($estudianteId)) {
+                    continue;
+                }
+                $notifiedUserIds->put($estudianteId, true);
+                Notificacion::create([
+                    'user_id' => $estudianteId,
+                    'sender_id' => $user->id,
+                    'type' => 'entrega.revisada',
+                    'title' => "Entrega {$data['status']}: {$entrega->title}",
+                    'content' => "Tu entrega '{$entrega->title}' ha sido {$data['status']}.",
+                    'sent_at' => now(),
+                ]);
+            }
         }
 
         return response()->json(['data' => $entrega->fresh()]);
@@ -380,10 +491,18 @@ class EntregaController extends Controller
         }
 
         $query = Entrega::where('status', 'aprobada')
-            ->with(['proyecto:id,code,title,director_id', 'versiones' => fn ($q) => $q->latest()]);
+            ->with([
+                'proyecto:id,code,title,director_id',
+                'proyectos:id,code,title,director_id',
+                'versiones' => fn ($q) => $q->latest(),
+            ]);
 
         if ($request->filled('proyecto_id')) {
-            $query->where('proyecto_id', $request->integer('proyecto_id'));
+            $query->where(function ($q) use ($request) {
+                $pid = $request->integer('proyecto_id');
+                $q->where('proyecto_id', $pid)
+                  ->orWhereHas('proyectos', fn ($sq) => $sq->where('proyecto_id', $pid));
+            });
         }
 
         if ($request->filled('fecha_desde')) {
@@ -410,24 +529,79 @@ class EntregaController extends Controller
      */
     private function autoAdvancePhase(Entrega $entrega): void
     {
-        $proyecto = $entrega->proyecto()->firstOrFail();
+        $proyectos = $entrega->proyectos()->get();
 
-        // Check if there are any non-approved entregas in this phase
-        $pendingInPhase = Entrega::where('proyecto_id', $proyecto->id)
-            ->where('phase', $entrega->phase)
-            ->where('status', '!=', 'aprobada')
-            ->exists();
+        // Fall back to direct proyecto relation if no pivot projects
+        if ($proyectos->isEmpty() && $entrega->proyecto) {
+            $proyectos = collect([$entrega->proyecto]);
+        }
 
-        if (! $pendingInPhase) {
-            $currentPhase = $proyecto->current_phase;
+        foreach ($proyectos as $proyecto) {
+            // Check if there are any non-approved entregas in this phase for this project
+            // (scope checks both direct FK and pivot table)
+            $pendingInPhase = Entrega::paraProyecto($proyecto->id)
+                ->where('phase', $entrega->phase)
+                ->where('status', '!=', 'aprobada')
+                ->exists();
 
-            if ($currentPhase->value === $entrega->phase) {
-                $nextPhase = $currentPhase->next();
-                if ($nextPhase !== null) {
-                    $proyecto->current_phase = $nextPhase;
-                    $proyecto->save();
+            if (! $pendingInPhase) {
+                $currentPhase = $proyecto->current_phase;
+
+                if ($currentPhase->value === $entrega->phase) {
+                    $nextPhase = $currentPhase->next();
+                    if ($nextPhase !== null) {
+                        $proyecto->current_phase = $nextPhase;
+                        $proyecto->save();
+                    }
                 }
             }
         }
+    }
+
+    /**
+     * Check if a user is a student of any project linked to this entrega.
+     */
+    private function esEstudianteDeEntrega(Entrega $entrega, int $userId): bool
+    {
+        // Check via pivot projects
+        $proyectos = $entrega->proyectos()->get();
+        foreach ($proyectos as $proyecto) {
+            $esEstudiante = $proyecto->estudiantes()
+                ->where('user_id', $userId)
+                ->exists();
+            if ($esEstudiante) {
+                return true;
+            }
+        }
+
+        // Fall back to direct proyecto relation
+        if ($entrega->proyecto) {
+            return $entrega->proyecto->estudiantes()
+                ->where('user_id', $userId)
+                ->exists();
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if a user is the director of any project linked to this entrega.
+     */
+    private function esDirectorDeEntrega(Entrega $entrega, int $userId): bool
+    {
+        // Check via pivot projects
+        $proyectos = $entrega->proyectos()->get();
+        foreach ($proyectos as $proyecto) {
+            if ($proyecto->director_id === $userId) {
+                return true;
+            }
+        }
+
+        // Fall back to direct proyecto relation
+        if ($entrega->proyecto && $entrega->proyecto->director_id === $userId) {
+            return true;
+        }
+
+        return false;
     }
 }

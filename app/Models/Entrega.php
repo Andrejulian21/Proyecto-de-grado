@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Entrega extends Model
@@ -19,6 +20,7 @@ class Entrega extends Model
 
     protected $fillable = [
         'proyecto_id',
+        'semester_id',
         'phase',
         'title',
         'description',
@@ -26,7 +28,11 @@ class Entrega extends Model
         'status',
         'consolidated_grade',
         'evaluation_complete',
+        'acceptance_criteria',
+        'hora_maxima',
     ];
+
+    protected $appends = ['grupo_id'];
 
     protected function casts(): array
     {
@@ -38,9 +44,37 @@ class Entrega extends Model
         ];
     }
 
+    public function getGrupoIdAttribute(): ?int
+    {
+        return $this->proyecto?->semester_id;
+    }
+
     public function proyecto(): BelongsTo
     {
         return $this->belongsTo(Proyecto::class, 'proyecto_id');
+    }
+
+    public function proyectos(): BelongsToMany
+    {
+        return $this->belongsToMany(Proyecto::class, 'entrega_proyecto', 'entrega_id', 'proyecto_id')
+            ->withTimestamps();
+    }
+
+    /**
+     * Get the first linked project (from pivot) or fall back to direct proyecto relation.
+     */
+    public function firstProyecto(): ?Proyecto
+    {
+        if ($this->relationLoaded('proyectos') && $this->proyectos->isNotEmpty()) {
+            return $this->proyectos->first();
+        }
+
+        return $this->proyecto;
+    }
+
+    public function semestre(): BelongsTo
+    {
+        return $this->belongsTo(Semestre::class, 'semester_id');
     }
 
     public function versiones(): HasMany
@@ -61,5 +95,18 @@ class Entrega extends Model
     public function scopePorEstado(Builder $query, string $status): Builder
     {
         return $query->where('status', $status);
+    }
+
+    /**
+     * Filter entregas by project — checks both direct FK and pivot table.
+     */
+    public function scopeParaProyecto(Builder $query, int $proyectoId): Builder
+    {
+        return $query->where(function ($q) use ($proyectoId) {
+            $q->where('proyecto_id', $proyectoId)
+              ->orWhereHas('proyectos', function ($q2) use ($proyectoId) {
+                  $q2->where('proyectos.id', $proyectoId);
+              });
+        });
     }
 }

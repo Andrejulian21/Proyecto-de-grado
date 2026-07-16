@@ -20,6 +20,10 @@ class EvaluadorProyecto extends Model
         'evaluador_id',
         'invitation_status',
         'assigned_at',
+        'fecha',
+        'hora_inicio',
+        'hora_fin',
+        'fase',
     ];
 
     protected function casts(): array
@@ -27,6 +31,9 @@ class EvaluadorProyecto extends Model
         return [
             'invitation_status' => EstadoInvitacionEvaluador::class,
             'assigned_at' => 'datetime',
+            'fecha' => 'date:Y-m-d',
+            'hora_inicio' => 'string',
+            'hora_fin' => 'string',
         ];
     }
 

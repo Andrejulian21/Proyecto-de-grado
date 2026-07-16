@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { cn } from '@/lib/utils';
-import { Loader2, Search, BookOpen, Gavel, FileText, PlaySquare, Download, FolderKanban } from 'lucide-react';
+import { Loader2, Search, BookOpen, Gavel, FileText, PlaySquare, Download, FolderKanban, AlertCircle } from 'lucide-react';
+import { apiFetch } from '@/lib/utils';
 
 type ResourceType = 'reglamento' | 'guia' | 'plantilla' | 'tutorial';
 type TabKey = 'todos' | ResourceType;
@@ -17,44 +18,33 @@ interface Resource {
     downloads: number;
 }
 
-const MOCK_RECURSOS: Resource[] = [
-    {
-        id: 1,
-        title: 'Reglamento de Proyectos de Grado 2026',
-        type: 'reglamento',
-        description: 'Normativa vigente que regula la inscripción, desarrollo y evaluación de proyectos de grado en Ingeniería de Sistemas.',
-        author: 'Comité de Proyectos',
-        size: '1.2 MB',
-        downloads: 342,
-    },
-    {
-        id: 2,
-        title: 'Guía para la elaboración del anteproyecto',
-        type: 'guia',
-        description: 'Documento detallado con la estructura, requisitos y recomendaciones para la presentación del anteproyecto de grado.',
-        author: 'Coordinación Académica',
-        size: '890 KB',
-        downloads: 215,
-    },
-    {
-        id: 3,
-        title: 'Plantilla de informe final',
-        type: 'plantilla',
-        description: 'Formato oficial en Word para la presentación del informe final del proyecto de grado, con estilos y estructura predefinidos.',
-        author: 'Coordinación de Proyectos',
-        size: '450 KB',
-        downloads: 178,
-    },
-    {
-        id: 4,
-        title: 'Tutorial: Cómo usar el sistema de entregas',
-        type: 'tutorial',
-        description: 'Video paso a paso que explica el proceso de carga y revisión de entregas en la plataforma de proyectos de grado.',
-        author: 'Centro de Innovación',
-        size: '15 MB',
-        downloads: 89,
-    },
-];
+/** Shape returned by GET /api/recursos */
+interface ApiResource {
+    id: number;
+    title: string;
+    category: string;
+    description: string | null;
+    file_path: string | null;
+    link: string | null;
+    access_count: number;
+    author: { id: number; name: string } | null;
+    created_at: string;
+    updated_at: string;
+}
+
+function fromApi(r: ApiResource): Resource {
+    return {
+        id: r.id,
+        title: r.title,
+        type: (['reglamento', 'guia', 'plantilla', 'tutorial'].includes(r.category)
+            ? r.category
+            : 'reglamento') as ResourceType,
+        description: r.description ?? '',
+        author: r.author?.name ?? '—',
+        size: '—',
+        downloads: r.access_count,
+    };
+}
 
 const TABS: { key: TabKey; label: string }[] = [
     { key: 'todos', label: 'Todos' },
@@ -81,15 +71,37 @@ const typeLabels: Record<ResourceType, string> = {
 export default function Recursos() {
     const [recursos, setRecursos] = useState<Resource[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [search, setSearch] = useState('');
     const [activeTab, setActiveTab] = useState<TabKey>('todos');
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setRecursos(MOCK_RECURSOS);
-            setLoading(false);
-        }, 400);
-        return () => clearTimeout(timer);
+        let cancelled = false;
+
+        async function load() {
+            setLoading(true);
+            setError(null);
+            try {
+                const res = await apiFetch('/api/recursos');
+                if (!res.ok) throw new Error('Error al cargar recursos');
+                const body = await res.json();
+                if (!cancelled) {
+                    setRecursos((body.data ?? []).map(fromApi));
+                }
+            } catch (err) {
+                if (!cancelled) {
+                    setError(err instanceof Error ? err.message : 'Error desconocido');
+                }
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        }
+
+        load();
+
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
     const filtered = recursos.filter((r) => {
@@ -147,6 +159,16 @@ export default function Recursos() {
             {loading ? (
                 <div className="flex items-center justify-center py-16">
                     <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+            ) : error ? (
+                <div className="rounded-xl border border-[#fee2e2] bg-[#fef2f2] p-6">
+                    <div className="flex items-start gap-3">
+                        <AlertCircle className="h-5 w-5 shrink-0 text-[#dc2626]" />
+                        <div>
+                            <p className="text-sm font-semibold text-[#dc2626]">Error al cargar recursos</p>
+                            <p className="mt-1 text-sm text-[#991b1b]">{error}</p>
+                        </div>
+                    </div>
                 </div>
             ) : filtered.length === 0 ? (
                 <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">

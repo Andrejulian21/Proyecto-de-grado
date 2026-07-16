@@ -21,6 +21,13 @@ class AnuncioController extends Controller
         return response()->json(['data' => $anuncios]);
     }
 
+    public function show(Anuncio $anuncio): JsonResponse
+    {
+        $anuncio->load('author:id,name');
+
+        return response()->json(['data' => $anuncio]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { Loader2, BookOpen, Download, Eye, User, FileText, Gavel, PlaySquare, ChevronRight } from 'lucide-react';
+import { Loader2, BookOpen, Download, Eye, User, FileText, Gavel, PlaySquare, ChevronRight, AlertCircle } from 'lucide-react';
+import { apiFetch } from '@/lib/utils';
 
 type ResourceType = 'reglamento' | 'guia' | 'plantilla' | 'tutorial';
 
@@ -17,52 +18,36 @@ interface ResourceDetail {
     accesses: number;
 }
 
-const MOCK_DETAIL: Record<number, ResourceDetail> = {
-    1: {
-        id: 1,
-        title: 'Reglamento de Proyectos de Grado 2026',
-        type: 'reglamento',
-        description: 'Normativa vigente que regula la inscripción, desarrollo y evaluación de proyectos de grado en Ingeniería de Sistemas.',
-        body: 'Este reglamento establece las disposiciones generales para el desarrollo de proyectos de grado del programa de Ingeniería de Sistemas. Incluye los requisitos de inscripción, las modalidades de proyecto, los roles y responsabilidades de los participantes, los criterios de evaluación y el cronograma general del proceso.\n\nAplica a todos los estudiantes que cursen proyectos de grado a partir del ciclo 2026-S1. Las disposiciones aquí contenidas reemplazan cualquier normativa anterior.',
-        author: 'Comité de Proyectos',
-        size: '1.2 MB',
-        downloads: 342,
-        accesses: 1205,
-    },
-    2: {
-        id: 2,
-        title: 'Guía para la elaboración del anteproyecto',
-        type: 'guia',
-        description: 'Documento detallado con la estructura, requisitos y recomendaciones para la presentación del anteproyecto de grado.',
-        body: 'Esta guía contiene las instrucciones detalladas para la elaboración del anteproyecto de grado. Cubre la estructura sugerida, los contenidos mínimos de cada sección, el formato de presentación y los criterios que evaluará el comité para su aprobación.',
-        author: 'Coordinación Académica',
-        size: '890 KB',
-        downloads: 215,
-        accesses: 876,
-    },
-    3: {
-        id: 3,
-        title: 'Plantilla de informe final',
-        type: 'plantilla',
-        description: 'Formato oficial en Word para la presentación del informe final del proyecto de grado.',
-        body: 'Plantilla oficial en formato .docx con estilos predefinidos para la elaboración del informe final. Incluye portada, tabla de contenidos, numeración de páginas y estilos para títulos, párrafos y tablas.',
-        author: 'Coordinación de Proyectos',
-        size: '450 KB',
-        downloads: 178,
-        accesses: 654,
-    },
-    4: {
-        id: 4,
-        title: 'Tutorial: Cómo usar el sistema de entregas',
-        type: 'tutorial',
-        description: 'Video paso a paso que explica el proceso de carga y revisión de entregas.',
-        body: 'Video tutorial que guía a los estudiantes a través del proceso completo de carga de entregas en la plataforma: inicio de sesión, navegación al módulo de entregas, carga de archivos, verificación de estado y consulta de retroalimentación.',
-        author: 'Centro de Innovación',
-        size: '15 MB',
-        downloads: 89,
-        accesses: 312,
-    },
-};
+/** Shape returned by GET /api/recursos/{id} */
+interface ApiResourceDetail {
+    id: number;
+    title: string;
+    category: string;
+    description: string | null;
+    body?: string | null;
+    file_path: string | null;
+    link: string | null;
+    access_count: number;
+    author: { id: number; name: string } | null;
+    created_at: string;
+    updated_at: string;
+}
+
+function fromApi(r: ApiResourceDetail): ResourceDetail {
+    return {
+        id: r.id,
+        title: r.title,
+        type: (['reglamento', 'guia', 'plantilla', 'tutorial'].includes(r.category)
+            ? r.category
+            : 'reglamento') as ResourceType,
+        description: r.description ?? '',
+        body: r.body ?? r.description ?? '',
+        author: r.author?.name ?? '—',
+        size: '—',
+        downloads: r.access_count,
+        accesses: r.access_count,
+    };
+}
 
 const typeIcons: Record<ResourceType, typeof BookOpen> = {
     reglamento: Gavel,
@@ -82,19 +67,39 @@ export default function RecursoDetalle() {
     const { id } = useParams<{ id: string }>();
     const [recurso, setRecurso] = useState<ResourceDetail | null>(null);
     const [loading, setLoading] = useState(true);
-    const [notFound, setNotFound] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            const data = MOCK_DETAIL[Number(id)];
-            if (data) {
-                setRecurso(data);
-            } else {
-                setNotFound(true);
+        let cancelled = false;
+
+        async function load() {
+            setLoading(true);
+            setError(null);
+            setRecurso(null);
+            try {
+                const res = await apiFetch(`/api/recursos/${id}`);
+                if (!res.ok) {
+                    if (res.status === 404) throw new Error('El recurso no existe o ha sido eliminado.');
+                    throw new Error('Error al cargar el recurso');
+                }
+                const body = await res.json();
+                if (!cancelled) {
+                    setRecurso(fromApi(body.data));
+                }
+            } catch (err) {
+                if (!cancelled) {
+                    setError(err instanceof Error ? err.message : 'Error desconocido');
+                }
+            } finally {
+                if (!cancelled) setLoading(false);
             }
-            setLoading(false);
-        }, 400);
-        return () => clearTimeout(timer);
+        }
+
+        load();
+
+        return () => {
+            cancelled = true;
+        };
     }, [id]);
 
     if (loading) {
@@ -105,16 +110,16 @@ export default function RecursoDetalle() {
         );
     }
 
-    if (notFound || !recurso) {
+    if (error || !recurso) {
         return (
             <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-surface-alt">
-                    <BookOpen className="h-6 w-6 text-text-subtle" />
+                    <AlertCircle className="h-6 w-6 text-text-subtle" />
                 </div>
                 <div className="flex flex-col gap-1">
                     <h3 className="text-base font-semibold text-text">Recurso no encontrado</h3>
                     <p className="text-sm text-text-muted">
-                        El recurso que buscas no existe o ha sido eliminado.
+                        {error ?? 'El recurso que buscas no existe o ha sido eliminado.'}
                     </p>
                 </div>
                 <Link

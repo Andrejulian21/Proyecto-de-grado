@@ -26,11 +26,28 @@ class TestUsersSeeder extends Seeder
         // También lo creamos en users para que pueda hacer login directo
         // si ya pasó por el flujo de OAuth antes.
         User::create([
+            'name' => 'Nicolas Moreno',
+            'email' => 'nmoreno534@unab.edu.co',
+            'role' => UserRole::Coordinador,
+            'es_externo' => false,
+        ]);
+
+        AuthorizedEmail::create([
+            'email' => 'nmoreno534@unab.edu.co',
+            'name' => 'Nicolas Moreno',
+            'role' => UserRole::Coordinador,
+        ]);
+
+        // También lo creamos en users para que pueda hacer login directo
+        // si ya pasó por el flujo de OAuth antes.
+        User::create([
             'name' => 'Juan Arteaga',
             'email' => 'jarteaga145@unab.edu.co',
             'role' => UserRole::Coordinador,
             'es_externo' => false,
         ]);
+
+        
 
         // ── 2. Estudiante (login externo con credenciales) ──
         User::create([

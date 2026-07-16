@@ -8,7 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Evaluacion;
 use App\Models\EvaluadorProyecto;
 use App\Models\Entrega;
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -17,24 +17,58 @@ class EvaluacionController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'entrega_id' => 'required|exists:entregas,id',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
-        }
-
         $user = $request->user();
-        $query = Evaluacion::where('entrega_id', $request->integer('entrega_id'));
+        $query = Evaluacion::query()
+            ->with(['evaluador:id,name,email', 'entrega:id,proyecto_id']);
+
+        if ($request->has('entrega_id')) {
+            $validator = Validator::make($request->all(), [
+                'entrega_id' => 'required|exists:entregas,id',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['errors' => $validator->errors()], 422);
+            }
+
+            $query->where('entrega_id', $request->integer('entrega_id'));
+        }
 
         if ($user->role->value !== 'Coordinador') {
             $query->where('evaluador_id', $user->id);
         }
 
-        return response()->json([
-            'data' => $query->with('evaluador:id,name,email')->get(),
-        ]);
+        $evaluaciones = $query->get();
+
+        // When filtering by a specific entrega, return individual records (legacy/API contract).
+        if ($request->has('entrega_id')) {
+            return response()->json(['data' => $evaluaciones]);
+        }
+
+        // When no filter (e.g. page load), the frontend expects aggregated results
+        // per project for the ResultsTable component.
+        $grouped = $evaluaciones->groupBy(fn ($e) => $e->entrega?->proyecto_id ?? 0);
+
+        $results = $grouped->map(function (Collection $items, int $proyectoId) {
+            $grades = $items->whereNotNull('grade')->pluck('grade')->toArray();
+            $promedio = count($grades) > 0
+                ? round(array_sum($grades) / count($grades), 2)
+                : null;
+
+            return [
+                'id' => $proyectoId,
+                'proyecto_id' => $proyectoId,
+                'proyecto_nombre' => '',
+                'proyecto_codigo' => '',
+                'estudiantes' => [],
+                'director' => '',
+                'fase' => 'Anteproyecto',
+                'evaluadores' => $items->pluck('evaluador.name')->unique()->values()->toArray(),
+                'nota_promedio' => $promedio,
+                'puntuaciones' => $grades,
+            ];
+        })->values()->toArray();
+
+        return response()->json(['data' => $results]);
     }
 
     public function store(Request $request): JsonResponse

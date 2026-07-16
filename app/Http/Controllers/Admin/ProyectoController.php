@@ -15,14 +15,48 @@ use Illuminate\Support\Facades\Validator;
 
 class ProyectoController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $proyectos = Proyecto::query()
-            ->with(['semestre', 'director', 'estudiantes'])
-            ->orderByDesc('created_at')
-            ->get();
+        $query = Proyecto::query()
+            ->with(['semestre', 'director:id,name,email', 'estudiantes:id,name,email'])
+            ->orderByDesc('created_at');
+
+        // Filter by active semester
+        if ($request->boolean('semestre_activo')) {
+            $query->enSemestresActivos();
+        }
+
+        // Search by keyword (code or title)
+        if ($search = $request->query('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('code', 'like', "%{$search}%")
+                  ->orWhere('title', 'like', "%{$search}%");
+            });
+        }
+
+        $proyectos = $query->get();
 
         return response()->json(['data' => $proyectos]);
+    }
+
+    public function show(Proyecto $proyecto): JsonResponse
+    {
+        $proyecto->load([
+            'semestre',
+            'director:id,name',
+            'estudiantes:id,name',
+            'entregas',
+            'entregasPivot',
+        ]);
+
+        // Merge direct FK entregas + pivot-linked entregas, deduplicate by id
+        $directEntregas = $proyecto->entregas;
+        $pivotEntregas = $proyecto->entregasPivot;
+        $merged = $directEntregas->concat($pivotEntregas)->unique('id')->values();
+
+        $proyecto->setRelation('entregas', $merged);
+
+        return response()->json(['data' => $proyecto]);
     }
 
     public function store(Request $request): JsonResponse

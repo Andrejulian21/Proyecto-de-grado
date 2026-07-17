@@ -82,6 +82,19 @@ class ProyectoController extends Controller
             ], 422);
         }
 
+        // Un estudiante no puede estar en más de un proyecto
+        $alreadyAssigned = \DB::table('proyecto_estudiante')
+            ->whereIn('user_id', $studentIds)
+            ->pluck('user_id')
+            ->toArray();
+
+        if (! empty($alreadyAssigned)) {
+            $names = User::whereIn('id', $alreadyAssigned)->pluck('name')->join(', ');
+            return response()->json([
+                'errors' => ['student_ids' => ["Los siguientes estudiantes ya tienen un proyecto asignado: {$names}"]],
+            ], 422);
+        }
+
         if (count($studentIds) >= 3) {
             $data['requires_group_justification'] = true;
         }

@@ -19,7 +19,7 @@ import {
 const FASE_LABELS: Record<Fase, string> = {
     anteproyecto: 'Anteproyecto',
     presentacion_anteproyecto: 'Presentación Anteproyecto',
-    desarrollo: 'Desarrollo',
+    desarrollo: 'Desarrollo del proyecto',
     presentacion_final: 'Presentación Final',
 };
 

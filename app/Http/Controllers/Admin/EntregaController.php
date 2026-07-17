@@ -340,6 +340,42 @@ class EntregaController extends Controller
     }
 
     /**
+     * GET /api/admin/entregas/{id}
+     *
+     * T-013: Show a single entrega with project info for director's review.
+     */
+    public function show(Request $request, int $id): JsonResponse
+    {
+        $entrega = Entrega::with([
+            'proyecto:id,code,title,director_id',
+            'proyecto.estudiantes:id,name',
+            'proyectos:id,code,title',
+            'semestre:id,name',
+            'versiones' => fn ($q) => $q->orderByDesc('version_number'),
+        ])->findOrFail($id);
+
+        // Authorize: director of linked project, student of linked project, or coordinator
+        $user = $request->user();
+        $role = $user->role->value;
+        $esDirector = $this->esDirectorDeEntrega($entrega, $user->id);
+        $esEstudiante = $this->esEstudianteDeEntrega($entrega, $user->id);
+
+        if (! in_array($role, ['Coordinador', 'Director', 'Estudiante'], true)) {
+            return response()->json(['error' => 'No autorizado.'], 403);
+        }
+
+        if ($role === 'Director' && ! $esDirector) {
+            return response()->json(['error' => 'No eres el director de este proyecto.'], 403);
+        }
+
+        if ($role === 'Estudiante' && ! $esEstudiante) {
+            return response()->json(['error' => 'No eres estudiante de este proyecto.'], 403);
+        }
+
+        return response()->json(['data' => $entrega]);
+    }
+
+    /**
      * PUT /api/admin/entregas/{id}/habilitar
      *
      * Director habilita la entrega para que el estudiante suba versiones.
@@ -421,7 +457,7 @@ class EntregaController extends Controller
 
         $validator = Validator::make($request->all(), [
             'status' => 'required|string|in:aprobada,rechazada',
-            'consolidated_grade' => 'nullable|numeric|min:0|max:100',
+            'consolidated_grade' => 'nullable|numeric|min:0|max:5',
             'director_notes' => 'nullable|string',
         ]);
 

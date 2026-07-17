@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { PhaseStepper, type PhaseStep } from '@/components/project/PhaseStepper';
 import {
     ArrowLeft, Award, User, FileText, Calendar, Clock,
     ChevronDown, ChevronRight, Loader2, AlertTriangle, RefreshCw,
@@ -49,13 +50,19 @@ const MOCK_DELIVERIES: Delivery[] = [
     { id: 4, name: 'Entrega Final', date: '30/11/2026', status: 'pending', grade: '—' },
 ];
 
-const STEP_LABELS = ['Anteproyecto', 'Presentación Anteproyecto', 'Desarrollo', 'Presentación Final'];
-
 const PHASE_STEP_MAP: Record<string, number> = {
     'anteproyecto': 0,
     'presentacion_anteproyecto': 1,
     'desarrollo': 2,
     'presentacion_final': 3,
+};
+
+const PHASE_IDS = ['anteproyecto', 'presentacion_anteproyecto', 'desarrollo', 'presentacion_final'];
+const PHASE_LABELS: Record<string, string> = {
+    anteproyecto: 'Anteproyecto',
+    presentacion_anteproyecto: 'Presentación Anteproyecto',
+    desarrollo: 'Desarrollo del proyecto',
+    presentacion_final: 'Presentación Final',
 };
 
 const statusConfig: Record<string, { label: string; variant: 'success' | 'warning' | 'error' | 'info' | 'inactivo' }> = {
@@ -162,6 +169,12 @@ export default function SupervisionReadOnly({ projectCode, projectTitle, project
         ? (PHASE_STEP_MAP[displayProject.currentPhase] ?? 2)
         : 3;
 
+    const allPhases: PhaseStep[] = PHASE_IDS.map((id, idx) => ({
+        id,
+        label: PHASE_LABELS[id],
+        status: idx < currentStep ? 'done' : idx === currentStep ? 'current' : 'future',
+    }));
+
     return (
         <div className="flex flex-col gap-6">
             <PageHeader
@@ -265,53 +278,13 @@ export default function SupervisionReadOnly({ projectCode, projectTitle, project
                         </div>
                     </div>
 
-                    {/* Stepper */}
-                    <div className="rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
-                        <h3 className="mb-5 text-base font-bold text-[#1c1917]">Progreso del Proyecto</h3>
-                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center">
-                            {STEP_LABELS.map((label, idx) => {
-                                const isCompleted = idx < currentStep;
-                                const isCurrent = idx === currentStep;
-                                return (
-                                    <div key={idx} className="flex items-center sm:flex-1">
-                                        <div className="flex items-center gap-2 sm:flex-col sm:items-center sm:gap-1">
-                                            <div
-                                                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-colors ${
-                                                    isCompleted
-                                                        ? 'bg-[#c2410c] text-white'
-                                                        : isCurrent
-                                                            ? 'border-2 border-[#c2410c] bg-white text-[#c2410c]'
-                                                            : 'border-2 border-[#e5e5e5] bg-white text-[#78716c]'
-                                                }`}
-                                            >
-                                                {isCompleted ? (
-                                                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                                        <polyline points="20 6 9 17 4 12" />
-                                                    </svg>
-                                                ) : (
-                                                    idx + 1
-                                                )}
-                                            </div>
-                                            <span
-                                                className={`text-xs font-semibold whitespace-nowrap ${
-                                                    isCurrent ? 'text-[#c2410c]' : 'text-[#78716c]'
-                                                }`}
-                                            >
-                                                {label}
-                                            </span>
-                                        </div>
-                                        {idx < STEP_LABELS.length - 1 && (
-                                            <div
-                                                className={`mx-3 h-px flex-1 sm:mb-6 ${
-                                                    idx < currentStep ? 'bg-[#c2410c]' : 'bg-[#e5e5e5]'
-                                                }`}
-                                            />
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
+                    <PhaseStepper
+                        phases={allPhases}
+                        selectedPhaseId={PHASE_IDS[currentStep]}
+                        onSelectPhase={() => {}}
+                        deliveryCountByPhase={() => 0}
+                        title="Progreso del Proyecto"
+                    />
 
                     {/* Read-only Deliveries */}
                     <div className="rounded-xl border border-[#e5e5e5] bg-white shadow-[0_1px_2px_rgba(28,25,23,0.05)]">

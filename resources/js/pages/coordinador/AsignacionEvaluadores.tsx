@@ -123,8 +123,8 @@ function EditModal({
                             onChange={(e) => setFase(e.target.value as 'Anteproyecto' | 'Final')}
                             className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
                         >
-                            <option value="Anteproyecto">Anteproyecto</option>
-                            <option value="Final">Evaluación Final</option>
+                            <option value="Anteproyecto">Presentación Anteproyecto</option>
+                            <option value="Final">Presentación Final</option>
                         </select>
                     </div>
 
@@ -417,7 +417,7 @@ export default function AsignacionEvaluadores() {
             label: 'Fase',
             render: (row) => (
                 <StatusBadge variant={row.fase === 'Final' ? 'info' : 'en-curso'}>
-                    {row.fase === 'Final' ? 'Evaluación Final' : 'Anteproyecto'}
+                    {row.fase === 'Final' ? 'Presentación Final' : 'Presentación Anteproyecto'}
                 </StatusBadge>
             ),
         },
@@ -558,7 +558,7 @@ export default function AsignacionEvaluadores() {
                                         onChange={() => setFormFase('Anteproyecto')}
                                         className="accent-[#c2410c]"
                                     />
-                                    Anteproyecto
+                                    Presentación Anteproyecto
                                 </label>
                                 <label className="flex items-center gap-2 text-sm text-[#1c1917] cursor-pointer">
                                     <input
@@ -569,7 +569,7 @@ export default function AsignacionEvaluadores() {
                                         onChange={() => setFormFase('Final')}
                                         className="accent-[#c2410c]"
                                     />
-                                    Evaluación Final
+                                    Presentación Final
                                 </label>
                             </div>
                         </div>

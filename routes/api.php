@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\EntregaController;
 use App\Http\Controllers\Admin\ProyectoController;
 use App\Http\Controllers\Admin\SemestreController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Api\DirectorController;
 use App\Http\Controllers\Auth\AuthController;
 use Illuminate\Support\Facades\Route;
 
@@ -51,7 +52,6 @@ Route::middleware([
     'auth:sanctum',
     'single_session',
     'activity',
-    'ensure_password_changed',
 ])->group(function () {
     Route::get('/auth/user', [AuthController::class, 'sessionCheck'])
         ->name('auth.user');
@@ -132,11 +132,26 @@ Route::middleware([
         ->name('notificaciones.no-leidas');
     Route::put('/notificaciones/{notificacion}/leer', [\App\Http\Controllers\Api\NotificacionController::class, 'marcarLeida'])
         ->name('notificaciones.leer');
+
+    // Director dashboard endpoints
+    Route::prefix('director')->name('director.')->group(function () {
+        Route::get('/proyectos', [DirectorController::class, 'proyectos']);
+        Route::get('/proyectos/{id}/bitacoras', [DirectorController::class, 'bitacoras'])
+            ->whereNumber('id');
+        Route::get('/proyectos/{id}', [DirectorController::class, 'proyectoDetalle'])
+            ->whereNumber('id');
+        Route::get('/kpis', [DirectorController::class, 'kpis']);
+        Route::get('/entregas', [DirectorController::class, 'entregas']);
+        // PR 3 — Evaluaciones
+        Route::get('/evaluaciones', [DirectorController::class, 'evaluaciones']);
+        Route::get('/proyectos/{proyecto}/entrega-fase', [DirectorController::class, 'entregaFase'])
+            ->whereNumber('proyecto');
+    });
 });
 
 // -- admin (coordinador-only) routes ---------------------------------
 
-Route::middleware(['auth:sanctum', 'single_session', 'activity', 'ensure_password_changed', 'role:Coordinador'])
+Route::middleware(['auth:sanctum', 'single_session', 'activity', 'role:Coordinador'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
@@ -241,6 +256,9 @@ Route::middleware(['auth:sanctum', 'single_session', 'activity'])
             ->name('entregas.finales');
         Route::get('/entregas', [EntregaController::class, 'index'])
             ->name('entregas.index');
+        Route::get('/entregas/{id}', [EntregaController::class, 'show'])
+            ->whereNumber('id')
+            ->name('entregas.show');
         Route::post('/entregas', [EntregaController::class, 'store'])
             ->name('entregas.store');
         Route::put('/entregas/{id}/revisar', [EntregaController::class, 'revisar'])

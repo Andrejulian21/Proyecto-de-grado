@@ -155,7 +155,7 @@ it('al revisar entrega se genera notificacion para el estudiante', function () {
     $this->actingAs($this->director)
         ->putJson("/api/admin/entregas/{$entrega->id}/revisar", [
             'status' => 'aprobada',
-            'consolidated_grade' => 90.0,
+            'consolidated_grade' => 4.5,
             'director_notes' => 'Buen trabajo',
         ]);
 

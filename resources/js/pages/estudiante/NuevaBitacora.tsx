@@ -8,6 +8,7 @@ export default function NuevaBitacora() {
     const navigate = useNavigate();
 
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [time, setTime] = useState('12:00');
     const [topic, setTopic] = useState('');
     const [description, setDescription] = useState('');
     const [duration, setDuration] = useState('1');
@@ -43,7 +44,7 @@ export default function NuevaBitacora() {
                     proyecto_id: proyectoId,
                     topic: topic.trim(),
                     notes: description.trim(),
-                    meeting_date: date,
+                    meeting_date: `${date}T${time}:00`,
                     duration_hours: parseFloat(duration),
                 }),
             });
@@ -107,6 +108,20 @@ export default function NuevaBitacora() {
                                 type="date"
                                 value={date}
                                 onChange={(e) => setDate(e.target.value)}
+                                className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                required
+                            />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                            <label htmlFor="binnacle-time" className="text-sm font-semibold text-[#1c1917]">
+                                Hora <span className="text-[#dc2626]">*</span>
+                            </label>
+                            <input
+                                id="binnacle-time"
+                                type="time"
+                                value={time}
+                                onChange={(e) => setTime(e.target.value)}
                                 className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
                                 required
                             />

@@ -141,6 +141,29 @@ class BitacoraController extends Controller
         }
 
         if ($currentStatus === EstadoFirma::Pendiente->value) {
+            // T-009: Director can sign directly from Pendiente → Completada
+            if ($proyecto->director_id === $user->id) {
+                $bitacora->update([
+                    'signature_status' => EstadoFirma::Completada->value,
+                    'director_signed_at' => now(),
+                ]);
+
+                // Notificar a los estudiantes del proyecto
+                $estudiantes = $proyecto->estudiantes()->pluck('user_id');
+                foreach ($estudiantes as $estudianteId) {
+                    Notificacion::create([
+                        'user_id' => $estudianteId,
+                        'sender_id' => $user->id,
+                        'type' => 'bitacora.completada',
+                        'title' => 'Bitácora completada por director',
+                        'content' => "El director ha completado la firma de la bitácora '{$bitacora->topic}'.",
+                        'sent_at' => now(),
+                    ]);
+                }
+
+                return response()->json(['data' => $bitacora->fresh()]);
+            }
+
             // Only a student of this project can sign from Pendiente
             $esEstudiante = $proyecto->estudiantes()
                 ->where('user_id', $user->id)

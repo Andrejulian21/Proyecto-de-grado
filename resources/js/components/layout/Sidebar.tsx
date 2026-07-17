@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import {
     LayoutDashboard,
@@ -36,17 +36,14 @@ const navConfig: Record<string, { to: string; icon: typeof LayoutDashboard; labe
         { to: '/recursos/admin', label: 'Recursos Admin', icon: FolderKanban },
     ],
     Director: [
-        { to: '/', label: 'Panel', icon: LayoutDashboard },
-        { to: '/supervision/:proyectoId', label: 'Supervisión', icon: FolderKanban },
-        { to: '/bitacoras', label: 'Bitácoras', icon: ScrollText },
-        { to: '/bitacoras/proyectos', label: 'Bitácoras Proyectos', icon: ScrollText },
+        { to: '/dashboard/director', label: 'Panel', icon: LayoutDashboard },
+        { to: '/supervision', label: 'Supervisión', icon: FolderKanban },
         { to: '/evaluaciones', label: 'Evaluaciones', icon: ClipboardCheck },
         { to: '/anuncios', label: 'Anuncios', icon: Megaphone },
         { to: '/recursos', label: 'Recursos', icon: FolderKanban },
     ],
     Estudiante: [
-        { to: '/', label: 'Panel', icon: LayoutDashboard },
-        { to: '/mi-proyecto', label: 'Mi Proyecto', icon: GraduationCap },
+        { to: '/dashboard/estudiante', label: 'Mi Proyecto', icon: GraduationCap },
         { to: '/bitacora', label: 'Bitácora', icon: ScrollText },
         { to: '/anuncios', label: 'Anuncios', icon: Megaphone },
         { to: '/recursos', label: 'Recursos', icon: FolderKanban },
@@ -63,6 +60,7 @@ const navConfig: Record<string, { to: string; icon: typeof LayoutDashboard; labe
 
 export function Sidebar({ open, onClose }: SidebarProps) {
     const { role } = useAuth();
+    const location = useLocation();
     const isCoordinator = role === 'Coordinador';
     const items = navConfig[role ?? ''] ?? navConfig.EvaluadorExterno;
 
@@ -104,30 +102,33 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
                 <nav className="flex-1 overflow-y-auto p-3" aria-label="Secciones">
                     <ul className="space-y-1">
-                        {items.map((item) => (
-                            <li key={item.to}>
-                                <NavLink
-                                    to={item.to}
-                                    end={['/', '/dashboard/coordinador', '/anuncios', '/anuncios/admin'].includes(item.to)}
-                                    onClick={onClose}
-                                    className={({ isActive }) =>
-                                        cn(
-                                            'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150',
-                                            isCoordinator
-                                                ? isActive
-                                                    ? 'bg-primary/20 text-primary-container'
-                                                    : 'text-white/70 hover:bg-white/10 hover:text-white'
-                                                : isActive
-                                                    ? 'bg-primary-container text-primary-on-container'
-                                                    : 'text-text-muted hover:bg-surface-alt hover:text-text',
-                                        )
-                                    }
-                                >
-                                    <item.icon className="h-4 w-4 shrink-0" />
-                                    {item.label}
-                                </NavLink>
-                            </li>
-                        ))}
+                        {items.map((item) => {
+                            const isSupervisionActive = item.to === '/supervision' && location.pathname.startsWith('/bitacoras');
+                            return (
+                                <li key={item.to}>
+                                    <NavLink
+                                        to={item.to}
+                                        end={['/', '/dashboard/director', '/dashboard/estudiante', '/dashboard/coordinador', '/anuncios', '/anuncios/admin', '/evaluaciones'].includes(item.to)}
+                                        onClick={onClose}
+                                        className={({ isActive }) =>
+                                            cn(
+                                                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150',
+                                                isCoordinator
+                                                    ? (isActive || isSupervisionActive)
+                                                        ? 'bg-primary/20 text-primary-container'
+                                                        : 'text-white/70 hover:bg-white/10 hover:text-white'
+                                                    : (isActive || isSupervisionActive)
+                                                        ? 'bg-primary-container text-primary-on-container'
+                                                        : 'text-text-muted hover:bg-surface-alt hover:text-text',
+                                            )
+                                        }
+                                    >
+                                        <item.icon className="h-4 w-4 shrink-0" />
+                                        {item.label}
+                                    </NavLink>
+                                </li>
+                            );
+                        })}
                     </ul>
                 </nav>
 

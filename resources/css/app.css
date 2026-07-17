@@ -62,4 +62,9 @@
         @apply bg-[#fafaf9] text-[#1c1917] antialiased;
         font-family: 'Open Sans', system-ui, -apple-system, sans-serif;
     }
+
+    a {
+        color: inherit;
+        text-decoration: inherit;
+    }
 }

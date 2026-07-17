@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Eye, Pencil, FileText, Loader2, AlertTriangle } from 'lucide-react';
+import { Plus, Eye, FileText, Loader2, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, type Column } from '@/components/ui/DataTable';
@@ -56,64 +56,50 @@ function formatDate(d: string | undefined): string {
     return new Date(d).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-/* ── Columns ── */
+/* ── Main component ── */
 
-const columns: Column<Binnacle>[] = [
-    { key: 'date', label: 'Fecha', className: 'whitespace-nowrap' },
-    { key: 'topic', label: 'Tema' },
-    {
-        key: 'description',
-        label: 'Descripcion',
-        className: 'max-w-xs truncate',
-        render: (row) => (
-            <span className="block truncate text-[#57534e]" title={row.description}>
-                {row.description}
-            </span>
-        ),
-    },
-    { key: 'duration', label: 'Duracion', className: 'whitespace-nowrap' },
-    {
-        key: 'signatureStatus',
-        label: 'Estado firma',
-        render: (row) => {
-            const config = signatureConfig[row.signatureStatus];
-            return <StatusBadge variant={config.variant}>{config.label}</StatusBadge>;
+export default function BitacorasEstudiante() {
+    const navigate = useNavigate();
+    const columns: Column<Binnacle>[] = [
+        { key: 'date', label: 'Fecha', className: 'whitespace-nowrap' },
+        { key: 'topic', label: 'Tema' },
+        {
+            key: 'description',
+            label: 'Descripcion',
+            className: 'max-w-xs truncate',
+            render: (row) => (
+                <span className="block truncate text-[#57534e]" title={row.description}>
+                    {row.description}
+                </span>
+            ),
         },
-    },
-    {
-        key: 'actions',
-        label: 'Acciones',
-        className: 'text-right',
-        render: (row) => {
-            const isSigned = row.signatureStatus === 'signed';
-            return (
+        { key: 'duration', label: 'Duracion', className: 'whitespace-nowrap' },
+        {
+            key: 'signatureStatus',
+            label: 'Estado firma',
+            render: (row) => {
+                const config = signatureConfig[row.signatureStatus];
+                return <StatusBadge variant={config.variant}>{config.label}</StatusBadge>;
+            },
+        },
+        {
+            key: 'actions',
+            label: 'Acciones',
+            className: 'text-right',
+            render: (row) => (
                 <div className="inline-flex gap-0.5">
                     <button
+                        onClick={() => navigate(`/bitacora/${row.id}/revision`)}
                         className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#f5f5f4] hover:text-[#c2410c] active:scale-[0.98]"
                         aria-label={`Ver bitacora ${row.topic}`}
                         title="Ver"
                     >
                         <Eye className="h-4 w-4" />
                     </button>
-                    {!isSigned && (
-                        <button
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#f5f5f4] hover:text-[#c2410c] active:scale-[0.98]"
-                            aria-label={`Editar bitacora ${row.topic}`}
-                            title="Editar"
-                        >
-                            <Pencil className="h-4 w-4" />
-                        </button>
-                    )}
                 </div>
-            );
+            ),
         },
-    },
-];
-
-/* ── Main component ── */
-
-export default function BitacorasEstudiante() {
-    const navigate = useNavigate();
+    ];
     const [binnacles, setBinnacles] = useState<Binnacle[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);

@@ -164,7 +164,7 @@ export default function DetalleEntregaDirector() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     status: reviewStatus,
-                    consolidated_grade: parsedGrade !== null ? parsedGrade * 20 : null, // Convert 0-5 scale to 0-100
+                    consolidated_grade: parsedGrade, // Direct 0.0–5.0 scale (backend stores the same)
                     director_notes: directorNotes || null,
                 }),
             });
@@ -418,7 +418,7 @@ export default function DetalleEntregaDirector() {
                         </StatusBadge>
                         {delivery.consolidated_grade !== null && (
                             <p className="text-2xl font-bold tabular-nums text-[#1c1917]">
-                                {(delivery.consolidated_grade / 20).toFixed(1)}
+                                {delivery.consolidated_grade.toFixed(1)}
                                 <span className="text-lg text-[#78716c]">/5.0</span>
                             </p>
                         )}

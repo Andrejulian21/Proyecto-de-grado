@@ -3,12 +3,10 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { RevisionBitacoraView, type BitacoraDetail } from '@/components/bitacoras/RevisionBitacoraView';
 import { apiFetch } from '@/lib/utils';
-import { useAuth } from '@/hooks/useAuth';
 
-export default function RevisionBitacoraEstudiante() {
+export default function RevisionBitacoraCoordinador() {
     const navigate = useNavigate();
     const { id } = useParams<{ id: string }>();
-    const { user } = useAuth();
     const [bitacora, setBitacora] = useState<BitacoraDetail | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -31,8 +29,8 @@ export default function RevisionBitacoraEstudiante() {
                 const json = await res.json();
                 const b = json.data;
 
-                // Fetch project details (code, student names, director name)
-                const projRes = await apiFetch('/api/estudiante/proyecto');
+                // Fetch project details (code, student names)
+                const projRes = await apiFetch(`/api/admin/proyectos/${b.proyecto_id}`);
                 if (!projRes.ok) {
                     throw new Error('Error al cargar los datos del proyecto.');
                 }
@@ -82,7 +80,7 @@ export default function RevisionBitacoraEstudiante() {
         return () => {
             cancelled = true;
         };
-    }, [id, user?.name]);
+    }, [id]);
 
     if (loading) {
         return (
@@ -99,10 +97,10 @@ export default function RevisionBitacoraEstudiante() {
                 <p className="text-sm text-[#57534e]">{error ?? 'Bitácora no encontrada.'}</p>
                 <button
                     type="button"
-                    onClick={() => navigate('/bitacora')}
+                    onClick={() => navigate('/directores')}
                     className="text-sm font-semibold text-[#c2410c] hover:underline"
                 >
-                    Volver a bitácoras
+                    Volver a directores
                 </button>
             </div>
         );
@@ -110,25 +108,17 @@ export default function RevisionBitacoraEstudiante() {
 
     return (
         <RevisionBitacoraView
-            mode="student"
+            mode="director"
             bitacora={bitacora}
-            onBack={() => navigate('/bitacora')}
+            onBack={() => navigate(-1)}
             onSign={async () => {
-                // El estudiante no firma directamente; solo el director
-                throw new Error('Solo el director puede firmar la bitácora.');
+                // El coordinador no puede firmar — mostrar mensaje
+                throw new Error('Solo el director del proyecto puede firmar bitácoras.');
             }}
-            onSaveContent={(content: string, _weeklySummary: string) => {
-                apiFetch(`/api/bitacoras/${id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        notes: content,
-                        topic: _weeklySummary || undefined,
-                    }),
-                }).catch(() => {
-                    // Error silencioso — la UI actualiza localmente igual
-                });
+            onRemoveSignature={() => {
+                // No-op: coordinador no puede quitar firmas
             }}
+            disableSigning={true}
         />
     );
 }

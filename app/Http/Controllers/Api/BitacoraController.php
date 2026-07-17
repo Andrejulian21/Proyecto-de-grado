@@ -242,11 +242,17 @@ class BitacoraController extends Controller
             ->get()
             ->map(function ($bitacora) use ($proyecto) {
                 return [
-                    'id' => $bitacora->id,
-                    'fecha' => $bitacora->created_at->toISO8601String(),
-                    'contenido' => $bitacora->notes ?? '',
-                    'firmada' => $bitacora->signature_status->value === EstadoFirma::Completada->value,
-                    'director_name' => $proyecto->director?->name ?? 'Sin asignar',
+                    'id'               => $bitacora->id,
+                    'topic'            => $bitacora->topic,
+                    'notes'            => $bitacora->notes,
+                    'meeting_date'     => $bitacora->meeting_date?->toDateString(),
+                    'duration_hours'   => $bitacora->duration_hours,
+                    'signature_status' => $bitacora->signature_status?->value,
+                    'fecha'            => $bitacora->created_at->toISO8601String(),
+                    'contenido'        => $bitacora->notes ?? '',
+                    'firmada'          => $bitacora->signature_status->value === EstadoFirma::Completada->value,
+                    'director_name'    => $proyecto->director?->name ?? 'Sin asignar',
+                    'created_at'       => $bitacora->created_at->toISO8601String(),
                 ];
             });
 
@@ -314,6 +320,11 @@ class BitacoraController extends Controller
 
         if (! $proyecto) {
             return false;
+        }
+
+        // Coordinadores tienen acceso global
+        if ($user->role->value === 'Coordinador') {
+            return true;
         }
 
         if ($proyecto->director_id === $user->id) {

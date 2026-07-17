@@ -70,7 +70,9 @@ export function useAlertas(): UseAlertasResult {
 
             // Regla 1: Bitácoras sin firmar > 1h desde creación
             for (const bit of bitacoras) {
+                if (!bit.created_at) continue;
                 const createdAt = new Date(bit.created_at);
+                if (isNaN(createdAt.getTime())) continue;
                 const diffMs = now.getTime() - createdAt.getTime();
                 const diffHours = diffMs / (1000 * 60 * 60);
 
@@ -96,8 +98,9 @@ export function useAlertas(): UseAlertasResult {
 
             // Regla 2: Entregas con deadline pasado y sin submission
             for (const ent of entregas) {
+                if (!ent.fecha_limite) continue;
                 const deadline = new Date(ent.fecha_limite);
-                if (deadline >= now) continue;
+                if (isNaN(deadline.getTime()) || deadline >= now) continue;
 
                 const hasSubmission =
                     ent.submission != null ||
@@ -127,6 +130,7 @@ export function useAlertas(): UseAlertasResult {
                 if (!signTime) continue;
 
                 const signDate = new Date(signTime);
+                if (isNaN(signDate.getTime())) continue;
                 const diffMs = now.getTime() - signDate.getTime();
                 if (diffMs > 60 * 60 * 1000) continue; // Only last 1h
 

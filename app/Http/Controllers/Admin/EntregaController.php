@@ -350,6 +350,7 @@ class EntregaController extends Controller
             'proyecto:id,code,title,director_id',
             'proyecto.estudiantes:id,name',
             'proyectos:id,code,title',
+            'proyectos.estudiantes:id,name',
             'semestre:id,name',
             'versiones' => fn ($q) => $q->orderByDesc('version_number'),
         ])->findOrFail($id);

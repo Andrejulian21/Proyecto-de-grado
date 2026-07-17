@@ -5,6 +5,7 @@ import { PhaseStepper, type PhaseStep } from '@/components/project/PhaseStepper'
 import {
     ArrowLeft, Award, User, FileText, Calendar, Clock,
     ChevronDown, ChevronRight, Loader2, AlertTriangle, RefreshCw,
+    Eye,
 } from 'lucide-react';
 import { useEffect, useState, useCallback } from 'react';
 import { apiFetch } from '@/lib/utils';
@@ -334,9 +335,16 @@ export default function SupervisionReadOnly({ projectCode, projectTitle, project
                                                     {/* Read-only: only "Ver entrega" button, no "Revisar" or signature controls */}
                                                     <div className="flex items-center gap-2">
                                                         <button
-                                                            className="inline-flex min-h-[36px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-white px-3 py-1.5 text-xs font-semibold text-[#1c1917] transition-colors hover:bg-[#f5f5f4] active:scale-[0.98]"
+                                                            onClick={() => {
+                                                                if (isRealData && projectId) {
+                                                                    navigate(`/directores/proyectos/${projectId}/entregas/${d.id}`);
+                                                                }
+                                                            }}
+                                                            className="inline-flex min-h-[36px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-white px-3 py-1.5 text-xs font-semibold text-[#1c1917] transition-colors hover:bg-[#f5f5f4] active:scale-[0.98] disabled:opacity-50"
                                                             aria-label={`Ver detalle de ${d.name}`}
+                                                            disabled={!isRealData || !projectId}
                                                         >
+                                                            <Eye className="h-3.5 w-3.5" />
                                                             Ver entrega
                                                         </button>
                                                     </div>

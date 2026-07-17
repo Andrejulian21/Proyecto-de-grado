@@ -47,6 +47,7 @@ export default function RevisionBitacoraDirector() {
                     id: b.id,
                     content: b.notes ?? '',
                     weeklySummary: '',
+                    topic: b.topic ?? '',
                     projectCode: project.code ?? '',
                     date: b.meeting_date ?? '',
                     createdAt: b.created_at ?? '',

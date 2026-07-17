@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { TOTPInput } from '@/components/ui/TOTPInput';
@@ -28,6 +29,7 @@ export interface BitacoraDetail {
     id: number;
     content: string;
     weeklySummary: string;
+    topic: string;
     projectCode: string;
     date: string;
     createdAt: string;
@@ -77,6 +79,7 @@ export interface RevisionBitacoraViewProps {
     onRemoveSignature?: () => void;
     onSaveContent?: (content: string, weeklySummary: string) => void;
     currentStudentName?: string;
+    disableSigning?: boolean;
 }
 
 export function RevisionBitacoraView({
@@ -87,6 +90,7 @@ export function RevisionBitacoraView({
     onRemoveSignature,
     onSaveContent,
     currentStudentName = 'Ana Martínez',
+    disableSigning = false,
 }: RevisionBitacoraViewProps) {
     const [bitacora, setBitacora] = useState(initialBitacora);
     const [content, setContent] = useState(bitacora.content);
@@ -335,8 +339,8 @@ export function RevisionBitacoraView({
                     </div>
                 </div>
 
-                {/* TOTP panel */}
-                <div className="lg:col-span-2">
+                {/* TOTP panel — hidden for coordinator */}
+                <div className={cn("lg:col-span-2", disableSigning && "hidden")}>
                     <div className="sticky top-20 rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                         <div className="mb-5 flex items-center gap-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e0e7ff]">

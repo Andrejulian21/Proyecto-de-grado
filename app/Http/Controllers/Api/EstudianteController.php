@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Entrega;
 use App\Models\Proyecto;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -29,9 +30,6 @@ class EstudianteController extends Controller
                 'director:id,name,email',
                 'estudiantes:id,name,email',
                 'semestre:id,name,is_active',
-                'entregas' => function ($q) {
-                    $q->orderBy('due_date')->with('versiones');
-                },
             ])
             ->first();
 
@@ -40,6 +38,14 @@ class EstudianteController extends Controller
                 'error' => 'No tienes un proyecto asignado.',
             ], 404);
         }
+
+        // Load ALL entregas: direct FK + pivot-linked, with versiones
+        $entregas = Entrega::paraProyecto($proyecto->id)
+            ->with('versiones')
+            ->orderBy('due_date')
+            ->get();
+
+        $proyecto->setRelation('entregas', $entregas);
 
         return response()->json(['data' => $proyecto]);
     }
@@ -64,7 +70,7 @@ class EstudianteController extends Controller
             ], 404);
         }
 
-        $entregas = $proyecto->entregas()
+        $entregas = Entrega::paraProyecto($proyecto->id)
             ->with('versiones')
             ->orderBy('due_date')
             ->get()
@@ -79,7 +85,7 @@ class EstudianteController extends Controller
                     'nota'             => $entrega->consolidated_grade,
                     'criterios'        => $entrega->acceptance_criteria,
                     'total_versiones'  => $entrega->versiones->count(),
-                    'ultima_version'   => $entrega->versiones->last()?->numero_version,
+                    'ultima_version'   => $entrega->versiones->last()?->version_number,
                 ];
             });
 

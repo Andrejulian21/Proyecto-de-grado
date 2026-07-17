@@ -39,11 +39,14 @@ const CoordinadorBitacoras = lazy(() => import('@/pages/coordinador/CoordinadorB
 const GestionAlertas = lazy(() => import('@/pages/coordinador/GestionAlertas'));
 const RecursosAdmin = lazy(() => import('@/pages/coordinador/RecursosAdmin'));
 const DirectoresPage = lazy(() => import('@/pages/coordinador/DirectoresPage'));
+const VerBitacorasCoordinador = lazy(() => import('@/pages/coordinador/VerBitacorasCoordinador'));
+const RevisionBitacoraCoordinador = lazy(() => import('@/pages/coordinador/RevisionBitacoraCoordinador'));
 const EvaluarProyecto = lazy(() => import('@/pages/evaluador/EvaluarProyecto'));
 const EvaluadorCalificar = lazy(() => import('@/pages/evaluador/EvaluadorCalificar'));
 const AnalisisAutomaticoEntregas = lazy(() => import('@/pages/estudiante/AnalisisAutomaticoEntregas'));
 const AsistenteOrientacion = lazy(() => import('@/pages/estudiante/AsistenteOrientacion'));
 const EvaluacionesDirector = lazy(() => import('@/pages/director/EvaluacionesDirector'));
+const DetalleEntregaCoordinador = lazy(() => import('@/pages/coordinador/DetalleEntregaCoordinador'));
 
 function SuspenseWrapper({ children }: { children: React.ReactNode }) {
     return (
@@ -133,6 +136,9 @@ function App() {
                                 {/* PR9: Coordinador proyectos */}
                                 <Route path="/proyectos" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><GestionProyectos /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/directores" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><DirectoresPage /></SuspenseWrapper></ProtectedRoute>} />
+                                <Route path="/directores/proyectos/:proyectoId/bitacoras" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><VerBitacorasCoordinador /></SuspenseWrapper></ProtectedRoute>} />
+                                <Route path="/directores/bitacoras/:id/revision" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><RevisionBitacoraCoordinador /></SuspenseWrapper></ProtectedRoute>} />
+                                <Route path="/directores/proyectos/:proyectoId/entregas/:entregaId" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><DetalleEntregaCoordinador /></SuspenseWrapper></ProtectedRoute>} />
                                 {/* PR10: Coordinador admin */}
                                 <Route path="/anuncios/admin" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><AnunciosAdmin /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/evaluadores" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><AsignacionEvaluadores /></SuspenseWrapper></ProtectedRoute>} />

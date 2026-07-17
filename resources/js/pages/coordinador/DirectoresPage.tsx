@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useDirectores, type Director, type DirectorProyecto, type Bitacora } from '@/hooks/useDirectores';
@@ -124,9 +125,10 @@ interface ProjectCardProps {
     proyecto: DirectorProyecto;
     mode: DrillMode;
     onSelect: (p: DirectorProyecto) => void;
+    onViewBitacora?: (p: DirectorProyecto) => void;
 }
 
-function ProjectCard({ proyecto, mode, onSelect }: ProjectCardProps) {
+function ProjectCard({ proyecto, mode, onSelect, onViewBitacora }: ProjectCardProps) {
     const isBitacoraMode = mode === 'bitacoras';
 
     return (
@@ -160,14 +162,26 @@ function ProjectCard({ proyecto, mode, onSelect }: ProjectCardProps) {
                             Bitácoras
                         </button>
                     ) : (
-                        <button
-                            onClick={() => onSelect(proyecto)}
-                            className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-[#e5e5e5] bg-white px-3 py-1.5 text-xs font-semibold text-[#1c1917] transition-colors hover:border-[#c2410c] hover:bg-[#fed7aa] hover:text-[#c2410c] active:scale-[0.98]"
-                            aria-label={`Ver supervisión de ${proyecto.title}`}
-                        >
-                            <ExternalLink className="h-3.5 w-3.5" />
-                            Supervisión
-                        </button>
+                        <>
+                            <button
+                                onClick={() => onSelect(proyecto)}
+                                className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-[#e5e5e5] bg-white px-3 py-1.5 text-xs font-semibold text-[#1c1917] transition-colors hover:border-[#c2410c] hover:bg-[#fed7aa] hover:text-[#c2410c] active:scale-[0.98]"
+                                aria-label={`Ver supervisión de ${proyecto.title}`}
+                            >
+                                <ExternalLink className="h-3.5 w-3.5" />
+                                Supervisión
+                            </button>
+                            {onViewBitacora && (
+                                <button
+                                    onClick={() => onViewBitacora(proyecto)}
+                                    className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-[#e5e5e5] bg-white px-3 py-1.5 text-xs font-semibold text-[#1c1917] transition-colors hover:border-[#4f46e5] hover:bg-[#e0e7ff] hover:text-[#4f46e5] active:scale-[0.98]"
+                                    aria-label={`Ver bitácora de ${proyecto.title}`}
+                                >
+                                    <ScrollText className="h-3.5 w-3.5" />
+                                    Ver Bitácora
+                                </button>
+                            )}
+                        </>
                     )}
                 </div>
             </div>
@@ -177,7 +191,7 @@ function ProjectCard({ proyecto, mode, onSelect }: ProjectCardProps) {
 
 /* ── Level 3: Bitácora List ── */
 
-function BitacoraItem({ bitacora }: { bitacora: Bitacora }) {
+function BitacoraItem({ bitacora, onViewDetail }: { bitacora: Bitacora; onViewDetail?: (id: number) => void }) {
     const [expanded, setExpanded] = useState(false);
 
     return (
@@ -212,7 +226,13 @@ function BitacoraItem({ bitacora }: { bitacora: Bitacora }) {
             </button>
             {expanded && (
                 <div className="border-t border-[#e5e5e5] bg-[#fafaf9] px-6 py-4">
-                    <p className="text-sm text-[#57534e] whitespace-pre-line">{bitacora.contenido}</p>
+                    <p className="text-sm text-[#57534e] whitespace-pre-line mb-3">{bitacora.contenido}</p>
+                    <button
+                        onClick={() => onViewDetail?.(bitacora.id)}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-primary-hover"
+                    >
+                        Ver detalle
+                    </button>
                 </div>
             )}
         </div>
@@ -222,6 +242,7 @@ function BitacoraItem({ bitacora }: { bitacora: Bitacora }) {
 /* ── Main Component ── */
 
 export default function DirectoresPage() {
+    const navigate = useNavigate();
     const {
         directores,
         loading,
@@ -271,6 +292,10 @@ export default function DirectoresPage() {
     function handleViewSupervision(proyecto: DirectorProyecto) {
         viewProyecto(proyecto);
         setNivel(3);
+    }
+
+    function handleViewBitacoraProyecto(proyecto: DirectorProyecto) {
+        navigate(`/directores/proyectos/${proyecto.id}/bitacoras`);
     }
 
     function handleBack() {
@@ -377,6 +402,7 @@ export default function DirectoresPage() {
                                     proyecto={proyecto}
                                     mode={drillMode}
                                     onSelect={drillMode === 'proyectos' ? handleViewSupervision : handleSelectProyecto}
+                                    onViewBitacora={drillMode === 'proyectos' ? handleViewBitacoraProyecto : undefined}
                                 />
                             ))}
                         </div>
@@ -407,7 +433,7 @@ export default function DirectoresPage() {
                             </div>
                             <div className="divide-y divide-[#e5e5e5]">
                                 {bitacoras.map((bitacora) => (
-                                    <BitacoraItem key={bitacora.id} bitacora={bitacora} />
+                                    <BitacoraItem key={bitacora.id} bitacora={bitacora} onViewDetail={(id) => navigate(`/directores/bitacoras/${id}/revision`)} />
                                 ))}
                             </div>
                         </div>

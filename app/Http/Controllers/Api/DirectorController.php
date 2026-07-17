@@ -47,7 +47,13 @@ class DirectorController extends Controller
 
         $proyectosSupervisando = $proyectoIds->count();
 
-        $entregasPendientes = Entrega::whereIn('proyecto_id', $proyectoIds)
+        $entregasPendientes = Entrega::where(function ($q) use ($proyectoIds) {
+                foreach ($proyectoIds as $pid) {
+                    $q->orWhere(function ($sq) use ($pid) {
+                        $sq->paraProyecto($pid);
+                    });
+                }
+            })
             ->where('status', 'enviada')
             ->count();
 
@@ -55,7 +61,13 @@ class DirectorController extends Controller
             ->where('status', 'en_riesgo')
             ->count();
 
-        $aprobadasMes = Entrega::whereIn('proyecto_id', $proyectoIds)
+        $aprobadasMes = Entrega::where(function ($q) use ($proyectoIds) {
+                foreach ($proyectoIds as $pid) {
+                    $q->orWhere(function ($sq) use ($pid) {
+                        $sq->paraProyecto($pid);
+                    });
+                }
+            })
             ->where('status', 'aprobada')
             ->whereMonth('created_at', now()->month)
             ->whereYear('created_at', now()->year)
@@ -85,24 +97,35 @@ class DirectorController extends Controller
             ->enSemestresActivos()
             ->pluck('id');
 
-        $entregas = Entrega::whereIn('proyecto_id', $proyectoIds)
+        $entregas = Entrega::where(function ($q) use ($proyectoIds) {
+                foreach ($proyectoIds as $pid) {
+                    $q->orWhere(function ($sq) use ($pid) {
+                        $sq->paraProyecto($pid);
+                    });
+                }
+            })
             ->where('status', 'enviada')
-            ->with('proyecto:id,code,title,director_id')
+            ->with([
+                'proyecto:id,code,title,director_id',
+                'proyectos:id,code,title',
+            ])
             ->orderBy('due_date', 'asc')
             ->take(20)
             ->get();
 
-        // Load students for all projects in one query to avoid N+1
+        // Load students for each project, handling both direct and pivot relations
         $entregas->load('proyecto.estudiantes:id,name');
+        $entregas->load('proyectos.estudiantes:id,name');
 
         $result = $entregas->map(function ($entrega) {
-            $primerEstudiante = $entrega->proyecto?->estudiantes->first();
+            $primerProyecto = $entrega->proyecto ?? $entrega->proyectos->first();
+            $primerEstudiante = $primerProyecto?->estudiantes->first();
 
             return [
                 'id'          => $entrega->id,
-                'proyecto_id' => $entrega->proyecto_id,
-                'codigo'      => $entrega->proyecto?->code,
-                'proyecto'    => $entrega->proyecto?->title,
+                'proyecto_id' => $primerProyecto?->id,
+                'codigo'      => $primerProyecto?->code,
+                'proyecto'    => $primerProyecto?->title,
                 'title'       => $entrega->title,
                 'estudiante'  => $primerEstudiante?->name ?? '—',
                 'due_date'    => $entrega->due_date?->toDateString(),
@@ -152,8 +175,14 @@ class DirectorController extends Controller
         $proyecto->load([
             'semestre',
             'estudiantes:id,name',
-            'entregas',
         ]);
+
+        // Load ALL entregas: direct FK + pivot-linked
+        $entregas = Entrega::paraProyecto($proyecto->id)
+            ->orderByDesc('due_date')
+            ->get();
+
+        $proyecto->setRelation('entregas', $entregas);
 
         return response()->json(['data' => $proyecto]);
     }

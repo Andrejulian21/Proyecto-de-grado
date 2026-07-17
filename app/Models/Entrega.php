@@ -25,6 +25,8 @@ class Entrega extends Model
         'title',
         'description',
         'due_date',
+        'start_date',
+        'start_time',
         'status',
         'consolidated_grade',
         'evaluation_complete',
@@ -39,6 +41,7 @@ class Entrega extends Model
         return [
             'status' => EstadoEntrega::class,
             'due_date' => 'date',
+            'start_date' => 'date',
             'consolidated_grade' => 'decimal:2',
             'evaluation_complete' => 'boolean',
         ];

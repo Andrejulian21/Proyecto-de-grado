@@ -70,6 +70,8 @@ export default function CoordinadorEntregas() {
     const [formTitulo, setFormTitulo] = useState('');
     const [formDesc, setFormDesc] = useState('');
     const [formFecha, setFormFecha] = useState('');
+    const [formFechaInicio, setFormFechaInicio] = useState('');
+    const [formHoraInicio, setFormHoraInicio] = useState('');
     const [formHora, setFormHora] = useState('');
     const [formCriterios, setFormCriterios] = useState('');
     const [createError, setCreateError] = useState<string | null>(null);
@@ -92,12 +94,16 @@ export default function CoordinadorEntregas() {
                     titulo: formTitulo.trim(),
                     descripcion: formDesc.trim(),
                     fecha_limite: formFecha,
+                    fecha_inicio: formFechaInicio || undefined,
+                    hora_inicio: formHoraInicio || undefined,
                     criterios: formCriterios.trim() || undefined,
                     hora_maxima: formHora || undefined,
                 });
                 setFormTitulo('');
                 setFormDesc('');
                 setFormFecha('');
+                setFormFechaInicio('');
+                setFormHoraInicio('');
                 setFormHora('');
                 setFormCriterios('');
                 setShowCreateForm(false);
@@ -113,6 +119,8 @@ export default function CoordinadorEntregas() {
     // ── Edit modal state ─────────────────────────────────────────
     const [editingEntrega, setEditingEntrega] = useState<Entrega | null>(null);
     const [editFecha, setEditFecha] = useState('');
+    const [editFechaInicio, setEditFechaInicio] = useState('');
+    const [editHoraInicio, setEditHoraInicio] = useState('');
     const [editTitulo, setEditTitulo] = useState('');
     const [editDesc, setEditDesc] = useState('');
     const [editHora, setEditHora] = useState('');
@@ -128,6 +136,12 @@ export default function CoordinadorEntregas() {
         } catch {
             setEditFecha('');
         }
+        try {
+            setEditFechaInicio(entrega.start_date ? new Date(entrega.start_date).toISOString().slice(0, 10) : '');
+        } catch {
+            setEditFechaInicio('');
+        }
+        setEditHoraInicio(entrega.start_time ?? '');
         setEditTitulo(entrega.title || '');
         setEditDesc(entrega.description || '');
         setEditHora(entrega.hora_maxima ?? '');
@@ -156,6 +170,8 @@ export default function CoordinadorEntregas() {
                 description: editDesc.trim(),
                 acceptance_criteria: editCriterios.trim() || null,
                 hora_maxima: editHora || null,
+                start_date: editFechaInicio || null,
+                start_time: editHoraInicio || null,
                 phase: editFase,
             };
             await actualizar(editingEntrega.id, payload);
@@ -359,6 +375,33 @@ export default function CoordinadorEntregas() {
                                 className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
                             />
                         </div>
+
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-sm font-semibold text-[#1c1917]">
+                                Fecha de inicio
+                            </label>
+                            <div className="relative">
+                                <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#78716c]" />
+                                <input
+                                    type="date"
+                                    value={formFechaInicio}
+                                    onChange={(e) => setFormFechaInicio(e.target.value)}
+                                    className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white pl-9 pr-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-sm font-semibold text-[#1c1917]">
+                                Hora de inicio
+                            </label>
+                            <input
+                                type="time"
+                                value={formHoraInicio}
+                                onChange={(e) => setFormHoraInicio(e.target.value)}
+                                className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                            />
+                        </div>
                     </div>
 
                     {createError && (
@@ -477,6 +520,17 @@ export default function CoordinadorEntregas() {
                                             <span>{formatDate(entrega.due_date)}</span>
                                         </div>
 
+                                        {/* Fecha de inicio */}
+                                        {entrega.start_date && (
+                                            <div className="flex items-center gap-2">
+                                                <Calendar className="h-3.5 w-3.5 shrink-0 text-[#78716c]" />
+                                                <span className="text-xs text-[#16a34a]">Inicia: {formatDate(entrega.start_date)}</span>
+                                                {entrega.start_time && (
+                                                    <span className="text-xs text-[#16a34a]">{entrega.start_time}</span>
+                                                )}
+                                            </div>
+                                        )}
+
                                         {/* Hora máxima */}
                                         {entrega.hora_maxima && (
                                             <div className="flex items-center gap-2">
@@ -567,8 +621,8 @@ export default function CoordinadorEntregas() {
             {/* ── Edit Modal ──────────────────────────────────── */}
             {editingEntrega && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-                    <div className="w-full max-w-lg rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-xl">
-                        <div className="mb-4 flex items-center justify-between">
+                    <div className="w-full max-w-2xl rounded-xl border border-[#e5e5e5] bg-white shadow-xl">
+                        <div className="mb-4 flex items-center justify-between px-6 pt-6">
                             <h3 className="text-base font-bold text-[#1c1917]">Editar Entrega</h3>
                             <button
                                 type="button"
@@ -580,7 +634,7 @@ export default function CoordinadorEntregas() {
                             </button>
                         </div>
 
-                        <div className="flex flex-col gap-4">
+                        <div className="flex flex-col gap-4 px-6 pb-6 max-h-[65vh] overflow-y-auto">
                             {/* Grupo (read-only) */}
                             <GroupSelector value={editGrupoId} onChange={() => {}} readonly error={undefined} />
 
@@ -673,43 +727,74 @@ export default function CoordinadorEntregas() {
                                     className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
                                 />
                             </div>
+
+                            {/* Fecha de inicio */}
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-sm font-semibold text-[#1c1917]">
+                                    Fecha de inicio
+                                </label>
+                                <div className="relative">
+                                    <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#78716c]" />
+                                    <input
+                                        type="date"
+                                        value={editFechaInicio}
+                                        onChange={(e) => setEditFechaInicio(e.target.value)}
+                                        className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white pl-9 pr-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Hora de inicio */}
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-sm font-semibold text-[#1c1917]">
+                                    Hora de inicio
+                                </label>
+                                <input
+                                    type="time"
+                                    value={editHoraInicio}
+                                    onChange={(e) => setEditHoraInicio(e.target.value)}
+                                    className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                />
+                            </div>
                         </div>
 
-                        {editError && (
-                            <div className="mt-3 flex items-center gap-2 rounded-lg bg-[#fee2e2] px-4 py-2 text-sm text-[#dc2626]">
-                                <AlertCircle className="h-4 w-4 shrink-0" />
-                                {editError}
-                            </div>
-                        )}
+                        <div className="border-t border-[#e5e5e5] px-6 py-4">
+                            {editError && (
+                                <div className="mb-3 flex items-center gap-2 rounded-lg bg-[#fee2e2] px-4 py-2 text-sm text-[#dc2626]">
+                                    <AlertCircle className="h-4 w-4 shrink-0" />
+                                    {editError}
+                                </div>
+                            )}
 
-                        {mutationError && !editError && (
-                            <div className="mt-3 flex items-center gap-2 rounded-lg bg-[#fee2e2] px-4 py-2 text-sm text-[#dc2626]">
-                                <AlertCircle className="h-4 w-4 shrink-0" />
-                                {mutationError}
-                            </div>
-                        )}
+                            {mutationError && !editError && (
+                                <div className="mb-3 flex items-center gap-2 rounded-lg bg-[#fee2e2] px-4 py-2 text-sm text-[#dc2626]">
+                                    <AlertCircle className="h-4 w-4 shrink-0" />
+                                    {mutationError}
+                                </div>
+                            )}
 
-                        <div className="mt-5 flex items-center gap-3">
-                            <button
-                                type="button"
-                                onClick={handleUpdate}
-                                disabled={mutationLoading}
-                                className="inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                                {mutationLoading ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                    <Pencil className="h-4 w-4" />
-                                )}
-                                Guardar Cambios
-                            </button>
-                            <button
-                                type="button"
-                                onClick={closeEditModal}
-                                className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-transparent px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:bg-[#f5f5f4]"
-                            >
-                                Cancelar
-                            </button>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={handleUpdate}
+                                    disabled={mutationLoading}
+                                    className="inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    {mutationLoading ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Pencil className="h-4 w-4" />
+                                    )}
+                                    Guardar Cambios
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={closeEditModal}
+                                    className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-transparent px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:bg-[#f5f5f4]"
+                                >
+                                    Cancelar
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

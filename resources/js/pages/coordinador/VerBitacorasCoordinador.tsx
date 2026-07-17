@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -38,6 +38,8 @@ const statusConfig: Record<string, { label: string; variant: 'success' | 'warnin
 export default function VerBitacorasCoordinador() {
     const navigate = useNavigate();
     const { proyectoId } = useParams<{ proyectoId: string }>();
+    const [searchParams] = useSearchParams();
+    const directorId = searchParams.get('directorId');
 
     const [bitacoras, setBitacoras] = useState<ProyectoBitacora[]>([]);
     const [proyecto, setProyecto] = useState<ProyectoSimple | null>(null);
@@ -180,7 +182,7 @@ export default function VerBitacorasCoordinador() {
                     title="Cargando..."
                     actions={
                         <button
-                            onClick={() => navigate('/directores')}
+                            onClick={() => navigate(`/directores?directorId=${directorId}`)}
                             className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-transparent px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:border-[#c2410c] hover:bg-[#fed7aa] hover:text-[#c2410c] active:scale-[0.98]"
                         >
                             <ArrowLeft className="h-4 w-4" />
@@ -188,7 +190,7 @@ export default function VerBitacorasCoordinador() {
                         </button>
                     }
                 />
-                <div className="flex flex-col items-center justify-center gap-4 py-16">
+                <div className="flex items-center justify-center py-16" role="status" aria-label="Cargando bitácoras">
                     <Loader2 className="h-8 w-8 animate-spin text-[#c2410c]" />
                     <p className="text-sm text-[#57534e]">Cargando bitácoras...</p>
                 </div>
@@ -206,7 +208,7 @@ export default function VerBitacorasCoordinador() {
                     subtitle="No se pudieron cargar las bitácoras"
                     actions={
                         <button
-                            onClick={() => navigate('/directores')}
+                            onClick={() => navigate(`/directores?directorId=${directorId}`)}
                             className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-transparent px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:border-[#c2410c] hover:bg-[#fed7aa] hover:text-[#c2410c] active:scale-[0.98]"
                         >
                             <ArrowLeft className="h-4 w-4" />
@@ -239,7 +241,7 @@ export default function VerBitacorasCoordinador() {
                 subtitle={`${bitacoras.length} bitácora${bitacoras.length !== 1 ? 's' : ''} registrada${bitacoras.length !== 1 ? 's' : ''}`}
                 actions={
                     <button
-                        onClick={() => navigate('/directores')}
+                        onClick={() => navigate(`/directores?directorId=${directorId}`)}
                         className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-transparent px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:border-[#c2410c] hover:bg-[#fed7aa] hover:text-[#c2410c] active:scale-[0.98]"
                     >
                         <ArrowLeft className="h-4 w-4" />

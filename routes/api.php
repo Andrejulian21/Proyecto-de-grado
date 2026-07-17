@@ -95,6 +95,10 @@ Route::middleware([
     Route::post('/entregas/{id}/versiones', [EntregaController::class, 'subirVersion'])
         ->whereNumber('id')
         ->name('entregas.subir_version');
+    Route::delete('/entregas/{entregaId}/versiones/{versionId}', [EntregaController::class, 'eliminarVersion'])
+        ->whereNumber('entregaId')
+        ->whereNumber('versionId')
+        ->name('entregas.eliminar_version');
 
     // Estudiante solicita habilitación para subir versiones
     Route::post('/entregas/{id}/solicitar', [EntregaController::class, 'solicitar'])

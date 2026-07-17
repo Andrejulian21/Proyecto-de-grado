@@ -195,7 +195,7 @@ export function RevisionBitacoraView({
         <div className="flex flex-col gap-6">
             <PageHeader
                 eyebrow="Bitácora"
-                title="Revisar Bitácora"
+                title={bitacora.topic || 'Revisar Bitácora'}
                 subtitle={`${bitacora.projectCode} · ${bitacora.date ? new Date(bitacora.date).toLocaleString('es-CO') : '—'}`}
                 actions={
                     <button

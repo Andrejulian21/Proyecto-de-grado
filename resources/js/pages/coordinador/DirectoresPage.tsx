@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useDirectores, type Director, type DirectorProyecto, type Bitacora } from '@/hooks/useDirectores';
@@ -72,11 +72,10 @@ function EmptyState({ icon: Icon, message }: { icon: React.ComponentType<{ class
 
 interface DirectorCardProps {
     director: Director;
-    onViewBitacoras: (d: Director) => void;
     onViewProyectos: (d: Director) => void;
 }
 
-function DirectorCard({ director, onViewBitacoras, onViewProyectos }: DirectorCardProps) {
+function DirectorCard({ director, onViewProyectos }: DirectorCardProps) {
     return (
         <div className="rounded-xl border border-[#e5e5e5] bg-white p-5 shadow-[0_1px_2px_rgba(28,25,23,0.05)] transition-shadow hover:shadow-[0_4px_12px_rgba(28,25,23,0.08)]">
             <div className="mb-3 flex items-center gap-3">
@@ -98,14 +97,6 @@ function DirectorCard({ director, onViewBitacoras, onViewProyectos }: DirectorCa
             )}
 
             <div className="flex gap-2">
-                <button
-                    onClick={() => onViewBitacoras(director)}
-                    className="inline-flex min-h-[36px] flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#e5e5e5] bg-white px-3 py-1.5 text-xs font-semibold text-[#1c1917] transition-colors hover:border-[#4f46e5] hover:bg-[#e0e7ff] hover:text-[#4f46e5] active:scale-[0.98]"
-                    aria-label={`Ver bitácoras de ${director.name}`}
-                >
-                    <ScrollText className="h-3.5 w-3.5" />
-                    Ver bitácoras
-                </button>
                 <button
                     onClick={() => onViewProyectos(director)}
                     className="inline-flex min-h-[36px] flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#e5e5e5] bg-white px-3 py-1.5 text-xs font-semibold text-[#1c1917] transition-colors hover:border-[#c2410c] hover:bg-[#fed7aa] hover:text-[#c2410c] active:scale-[0.98]"
@@ -243,6 +234,8 @@ function BitacoraItem({ bitacora, onViewDetail }: { bitacora: Bitacora; onViewDe
 
 export default function DirectoresPage() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const queryDirectorId = searchParams.get('directorId');
     const {
         directores,
         loading,
@@ -265,18 +258,41 @@ export default function DirectoresPage() {
 
     const [nivel, setNivel] = useState<NivelView>(1);
     const [drillMode, setDrillMode] = useState<DrillMode>(null);
+    const volverRef = useRef(false);
 
     useEffect(() => {
         fetchDirectores();
     }, [fetchDirectores]);
 
-    /* ── Navigation helpers ── */
+    const queryProyectoId = searchParams.get('proyectoId');
 
-    function handleViewBitacoras(director: Director) {
-        setDrillMode('bitacoras');
-        selectDirector(director);
-        setNivel(2);
-    }
+    // Auto-select director from query param (e.g., coming back from entregas)
+    useEffect(() => {
+        if (volverRef.current) {
+            volverRef.current = false;
+            return;
+        }
+        if (queryDirectorId && directores.length > 0 && !selectedDirector) {
+            const dir = directores.find((d) => String(d.id) === queryDirectorId);
+            if (dir) {
+                selectDirector(dir);
+                setDrillMode('proyectos');
+                setNivel(queryProyectoId ? 3 : 2);
+            }
+        }
+    }, [queryDirectorId, directores, selectedDirector, selectDirector, queryProyectoId]);
+
+    // Auto-drill to supervision when proyectos load and queryProyectoId is set
+    useEffect(() => {
+        if (queryProyectoId && selectedDirector && proyectos.length > 0 && !selectedProyecto) {
+            const proy = proyectos.find((p) => String(p.id) === queryProyectoId);
+            if (proy) {
+                viewProyecto(proy);
+            }
+        }
+    }, [queryProyectoId, selectedDirector, proyectos, selectedProyecto, viewProyecto]);
+
+    /* ── Navigation helpers ── */
 
     function handleViewProyectos(director: Director) {
         setDrillMode('proyectos');
@@ -295,16 +311,22 @@ export default function DirectoresPage() {
     }
 
     function handleViewBitacoraProyecto(proyecto: DirectorProyecto) {
-        navigate(`/directores/proyectos/${proyecto.id}/bitacoras`);
+        const directorId = selectedDirector?.id ?? '';
+        navigate(`/directores/proyectos/${proyecto.id}/bitacoras?directorId=${directorId}`);
     }
 
     function handleBack() {
+        volverRef.current = true;
         if (nivel === 3) {
             setNivel(2);
             clearProyecto();
+            if (queryDirectorId) {
+                navigate(`/directores?directorId=${queryDirectorId}`, { replace: true });
+            }
         } else if (nivel === 2) {
             setNivel(1);
             reset();
+            navigate('/directores', { replace: true });
         }
     }
 
@@ -374,7 +396,6 @@ export default function DirectoresPage() {
                                 <DirectorCard
                                     key={director.id}
                                     director={director}
-                                    onViewBitacoras={handleViewBitacoras}
                                     onViewProyectos={handleViewProyectos}
                                 />
                             ))}
@@ -447,6 +468,7 @@ export default function DirectoresPage() {
                     projectTitle={selectedProyecto.title}
                     projectId={selectedProyecto.id}
                     onBack={handleBack}
+                    directorId={selectedDirector?.id ?? undefined}
                 />
             )}
         </div>

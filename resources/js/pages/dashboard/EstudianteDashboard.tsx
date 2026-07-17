@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { GraduationCap, CloudUpload, User, AlertTriangle, Loader2, FileText } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { GraduationCap, User, AlertTriangle, Loader2, FileText, Eye } from 'lucide-react';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { PageHeader } from '@/components/ui/PageHeader';
 import DeliveryAccordion from '@/components/DeliveryAccordion';
@@ -34,10 +35,13 @@ function mapStatus(s: string | undefined): EntregaData['status'] {
     if (s === 'aprobada' || s === 'Aprobada') return 'approved';
     if (s === 'enviada' || s === 'Enviada') return 'enviada';
     if (s === 'pendiente' || s === 'Pendiente') return 'pending';
-    return 'locked';
+    // Any other status (creacion, solicitada, etc.) → pending, not locked
+    // Locked is determined by start_date in the detail view, not by status
+    return 'pending';
 }
 
 export default function EstudianteDashboard() {
+    const navigate = useNavigate();
     const [proyecto, setProyecto] = useState<any>(null);
     const [entregas, setEntregas] = useState<EntregaData[]>([]);
     const [loading, setLoading] = useState(true);
@@ -106,22 +110,30 @@ export default function EstudianteDashboard() {
                 onSelectPhase={setSelectedPhaseId}
                 deliveryCountByPhase={deliveryCountByPhase}
             />
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-                <div className="lg:col-span-2">
-                    <div className="flex h-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-[#d6d3d1] bg-white p-8 text-center transition-colors hover:border-[#c2410c] hover:bg-[#fff7ed]">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#f5f5f4]"><CloudUpload className="h-6 w-6 text-[#c2410c]" /></div>
-                        <span className="text-sm font-semibold text-[#1c1917]">Subir nueva entrega</span>
-                        <span className="text-xs text-[#78716c]">Arrastra tu archivo o haz clic para seleccionar</span>
-                        <button type="button" className="inline-flex items-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a]"><CloudUpload className="h-4 w-4" />Seleccionar archivo</button>
-                    </div>
+            <div className="flex flex-col gap-3">
+                    {(() => {
+                        const filtered = entregas.filter((e) => e.fase === activePhaseId);
+                        return <>
+                            <h3 className="text-sm font-bold uppercase tracking-[0.05em] text-[#57534e]">Entregas ({filtered.length})</h3>
+                            {filtered.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-[#e5e5e5] bg-white py-12 text-sm text-[#78716c]"><FileText className="h-8 w-8 text-[#d6d3d1]" />No hay entregas para esta fase.</div>
+                            ) : filtered.map((d) => (
+                                <div key={d.id} className="flex flex-col">
+                                    <DeliveryAccordion delivery={d} />
+                                    <div className="flex justify-end border-x border-b border-[#e5e5e5] rounded-b-xl bg-white px-4 pb-3 pt-0">
+                                        <button
+                                            onClick={() => navigate(`/estudiante/entregas/${d.id}`)}
+                                            className="inline-flex items-center gap-1.5 rounded-lg bg-[#c2410c] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#9a330a] active:scale-[0.98]"
+                                        >
+                                            <Eye className="h-3.5 w-3.5" />
+                                            Ver detalle
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </>;
+                    })()}
                 </div>
-                <div className="flex flex-col gap-3 lg:col-span-3">
-                    <h3 className="text-sm font-bold uppercase tracking-[0.05em] text-[#57534e]">Entregas ({entregas.length})</h3>
-                    {entregas.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-[#e5e5e5] bg-white py-12 text-sm text-[#78716c]"><FileText className="h-8 w-8 text-[#d6d3d1]" />No hay entregas registradas.</div>
-                    ) : entregas.map((d) => <DeliveryAccordion key={d.id} delivery={d} />)}
-                </div>
-            </div>
         </div>
     );
 }

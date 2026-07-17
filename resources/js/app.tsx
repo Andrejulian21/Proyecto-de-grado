@@ -151,6 +151,8 @@ function App() {
                                 {/* PR13: Evaluador */}
                                 <Route path="/evaluaciones/:id" element={<ProtectedRoute allowedRoles={['Director', 'EvaluadorExterno']}><SuspenseWrapper><EvaluarProyecto /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/evaluaciones/:id/calificar" element={<ProtectedRoute allowedRoles={['EvaluadorExterno']}><SuspenseWrapper><EvaluadorCalificar /></SuspenseWrapper></ProtectedRoute>} />
+                                {/* Estudiante detalle entrega */}
+                                <Route path="/estudiante/entregas/:entregaId" element={<ProtectedRoute allowedRoles={['Estudiante']}><SuspenseWrapper><DetalleEntregaEstudiante /></SuspenseWrapper></ProtectedRoute>} />
                                 {/* PR14: IA mock */}
                                 <Route path="/analisis-entregas" element={<ProtectedRoute allowedRoles={['Estudiante']}><SuspenseWrapper><AnalisisAutomaticoEntregas /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/asistente" element={<ProtectedRoute allowedRoles={['Estudiante']}><SuspenseWrapper><AsistenteOrientacion /></SuspenseWrapper></ProtectedRoute>} />

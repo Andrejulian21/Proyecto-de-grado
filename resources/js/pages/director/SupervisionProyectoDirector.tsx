@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { PhaseStepper, type PhaseStep } from '@/components/project/PhaseStepper';
 import { useDirectorProyectos, type DirectorProyecto } from '@/hooks/useDirectorProyectos';
 import { apiFetch } from '@/lib/utils';
 import {
@@ -18,6 +19,7 @@ interface ProjectDelivery {
     title: string;
     description?: string;
     due_date: string;
+    phase: string;
     status: string;
     grade?: string | number | null;
 }
@@ -241,6 +243,7 @@ function ProjectDetailView({ proyectoId }: { proyectoId: number }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [expandedDelivery, setExpandedDelivery] = useState<number | null>(null);
+    const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -329,6 +332,29 @@ function ProjectDetailView({ proyectoId }: { proyectoId: number }) {
 
     const estudianteName = project.estudiantes?.map((e) => e.name).join(', ') ?? '';
     const deliveries = project.entregas ?? [];
+
+    const PHASE_IDS = ['anteproyecto', 'presentacion_anteproyecto', 'desarrollo', 'presentacion_final'];
+    const PHASE_LABELS: Record<string, string> = {
+        anteproyecto: 'Anteproyecto',
+        presentacion_anteproyecto: 'Presentación Anteproyecto',
+        desarrollo: 'Desarrollo del proyecto',
+        presentacion_final: 'Presentación Final',
+    };
+    const PHASE_STEP_MAP: Record<string, number> = {
+        anteproyecto: 0,
+        presentacion_anteproyecto: 1,
+        desarrollo: 2,
+        presentacion_final: 3,
+    };
+    const currentStep = project.current_phase ? (PHASE_STEP_MAP[project.current_phase] ?? 0) : 0;
+    const allPhases: PhaseStep[] = PHASE_IDS.map((id, idx) => ({
+        id,
+        label: PHASE_LABELS[id],
+        status: idx < currentStep ? 'done' : idx === currentStep ? 'current' : 'future',
+    }));
+    const activePhaseId = selectedPhaseId ?? (project.current_phase ?? PHASE_IDS[0]);
+    const filteredDeliveries = deliveries.filter((d) => !activePhaseId || d.phase === activePhaseId);
+    const deliveryCountByPhase = (phaseId: string) => deliveries.filter((d) => d.phase === phaseId).length;
 
     return (
         <div className="flex flex-col gap-6">
@@ -424,20 +450,33 @@ function ProjectDetailView({ proyectoId }: { proyectoId: number }) {
                 )}
             </div>
 
+            {/* Phase Stepper */}
+            <PhaseStepper
+                phases={allPhases}
+                selectedPhaseId={activePhaseId}
+                onSelectPhase={setSelectedPhaseId}
+                deliveryCountByPhase={deliveryCountByPhase}
+                title="Progreso del Proyecto"
+            />
+
             {/* Deliveries */}
             <div className="rounded-xl border border-[#e5e5e5] bg-white shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                 <div className="border-b border-[#e5e5e5] px-6 py-4">
-                    <h3 className="text-base font-bold text-[#1c1917]">Entregas</h3>
+                    <h3 className="text-base font-bold text-[#1c1917]">Entregas ({filteredDeliveries.length})</h3>
                 </div>
 
-                {deliveries.length === 0 ? (
+                {filteredDeliveries.length === 0 ? (
                     <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
                         <FileText className="h-8 w-8 text-[#78716c]" />
-                        <p className="text-sm text-[#57534e]">Este proyecto aún no tiene entregas registradas.</p>
+                        <p className="text-sm text-[#57534e]">
+                            {deliveries.length === 0
+                                ? 'Este proyecto aún no tiene entregas registradas.'
+                                : 'No hay entregas para esta fase.'}
+                        </p>
                     </div>
                 ) : (
                     <div className="divide-y divide-[#e5e5e5]">
-                        {deliveries.map((d) => {
+                        {filteredDeliveries.map((d) => {
                             const config = deliveryStatusConfig[d.status] ?? deliveryStatusConfig.pending;
                             const isExpanded = expandedDelivery === d.id;
                             return (

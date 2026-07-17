@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import {
     ArrowLeft, Download, FileText, Calendar, Loader2,
     AlertTriangle, User, MessageSquareText, Star,
-    CheckCircle2, XCircle, Clock,
+    CheckCircle2, XCircle, Clock, Eye, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
 
@@ -29,6 +29,10 @@ interface EntregaDetail {
     status: string;
     description: string | null;
     due_date: string | null;
+    start_date: string | null;
+    start_time: string | null;
+    hora_maxima: string | null;
+    acceptance_criteria: string | null;
     consolidated_grade: string | number | null;
     evaluation_complete: boolean;
     proyecto?: {
@@ -44,15 +48,15 @@ interface EntregaDetail {
 /* ── Helpers ── */
 
 const STATUS_MAP: Record<string, { label: string; variant: 'success' | 'warning' | 'error' | 'info' | 'inactivo' }> = {
-    aprobada: { label: 'Aprobado', variant: 'success' },
-    aprobado: { label: 'Aprobado', variant: 'success' },
-    rechazada: { label: 'Rechazado', variant: 'error' },
-    rechazado: { label: 'Rechazado', variant: 'error' },
-    revisada: { label: 'Correcciones', variant: 'warning' },
-    enviada: { label: 'Enviada', variant: 'info' },
-    pendiente: { label: 'Pendiente', variant: 'warning' },
-    solicitada: { label: 'Solicitada', variant: 'info' },
-    creacion: { label: 'Creada', variant: 'inactivo' },
+    aprobada: { label: 'Aprobada', variant: 'success' },
+    aprobado: { label: 'Aprobada', variant: 'success' },
+    rechazada: { label: 'Necesita ajustes', variant: 'warning' },
+    rechazado: { label: 'Necesita ajustes', variant: 'warning' },
+    revisada: { label: 'Necesita ajustes', variant: 'warning' },
+    enviada: { label: 'Sin revisar', variant: 'warning' },
+    pendiente: { label: 'Sin revisar', variant: 'warning' },
+    solicitada: { label: 'Sin entregar', variant: 'inactivo' },
+    creacion: { label: 'Sin entregar', variant: 'inactivo' },
 };
 
 function statusConfig(status: string) {
@@ -86,15 +90,52 @@ function getDownloadUrl(filePath: string): string {
     return `/storage/${filePath}`;
 }
 
+/* ── Internos ── */
+
+function formatDateShort(dateStr: string | null | undefined): string {
+    if (!dateStr) return '—';
+    try {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('es-CO', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+        });
+    } catch {
+        return dateStr;
+    }
+}
+
+function getReviewStatus(
+    version: Version,
+    entregaStatus: string,
+): { label: string; variant: 'success' | 'warning' | 'info' } {
+    const hasNotes = version.director_notes && version.director_notes.trim().length > 0;
+    if (!hasNotes) {
+        return { label: 'Sin revisar', variant: 'warning' };
+    }
+    if (entregaStatus === 'aprobada' || entregaStatus === 'aprobado') {
+        return { label: 'Aprobada', variant: 'success' };
+    }
+    return { label: 'Necesita ajustes', variant: 'warning' };
+}
+
+function isPdfUrl(filePath: string): boolean {
+    return filePath.toLowerCase().endsWith('.pdf');
+}
+
 /* ── Component ── */
 
 export default function DetalleEntregaCoordinador() {
     const { proyectoId, entregaId } = useParams<{ proyectoId: string; entregaId: string }>();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const directorId = searchParams.get('directorId');
 
     const [entrega, setEntrega] = useState<EntregaDetail | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [selectedVersionIdx, setSelectedVersionIdx] = useState(0);
 
     useEffect(() => {
         if (!entregaId) return;
@@ -124,6 +165,11 @@ export default function DetalleEntregaCoordinador() {
         return () => { cancelled = true; };
     }, [entregaId]);
 
+    // Reset version index when entrega changes (e.g., new data load)
+    useEffect(() => {
+        setSelectedVersionIdx(0);
+    }, [entrega?.id]);
+
     /* ── Loading state ── */
     if (loading) {
         return (
@@ -140,7 +186,7 @@ export default function DetalleEntregaCoordinador() {
                 <AlertTriangle className="h-10 w-10 text-[#dc2626]" />
                 <p className="text-sm text-[#dc2626]">{error ?? 'No se encontró la entrega.'}</p>
                 <button
-                    onClick={() => navigate(-1)}
+                    onClick={() => navigate(directorId ? `/directores?directorId=${directorId}&proyectoId=${proyectoId}` : -1)}
                     className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-white px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:bg-[#f5f5f4]"
                 >
                     <ArrowLeft className="h-4 w-4" />
@@ -151,8 +197,21 @@ export default function DetalleEntregaCoordinador() {
     }
 
     const statusCfg = statusConfig(entrega.status);
-    const latestVersion: Version | undefined = entrega.versiones?.[0];
-    const projectCode = entrega.proyecto?.code ?? '—';
+    // Use direct FK proyecto, or look up by proyectoId from the URL in the pivot list
+    const proyectoDesdeUrl = proyectoId
+        ? (entrega.proyectos ?? []).find((p) => String(p.id) === proyectoId)
+        : null;
+    const mainProyecto = entrega.proyecto ?? proyectoDesdeUrl ?? (entrega.proyectos?.[0] ?? null);
+    const projectCode = mainProyecto?.code ?? '';
+    const projectTitle = mainProyecto?.title ?? '';
+
+    // Sort versions descending by version_number (most recent first)
+    const sortedVersions = [...(entrega.versiones ?? [])].sort(
+        (a, b) => b.version_number - a.version_number,
+    );
+
+    const safeVersionIdx = Math.min(selectedVersionIdx, Math.max(0, sortedVersions.length - 1));
+    const selectedVersion: Version | null = sortedVersions[safeVersionIdx] ?? null;
 
     const phaseLabels: Record<string, string> = {
         anteproyecto: 'Anteproyecto',
@@ -163,14 +222,14 @@ export default function DetalleEntregaCoordinador() {
 
     return (
         <div className="flex flex-col gap-6">
-            {/* Header */}
+            {/* ── Header ── */}
             <PageHeader
                 eyebrow="Detalle de Entrega"
                 title={entrega.title}
-                subtitle={`${projectCode} · ${phaseLabels[entrega.phase] ?? entrega.phase}`}
+                subtitle={projectCode ? `${projectCode} · ${phaseLabels[entrega.phase] ?? entrega.phase}` : phaseLabels[entrega.phase] ?? entrega.phase}
                 actions={
                     <button
-                        onClick={() => navigate(-1)}
+                        onClick={() => navigate(directorId ? `/directores?directorId=${directorId}&proyectoId=${proyectoId}` : -1)}
                         className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-transparent px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:border-[#c2410c] hover:bg-[#fed7aa] hover:text-[#c2410c] active:scale-[0.98]"
                     >
                         <ArrowLeft className="h-4 w-4" />
@@ -179,124 +238,198 @@ export default function DetalleEntregaCoordinador() {
                 }
             />
 
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-                {/* Main column: versions table */}
-                <div className="lg:col-span-3 flex flex-col gap-6">
-                    {/* Versions card */}
-                    <div className="rounded-xl border border-[#e5e5e5] bg-white shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
-                        <div className="border-b border-[#e5e5e5] px-6 py-4">
-                            <div className="flex items-center gap-2">
-                                <FileText className="h-5 w-5 text-[#c2410c]" />
-                                <h3 className="text-base font-bold text-[#1c1917]">Versiones del Documento</h3>
+            {/* ── Full width layout ── */}
+            <div className="flex flex-col gap-6">
+
+                    {/* ── A. Info de la entrega (metadata cards) ── */}
+                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                        {/* Fecha de inicio */}
+                        {(entrega.start_date || entrega.start_time) && (
+                            <div className="rounded-xl border border-[#e5e5e5] bg-white p-4 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
+                                <p className="text-xs text-[#78716c]">Fecha de inicio</p>
+                                <p className="mt-1 text-sm font-semibold text-[#1c1917]">
+                                    {entrega.start_date ? formatDateShort(entrega.start_date) : '—'}
+                                    {entrega.start_time && (
+                                        <span className="ml-1 font-normal text-[#57534e]">
+                                            · {entrega.start_time}
+                                        </span>
+                                    )}
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Fecha límite */}
+                        {entrega.due_date && (
+                            <div className="rounded-xl border border-[#e5e5e5] bg-white p-4 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
+                                <p className="text-xs text-[#78716c]">Fecha límite</p>
+                                <p className="mt-1 text-sm font-semibold text-[#1c1917]">
+                                    {formatDateShort(entrega.due_date)}
+                                    {entrega.hora_maxima && (
+                                        <span className="ml-1 font-normal text-[#57534e]">
+                                            · {entrega.hora_maxima}
+                                        </span>
+                                    )}
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Estado */}
+                        <div className="rounded-xl border border-[#e5e5e5] bg-white p-4 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
+                            <p className="text-xs text-[#78716c]">Estado</p>
+                            <div className="mt-1.5">
+                                <StatusBadge variant={statusCfg.variant}>{statusCfg.label}</StatusBadge>
                             </div>
                         </div>
 
-                        {entrega.versiones.length === 0 ? (
+                        {/* Proyecto */}
+                        <div className="rounded-xl border border-[#e5e5e5] bg-white p-4 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
+                            <p className="text-xs text-[#78716c]">Proyecto</p>
+                            <p className="mt-1 text-sm font-semibold text-[#1c1917] truncate" title={projectTitle}>
+                                {projectTitle || projectCode}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* ── B. Descripción ── */}
+                    {entrega.description && (
+                        <div className="rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
+                            <h3 className="mb-3 text-[11px] font-bold uppercase tracking-[0.05em] text-[#57534e]">
+                                Descripción
+                            </h3>
+                            <p className="text-sm leading-relaxed text-[#1c1917] whitespace-pre-wrap">
+                                {entrega.description}
+                            </p>
+                        </div>
+                    )}
+
+                    {/* ── C. Criterios de aceptación ── */}
+                    {entrega.acceptance_criteria && (
+                        <div className="rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
+                            <h3 className="mb-3 text-[11px] font-bold uppercase tracking-[0.05em] text-[#57534e]">
+                                Criterios de Aceptación
+                            </h3>
+                            <p className="text-sm leading-relaxed text-[#1c1917] whitespace-pre-wrap">
+                                {entrega.acceptance_criteria}
+                            </p>
+                        </div>
+                    )}
+
+                    {/* ── D. Documento / Versiones ── */}
+                    {sortedVersions.length > 0 && selectedVersion ? (
+                        <div className="rounded-xl border border-[#e5e5e5] bg-white shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
+                            {/* Header + version selector */}
+                            <div className="flex items-center justify-between border-b border-[#e5e5e5] px-6 py-4">
+                                <div className="flex items-center gap-2">
+                                    <FileText className="h-5 w-5 text-[#c2410c]" />
+                                    <h3 className="text-base font-bold text-[#1c1917]">Documento</h3>
+                                </div>
+
+                                {/* Selector de versiones */}
+                                {sortedVersions.length <= 4 ? (
+                                    <div className="flex items-center gap-1">
+                                        {sortedVersions.map((v, idx) => (
+                                            <button
+                                                key={v.id}
+                                                onClick={() => setSelectedVersionIdx(idx)}
+                                                className={`inline-flex min-h-[32px] items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                                    safeVersionIdx === idx
+                                                        ? 'bg-[#c2410c] text-white shadow-sm'
+                                                        : 'bg-[#f5f5f4] text-[#57534e] hover:bg-[#e7e5e4]'
+                                                }`}
+                                            >
+                                                v{v.version_number}
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <select
+                                        value={safeVersionIdx}
+                                        onChange={(e) => setSelectedVersionIdx(Number(e.target.value))}
+                                        className="rounded-lg border border-[#e5e5e5] bg-white px-3 py-1.5 text-xs font-semibold text-[#1c1917] focus:border-[#c2410c] focus:outline-none focus:ring-1 focus:ring-[#c2410c]"
+                                    >
+                                        {sortedVersions.map((v, idx) => (
+                                            <option key={v.id} value={idx}>
+                                                Versión {v.version_number}
+                                            </option>
+                                        ))}
+                                    </select>
+                                )}
+                            </div>
+
+                            {/* Body: document + observations */}
+                            <div className="p-6">
+                                <div className="grid grid-cols-1 gap-6 xl:grid-cols-[280px_1fr]">
+                                    {/* Documento */}
+                                    <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-[#e5e5e5] bg-[#fafaf9] py-16">
+                                        <FileText className="h-16 w-16 text-[#d6d3d1]" />
+                                        <div className="text-center">
+                                            <p className="text-sm font-semibold text-[#1c1917]">
+                                                {selectedVersion.original_name || `documento_v${selectedVersion.version_number}.pdf`}
+                                            </p>
+                                            <p className="mt-1 flex items-center justify-center gap-1 text-xs text-[#78716c]">
+                                                <Calendar className="h-3 w-3" />
+                                                {formatDate(selectedVersion.uploaded_at || selectedVersion.created_at)}
+                                            </p>
+                                        </div>
+                                        <a
+                                            href={getDownloadUrl(selectedVersion.file_path)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a]"
+                                        >
+                                            <Download className="h-4 w-4" />
+                                            Abrir documento
+                                        </a>
+                                    </div>
+
+                                    {/* Observaciones de esta versión */}
+                                    <div className="rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-4">
+                                        <div className="mb-3 flex items-center justify-between gap-2">
+                                            <span className="text-sm font-bold text-[#1c1917]">
+                                                Versión {selectedVersion.version_number}
+                                            </span>
+                                            <StatusBadge variant={getReviewStatus(selectedVersion, entrega.status).variant}>
+                                                {getReviewStatus(selectedVersion, entrega.status).label}
+                                            </StatusBadge>
+                                        </div>
+                                        <div className="mb-3 space-y-1">
+                                            <p className="flex items-center gap-1 text-xs text-[#78716c]">
+                                                <Calendar className="h-3 w-3" />
+                                                {formatDate(selectedVersion.uploaded_at || selectedVersion.created_at)}
+                                            </p>
+                                        </div>
+                                        {selectedVersion.director_notes ? (
+                                            <div className="rounded-md bg-white p-3">
+                                                <p className="whitespace-pre-wrap text-xs leading-relaxed text-[#1c1917]">
+                                                    {selectedVersion.director_notes}
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <p className="text-xs text-[#a8a29e] italic">
+                                                Sin observaciones del director.
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        /* Sin versiones */
+                        <div className="rounded-xl border border-[#e5e5e5] bg-white shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
+                            <div className="border-b border-[#e5e5e5] px-6 py-4">
+                                <div className="flex items-center gap-2">
+                                    <FileText className="h-5 w-5 text-[#c2410c]" />
+                                    <h3 className="text-base font-bold text-[#1c1917]">Documento</h3>
+                                </div>
+                            </div>
                             <div className="flex flex-col items-center gap-3 py-12 text-center text-sm text-[#a8a29e]">
                                 <FileText className="h-10 w-10 text-[#d6d3d1]" />
                                 <p>El estudiante aún no ha subido versiones para esta entrega.</p>
                             </div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left text-sm">
-                                    <thead className="bg-[#f5f5f4] text-[11px] font-bold uppercase tracking-[0.05em] text-[#57534e]">
-                                        <tr>
-                                            <th className="px-6 py-3">Versión</th>
-                                            <th className="px-6 py-3">Fecha de subida</th>
-                                            <th className="px-6 py-3">Archivo</th>
-                                            <th className="px-6 py-3">Tamaño</th>
-                                            <th className="px-6 py-3"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {entrega.versiones.map((v: Version) => (
-                                            <tr
-                                                key={v.id}
-                                                className="border-b border-[#e5e5e5] last:border-none transition-colors hover:bg-[#fafaf9]"
-                                            >
-                                                <td className="px-6 py-3 font-semibold text-[#1c1917]">
-                                                    v{v.version_number}
-                                                </td>
-                                                <td className="px-6 py-3 text-[#57534e] whitespace-nowrap">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <Calendar className="h-3.5 w-3.5 shrink-0 text-[#78716c]" />
-                                                        {formatDate(v.uploaded_at || v.created_at)}
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-3 text-[#57534e] max-w-[240px] truncate">
-                                                    {v.original_name || 'documento.pdf'}
-                                                </td>
-                                                <td className="px-6 py-3 text-[#57534e] whitespace-nowrap">
-                                                    {formatFileSize(v.file_size)}
-                                                </td>
-                                                <td className="px-6 py-3">
-                                                    <a
-                                                        href={getDownloadUrl(v.file_path)}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#f5f5f4] hover:text-[#c2410c]"
-                                                        title="Descargar archivo"
-                                                    >
-                                                        <Download className="h-4 w-4" />
-                                                    </a>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Description card */}
-                    {entrega.description && (
-                        <div className="rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
-                            <h3 className="mb-2 text-sm font-semibold text-[#57534e]">Descripción</h3>
-                            <p className="text-sm text-[#1c1917] leading-relaxed">{entrega.description}</p>
-                        </div>
-                    )}
-                </div>
-
-                {/* Sidebar */}
-                <div className="lg:col-span-2 flex flex-col gap-4">
-                    {/* Status card */}
-                    <div className="rounded-xl border border-[#e5e5e5] bg-white p-5 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
-                        <div className="flex items-center gap-3">
-                            <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-                                entrega.status === 'aprobada' || entrega.status === 'aprobado'
-                                    ? 'bg-[#dcfce7] text-[#16a34a]'
-                                    : entrega.status === 'rechazada' || entrega.status === 'rechazado'
-                                        ? 'bg-[#fee2e2] text-[#dc2626]'
-                                        : entrega.status === 'enviada'
-                                            ? 'bg-[#dbeafe] text-[#2563eb]'
-                                            : 'bg-[#fef3c7] text-[#d97706]'
-                            }`}>
-                                {entrega.status === 'aprobada' || entrega.status === 'aprobado' ? (
-                                    <CheckCircle2 className="h-5 w-5" />
-                                ) : entrega.status === 'rechazada' || entrega.status === 'rechazado' ? (
-                                    <XCircle className="h-5 w-5" />
-                                ) : entrega.status === 'enviada' ? (
-                                    <FileText className="h-5 w-5" />
-                                ) : (
-                                    <Clock className="h-5 w-5" />
-                                )}
-                            </div>
-                            <div>
-                                <p className="text-xs text-[#78716c]">Estado</p>
-                                <StatusBadge variant={statusCfg.variant}>{statusCfg.label}</StatusBadge>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Due date */}
-                    {entrega.due_date && (
-                        <div className="rounded-xl border border-[#e5e5e5] bg-white p-5 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
-                            <p className="text-xs text-[#78716c]">Fecha límite</p>
-                            <p className="mt-1 text-sm font-semibold text-[#1c1917]">{formatDate(entrega.due_date)}</p>
                         </div>
                     )}
 
-                    {/* Consolidated grade */}
+                    {/* ── Nota consolidada ── */}
                     {entrega.consolidated_grade !== null && entrega.consolidated_grade !== undefined && (
                         <div className="rounded-xl border border-[#e5e5e5] bg-white p-5 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                             <div className="flex items-center gap-2">
@@ -309,38 +442,7 @@ export default function DetalleEntregaCoordinador() {
                             </p>
                         </div>
                     )}
-
-                    {/* Director's notes from latest version */}
-                    {latestVersion?.director_notes && (
-                        <div className="rounded-xl border border-[#e5e5e5] bg-white p-5 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
-                            <div className="flex items-center gap-2 mb-2">
-                                <MessageSquareText className="h-4 w-4 text-[#c2410c]" />
-                                <p className="text-xs text-[#78716c]">Observaciones del director</p>
-                            </div>
-                            <p className="text-sm text-[#1c1917] leading-relaxed whitespace-pre-wrap">
-                                {latestVersion.director_notes}
-                            </p>
-                        </div>
-                    )}
-
-                    {/* Proyectos vinculados */}
-                    {entrega.proyectos && entrega.proyectos.length > 0 && (
-                        <div className="rounded-xl border border-[#e5e5e5] bg-white p-5 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
-                            <div className="flex items-center gap-2 mb-2">
-                                <User className="h-4 w-4 text-[#4f46e5]" />
-                                <p className="text-xs text-[#78716c]">Proyectos vinculados</p>
-                            </div>
-                            <ul className="space-y-1">
-                                {entrega.proyectos.map((p) => (
-                                    <li key={p.id} className="text-sm text-[#1c1917]">
-                                        {p.code} — {p.title}
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
                 </div>
-            </div>
         </div>
     );
 }

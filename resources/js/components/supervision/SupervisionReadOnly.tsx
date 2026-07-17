@@ -16,6 +16,7 @@ interface Delivery {
     id: number;
     name: string;
     date: string;
+    phase: string;
     status: 'approved' | 'pending' | 'corrections' | 'rejected';
     grade: string;
 }
@@ -45,10 +46,10 @@ const MOCK_PROJECT: ProjectInfo = {
 };
 
 const MOCK_DELIVERIES: Delivery[] = [
-    { id: 1, name: 'Avance 1 — Definición', date: '15/03/2026', status: 'approved', grade: '92' },
-    { id: 2, name: 'Avance 2 — Diseño', date: '30/04/2026', status: 'corrections', grade: '78' },
-    { id: 3, name: 'Avance 3 — Implementación', date: '15/06/2026', status: 'pending', grade: '—' },
-    { id: 4, name: 'Entrega Final', date: '30/11/2026', status: 'pending', grade: '—' },
+    { id: 1, name: 'Avance 1 — Definición', date: '15/03/2026', phase: 'anteproyecto', status: 'approved', grade: '92' },
+    { id: 2, name: 'Avance 2 — Diseño', date: '30/04/2026', phase: 'presentacion_anteproyecto', status: 'corrections', grade: '78' },
+    { id: 3, name: 'Avance 3 — Implementación', date: '15/06/2026', phase: 'desarrollo', status: 'pending', grade: '—' },
+    { id: 4, name: 'Entrega Final', date: '30/11/2026', phase: 'presentacion_final', status: 'pending', grade: '—' },
 ];
 
 const PHASE_STEP_MAP: Record<string, number> = {
@@ -109,13 +110,16 @@ interface SupervisionReadOnlyProps {
     projectId?: number;
     /** Optional custom back handler; defaults to navigate(-1) */
     onBack?: () => void;
+    /** Director ID to include in navigation for proper back behavior */
+    directorId?: number;
 }
 
-export default function SupervisionReadOnly({ projectCode, projectTitle, projectId, onBack }: SupervisionReadOnlyProps) {
+export default function SupervisionReadOnly({ projectCode, projectTitle, projectId, onBack, directorId }: SupervisionReadOnlyProps) {
     const navigate = useNavigate();
     const [expandedDelivery, setExpandedDelivery] = useState<number | null>(null);
     const [projectInfo, setProjectInfo] = useState<ProjectInfo | null>(null);
     const [deliveries, setDeliveries] = useState<Delivery[] | null>(null);
+    const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -147,6 +151,7 @@ export default function SupervisionReadOnly({ projectCode, projectTitle, project
                 id: e.id,
                 name: e.title,
                 date: formatDate(e.due_date),
+                phase: e.phase ?? '',
                 status: mapEntregaStatus(e.status),
                 grade: e.consolidated_grade != null ? String(e.consolidated_grade) : '—',
             })));
@@ -175,6 +180,10 @@ export default function SupervisionReadOnly({ projectCode, projectTitle, project
         label: PHASE_LABELS[id],
         status: idx < currentStep ? 'done' : idx === currentStep ? 'current' : 'future',
     }));
+
+    const activePhaseId = selectedPhaseId ?? (displayProject?.currentPhase ?? PHASE_IDS[0]);
+    const filteredDeliveries = displayDeliveries.filter((d) => !activePhaseId || d.phase === activePhaseId);
+    const deliveryCountByPhase = (phaseId: string) => displayDeliveries.filter((d) => d.phase === phaseId).length;
 
     return (
         <div className="flex flex-col gap-6">
@@ -281,19 +290,19 @@ export default function SupervisionReadOnly({ projectCode, projectTitle, project
 
                     <PhaseStepper
                         phases={allPhases}
-                        selectedPhaseId={PHASE_IDS[currentStep]}
-                        onSelectPhase={() => {}}
-                        deliveryCountByPhase={() => 0}
+                        selectedPhaseId={activePhaseId}
+                        onSelectPhase={setSelectedPhaseId}
+                        deliveryCountByPhase={deliveryCountByPhase}
                         title="Progreso del Proyecto"
                     />
 
                     {/* Read-only Deliveries */}
                     <div className="rounded-xl border border-[#e5e5e5] bg-white shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                         <div className="border-b border-[#e5e5e5] px-6 py-4">
-                            <h3 className="text-base font-bold text-[#1c1917]">Entregas</h3>
+                            <h3 className="text-base font-bold text-[#1c1917]">Entregas ({filteredDeliveries.length})</h3>
                         </div>
                         <div className="divide-y divide-[#e5e5e5]">
-                            {displayDeliveries.map((d) => {
+                            {filteredDeliveries.map((d) => {
                                 const config = statusConfig[d.status];
                                 const isExpanded = expandedDelivery === d.id;
                                 return (
@@ -337,7 +346,7 @@ export default function SupervisionReadOnly({ projectCode, projectTitle, project
                                                         <button
                                                             onClick={() => {
                                                                 if (isRealData && projectId) {
-                                                                    navigate(`/directores/proyectos/${projectId}/entregas/${d.id}`);
+                                                                    navigate(`/directores/proyectos/${projectId}/entregas/${d.id}?directorId=${directorId ?? ''}`);
                                                                 }
                                                             }}
                                                             className="inline-flex min-h-[36px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-white px-3 py-1.5 text-xs font-semibold text-[#1c1917] transition-colors hover:bg-[#f5f5f4] active:scale-[0.98] disabled:opacity-50"
@@ -354,9 +363,11 @@ export default function SupervisionReadOnly({ projectCode, projectTitle, project
                                     </div>
                                 );
                             })}
-                            {displayDeliveries.length === 0 && !loading && (
+                            {filteredDeliveries.length === 0 && !loading && (
                                 <div className="px-6 py-12 text-center text-sm text-[#a8a29e]">
-                                    No hay entregas registradas para este proyecto.
+                                    {displayDeliveries.length === 0
+                                        ? 'No hay entregas registradas para este proyecto.'
+                                        : 'No hay entregas para esta fase.'}
                                 </div>
                             )}
                         </div>

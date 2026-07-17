@@ -266,14 +266,14 @@ it('director puede aprobar entrega con nota y feedback', function () {
     $response = $this->actingAs($this->director)
         ->putJson("/api/admin/entregas/{$entrega->id}/revisar", [
             'status' => 'aprobada',
-            'consolidated_grade' => 90.0,
+            'consolidated_grade' => 4.5,
             'director_notes' => 'Buen trabajo',
         ]);
 
     $response->assertOk();
     $entrega->refresh();
     expect($entrega->status->value)->toBe('aprobada');
-    expect((float) $entrega->consolidated_grade)->toEqual(90.0);
+    expect((float) $entrega->consolidated_grade)->toEqual(4.5);
     expect($entrega->evaluation_complete)->toBeTrue();
 });
 
@@ -289,7 +289,7 @@ it('estudiante NO puede revisar entrega (403)', function () {
     $response = $this->actingAs($this->estudiante)
         ->putJson("/api/admin/entregas/{$entrega->id}/revisar", [
             'status' => 'aprobada',
-            'consolidated_grade' => 90.0,
+            'consolidated_grade' => 4.5,
         ]);
 
     $response->assertStatus(403);
@@ -323,7 +323,7 @@ it('al aprobar ultima entrega de fase avanza proyecto a siguiente fase', functio
     $this->actingAs($this->director)
         ->putJson("/api/admin/entregas/{$entrega->id}/revisar", [
             'status' => 'aprobada',
-            'consolidated_grade' => 85.0,
+            'consolidated_grade' => 4.5,
             'director_notes' => 'Aprobado',
         ]);
 

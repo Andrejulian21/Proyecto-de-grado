@@ -27,7 +27,7 @@ class RecursoController extends Controller
         $recurso->load('author:id,name');
         $recurso->increment('access_count');
 
-        return response()->json(['data' => $recurso->fresh()]);
+        return response()->json(['data' => $recurso->fresh()->load('author:id,name')]);
     }
 
     public function store(Request $request): JsonResponse

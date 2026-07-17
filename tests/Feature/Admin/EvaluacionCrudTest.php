@@ -31,7 +31,7 @@ describe('T-015: Migraciones y modelos Evaluacion', function () {
             'evaluador_id' => $evaluador->id,
             'criterio' => 'Estructura',
             'percentage' => 50.00,
-            'grade' => 85.00,
+            'grade' => 4.50,
             'comment' => 'Buen trabajo',
             'evaluated_at' => now(),
         ]);
@@ -41,7 +41,7 @@ describe('T-015: Migraciones y modelos Evaluacion', function () {
         expect($evaluacion->evaluador_id)->toBe($evaluador->id);
         expect($evaluacion->criterio)->toBe('Estructura');
         expect((float) $evaluacion->percentage)->toEqual(50.00);
-        expect((float) $evaluacion->grade)->toEqual(85.00);
+        expect((float) $evaluacion->grade)->toEqual(4.50);
         expect($evaluacion->comment)->toBe('Buen trabajo');
         expect($evaluacion->evaluated_at)->not->toBeNull();
     });
@@ -146,7 +146,7 @@ describe('T-016: CRUD evaluaciones', function () {
             'evaluador_id' => $this->evaluador->id,
             'criterio' => 'Estructura',
             'percentage' => 50.00,
-            'grade' => 85.00,
+            'grade' => 4.50,
             'evaluated_at' => now(),
         ]);
 
@@ -224,7 +224,7 @@ describe('T-016: CRUD evaluaciones', function () {
                 'entrega_id' => $this->entrega->id,
                 'criterio' => 'Estructura',
                 'percentage' => 100.00,
-                'grade' => 90.00,
+                'grade' => 4.50,
                 'comment' => 'Excelente estructura',
             ]);
 
@@ -249,7 +249,7 @@ describe('T-016: CRUD evaluaciones', function () {
                 'entrega_id' => $otraEntrega->id,
                 'criterio' => 'Estructura',
                 'percentage' => 100.00,
-                'grade' => 90.00,
+                'grade' => 4.50,
             ]);
 
         $response->assertStatus(403);

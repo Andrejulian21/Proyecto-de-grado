@@ -40,10 +40,27 @@ const ROUTE_TITLES: Record<string, string> = {
 
 function usePageTitle(): string {
     const location = useLocation();
-    // Try exact match first, then prefix match (for nested routes).
-    return ROUTE_TITLES[location.pathname]
-        ?? ROUTE_TITLES[Object.keys(ROUTE_TITLES).find((k) => location.pathname.startsWith(k)) ?? '']
-        ?? 'Sistema Centralizado de Proyectos de Grado';
+
+    // 1. Exact match
+    if (ROUTE_TITLES[location.pathname]) {
+        return ROUTE_TITLES[location.pathname];
+    }
+
+    // 2. Prefix match with path boundary (avoid matching '/' for everything)
+    const matchedKey = Object.keys(ROUTE_TITLES)
+        .filter((k) => k !== '/') // exclude root — it would match everything
+        .find((k) => location.pathname === k || location.pathname.startsWith(k + '/'));
+
+    if (matchedKey) {
+        return ROUTE_TITLES[matchedKey];
+    }
+
+    // 3. Fallback to root only for exact root match
+    if (location.pathname === '/') {
+        return ROUTE_TITLES['/'];
+    }
+
+    return 'Sistema Centralizado de Proyectos de Grado';
 }
 
 export function AppShell({ children }: AppShellProps) {

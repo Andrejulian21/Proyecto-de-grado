@@ -1,142 +1,234 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useMemo, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { StatCard } from '@/components/ui/StatCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { FileText, Users, Clock, Search, Eye } from 'lucide-react';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { useDirectorBitacoras, type BitacoraEntry } from '@/hooks/useDirectorBitacoras';
+import { apiFetch } from '@/lib/utils';
+import {
+    FileText, Users, Clock, Eye, Loader2,
+    AlertCircle, RefreshCw, PenSquare, X, ArrowLeft,
+} from 'lucide-react';
 
-interface BinnacleEntry {
-    id: number;
-    project: string;
-    student: string;
-    date: string;
-    topic: string;
-    status: 'signed' | 'pending' | 'unsigned';
-    duration: string;
-}
-
-const MOCK_BINNACLES: BinnacleEntry[] = [
-    { id: 1, project: 'PG-2026-014', student: 'Carlos Méndez', date: '15/04/2026', topic: 'Revisión de arquitectura', status: 'pending', duration: '1h 30m' },
-    { id: 2, project: 'PG-2026-014', student: 'Carlos Méndez', date: '08/04/2026', topic: 'Implementación de módulos', status: 'signed', duration: '2h' },
-    { id: 3, project: 'PG-2026-015', student: 'María Rincón', date: '12/04/2026', topic: 'Análisis de sentimientos', status: 'pending', duration: '1h' },
-    { id: 4, project: 'PG-2026-015', student: 'María Rincón', date: '05/04/2026', topic: 'Recolección de datos', status: 'signed', duration: '1h 30m' },
-    { id: 5, project: 'PG-2026-008', student: 'Andrés Torres', date: '10/04/2026', topic: 'Diseño de dashboard', status: 'unsigned', duration: '2h' },
-    { id: 6, project: 'PG-2026-008', student: 'Andrés Torres', date: '03/04/2026', topic: 'Requisitos del dashboard', status: 'signed', duration: '1h' },
-    { id: 7, project: 'PG-2026-005', student: 'Diana Rojas', date: '14/04/2026', topic: 'Contenido E-Learning', status: 'pending', duration: '1h 30m' },
-    { id: 8, project: 'PG-2026-005', student: 'Diana Rojas', date: '07/04/2026', topic: 'Estructura del curso', status: 'signed', duration: '1h' },
-];
-
-const statusConfig: Record<string, { label: string; variant: 'success' | 'warning' | 'inactivo' }> = {
-    signed: { label: 'Firmada', variant: 'success' },
-    pending: { label: 'Pendiente', variant: 'warning' },
-    unsigned: { label: 'Sin firmar', variant: 'inactivo' },
+const statusConfig: Record<string, { label: string; variant: 'success' | 'warning' | 'inactivo' | 'info' }> = {
+    Completada: { label: 'Firmada', variant: 'success' },
+    Pendiente: { label: 'Pendiente', variant: 'warning' },
+    FirmadaEstudiante: { label: 'Firmada Estudiante', variant: 'info' },
+    FirmadaDirector: { label: 'Firmada Director', variant: 'info' },
+    Sospechosa: { label: 'Sospechosa', variant: 'inactivo' },
 };
-
-const columns: Column<BinnacleEntry>[] = [
-    { key: 'date', label: 'Fecha', className: 'whitespace-nowrap' },
-    { key: 'project', label: 'Proyecto' },
-    { key: 'student', label: 'Estudiante' },
-    { key: 'topic', label: 'Tema' },
-    { key: 'duration', label: 'Duración', className: 'whitespace-nowrap' },
-    {
-        key: 'status',
-        label: 'Estado',
-        render: (row) => {
-            const config = statusConfig[row.status];
-            return <StatusBadge variant={config.variant}>{config.label}</StatusBadge>;
-        },
-    },
-    {
-        key: 'actions',
-        label: 'Acciones',
-        className: 'text-right',
-        render: (row) => (
-            <div className="inline-flex gap-0.5">
-                <button
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#f5f5f4] hover:text-[#c2410c] active:scale-[0.98]"
-                    aria-label={`Ver detalle bitácora ${row.topic}`}
-                    title="Ver detalle"
-                >
-                    <Eye className="h-4 w-4" />
-                </button>
-                {row.status !== 'signed' && (
-                    <button
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#c2410c] hover:text-white active:scale-[0.98]"
-                        aria-label={`Firmar bitácora ${row.topic}`}
-                        title="Firmar"
-                    >
-                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                            <circle cx="9" cy="7" r="4" />
-                            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                        </svg>
-                    </button>
-                )}
-            </div>
-        ),
-    },
-];
 
 export default function BitacorasDirector() {
     const navigate = useNavigate();
-    const [search, setSearch] = useState('');
+    const [searchParams] = useSearchParams();
+    const proyectoId = searchParams.get('proyectoId');
+    const { data: bitacoras, loading, error, refetch } = useDirectorBitacoras();
+
     const [filterStatus, setFilterStatus] = useState<string>('all');
 
-    const filtered = MOCK_BINNACLES.filter((b) => {
-        const matchesSearch =
-            b.project.toLowerCase().includes(search.toLowerCase()) ||
-            b.student.toLowerCase().includes(search.toLowerCase()) ||
-            b.topic.toLowerCase().includes(search.toLowerCase());
-        const matchesStatus = filterStatus === 'all' || b.status === filterStatus;
-        return matchesSearch && matchesStatus;
+    // Confirm dialog state
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const [selectedBitacora, setSelectedBitacora] = useState<BitacoraEntry | null>(null);
+    const [signing, setSigning] = useState(false);
+    const [signError, setSignError] = useState<string | null>(null);
+
+    const openConfirmDialog = useCallback((b: BitacoraEntry) => {
+        setSelectedBitacora(b);
+        setSignError(null);
+        setConfirmOpen(true);
+    }, []);
+
+    const columns: Column<BitacoraEntry>[] = useMemo(() => [
+        {
+            key: 'meeting_date',
+            label: 'Fecha',
+            render: (row) => {
+                const d = row.meeting_date ? new Date(row.meeting_date) : null;
+                return (
+                    <span className="whitespace-nowrap text-[#1c1917]">
+                        {d ? d.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
+                    </span>
+                );
+            },
+        },
+        {
+            key: 'project_code',
+            label: 'Proyecto',
+            render: (row) => (
+                <span className="font-medium text-[#1c1917]">{row.project_code ?? '—'}</span>
+            ),
+        },
+        {
+            key: 'estudiante_name',
+            label: 'Estudiante',
+            render: (row) => (
+                <span className="text-[#57534e]">{row.estudiante_name ?? '—'}</span>
+            ),
+        },
+        {
+            key: 'topic',
+            label: 'Tema',
+            render: (row) => (
+                <span className="max-w-[200px] truncate text-[#57534e]" title={row.topic}>
+                    {row.topic}
+                </span>
+            ),
+        },
+        {
+            key: 'duration_hours',
+            label: 'Duración',
+            render: (row) => (
+                <span className="whitespace-nowrap text-[#57534e] tabular-nums">
+                    {row.duration_hours != null ? `${row.duration_hours}h` : '—'}
+                </span>
+            ),
+        },
+        {
+            key: 'signature_status',
+            label: 'Estado',
+            render: (row) => {
+                const config = statusConfig[row.signature_status] ?? { label: 'Sin firmar', variant: 'inactivo' as const };
+                return <StatusBadge variant={config.variant}>{config.label}</StatusBadge>;
+            },
+        },
+        {
+            key: 'actions',
+            label: 'Acciones',
+            className: 'text-right',
+            render: (row) => (
+                <div className="inline-flex gap-0.5">
+                    <button
+                        onClick={() => navigate(`/bitacoras/${row.id}/revision`)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#f5f5f4] hover:text-[#c2410c] active:scale-[0.98]"
+                        aria-label={`Ver detalle bitácora ${row.topic}`}
+                        title="Ver detalle"
+                    >
+                        <Eye className="h-4 w-4" />
+                    </button>
+                    {row.signature_status === 'Pendiente' && (
+                        <button
+                            onClick={() => openConfirmDialog(row)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#c2410c] hover:text-white active:scale-[0.98]"
+                            aria-label={`Firmar bitácora ${row.topic}`}
+                            title="Firmar"
+                        >
+                            <PenSquare className="h-4 w-4" />
+                        </button>
+                    )}
+                </div>
+            ),
+        },
+    ], [navigate, openConfirmDialog]);
+
+    const filtered = bitacoras.filter((b) => {
+        const matchesProject = !proyectoId || b.project_id === Number(proyectoId);
+        const matchesStatus = filterStatus === 'all' || b.signature_status === filterStatus;
+        return matchesProject && matchesStatus;
     });
 
-    const pendingCount = MOCK_BINNACLES.filter((b) => b.status === 'pending').length;
-    const signedCount = MOCK_BINNACLES.filter((b) => b.status === 'signed').length;
+    const totalCount = filtered.length;
+    const pendingCount = filtered.filter((b) => b.signature_status === 'Pendiente').length;
+    const signedCount = filtered.filter((b) => b.signature_status === 'Completada').length;
+
+    async function handleSign() {
+        if (!selectedBitacora) return;
+        setSigning(true);
+        setSignError(null);
+
+        try {
+            const res = await apiFetch(`/api/bitacoras/${selectedBitacora.id}/firmar`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            });
+
+            if (!res.ok) {
+                const body = await res.json().catch(() => null);
+                throw new Error(body?.error ?? body?.message ?? 'Error al firmar la bitácora.');
+            }
+
+            setConfirmOpen(false);
+            setSelectedBitacora(null);
+            refetch();
+        } catch (err) {
+            setSignError(err instanceof Error ? err.message : 'Error desconocido.');
+        } finally {
+            setSigning(false);
+        }
+    }
+
+    /* ── Loading state (initial only) ── */
+    if (loading && bitacoras.length === 0) {
+        return (
+            <div className="flex flex-col gap-6">
+                <PageHeader eyebrow="Director" title="Bitácoras" subtitle="Cargando bitácoras..." />
+                <div className="flex flex-col items-center justify-center gap-4 py-16">
+                    <Loader2 className="h-8 w-8 animate-spin text-[#c2410c]" />
+                    <p className="text-sm text-[#57534e]">Cargando bitácoras...</p>
+                </div>
+            </div>
+        );
+    }
+
+    /* ── Error state (no cached data) ── */
+    if (error && bitacoras.length === 0) {
+        return (
+            <div className="flex flex-col gap-6">
+                <PageHeader eyebrow="Director" title="Bitácoras" subtitle="Error al cargar los datos" />
+                <div className="flex flex-col items-center justify-center gap-4 py-16">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#fee2e2]">
+                        <AlertCircle className="h-6 w-6 text-[#dc2626]" />
+                    </div>
+                    <p className="text-sm text-[#57534e] max-w-md text-center">{error}</p>
+                    <button
+                        onClick={refetch}
+                        className="inline-flex items-center gap-2 rounded-lg border border-[#e5e5e5] bg-white px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:border-[#c2410c] hover:bg-[#fed7aa] hover:text-[#c2410c]"
+                    >
+                        <RefreshCw className="h-4 w-4" />
+                        Reintentar
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col gap-6">
             <PageHeader
                 eyebrow="Director"
-                title="Bitácoras"
-                subtitle="Revise y firme las bitácoras de los proyectos que supervisa"
+                title={proyectoId ? 'Bitácoras del Proyecto' : 'Bitácoras'}
+                subtitle={proyectoId ? 'Bitácoras registradas para este proyecto' : 'Revise y firme las bitácoras de los proyectos que supervisa'}
+                actions={
+                    proyectoId ? (
+                        <button
+                            onClick={() => navigate('/supervision')}
+                            className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-white px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:border-[#c2410c] hover:bg-[#fed7aa] hover:text-[#c2410c]"
+                        >
+                            <ArrowLeft className="h-4 w-4" />
+                            Volver
+                        </button>
+                    ) : error ? (
+                        <button
+                            onClick={refetch}
+                            className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-white px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:border-[#c2410c] hover:bg-[#fed7aa] hover:text-[#c2410c]"
+                        >
+                            <RefreshCw className="h-4 w-4" />
+                            Reintentar
+                        </button>
+                    ) : undefined
+                }
             />
 
             {/* Stats */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <StatCard
-                    icon={FileText}
-                    label="Total bitácoras"
-                    value={MOCK_BINNACLES.length}
-                />
-                <StatCard
-                    icon={Clock}
-                    label="Pendientes de firma"
-                    value={pendingCount}
-                    variant="warning"
-                />
-                <StatCard
-                    icon={Users}
-                    label="Firmadas"
-                    value={signedCount}
-                    variant="success"
-                />
+                <StatCard icon={FileText} label="Total bitácoras" value={totalCount} />
+                <StatCard icon={Clock} label="Pendientes de firma" value={pendingCount} variant="warning" />
+                <StatCard icon={Users} label="Firmadas" value={signedCount} variant="success" />
             </div>
 
-            {/* Filter */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <div className="relative flex-1">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#78716c]" />
-                    <input
-                        type="text"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Buscar por proyecto, estudiante o tema..."
-                        className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white pl-9 pr-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
-                    />
-                </div>
+            {/* Filter by status */}
+            <div className="flex justify-end">
                 <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
@@ -144,19 +236,99 @@ export default function BitacorasDirector() {
                     aria-label="Filtrar por estado"
                 >
                     <option value="all">Todos los estados</option>
-                    <option value="pending">Pendientes</option>
-                    <option value="signed">Firmadas</option>
-                    <option value="unsigned">Sin firmar</option>
+                    <option value="Pendiente">Pendientes</option>
+                    <option value="FirmadaEstudiante">Firmada Estudiante</option>
+                    <option value="Completada">Firmadas</option>
+                    <option value="Sospechosa">Sospechosas</option>
                 </select>
             </div>
+
+            {/* Error toast inline (when there's cached data) */}
+            {error && (
+                <div className="flex items-center gap-3 rounded-lg border border-[#fee2e2] bg-[#fef2f2] p-3 text-sm text-[#dc2626]">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <p className="flex-1">{error}</p>
+                    <button
+                        onClick={refetch}
+                        className="text-xs font-semibold text-[#dc2626] underline hover:no-underline"
+                    >
+                        Reintentar
+                    </button>
+                </div>
+            )}
 
             {/* Table */}
             <DataTable
                 columns={columns}
                 data={filtered}
+                loading={loading}
                 getRowKey={(row) => row.id}
-                emptyMessage="No se encontraron bitácoras."
+                emptyMessage={
+                    filterStatus !== 'all'
+                        ? 'No se encontraron bitácoras con el filtro seleccionado.'
+                        : 'Aún no hay bitácoras registradas.'
+                }
             />
+
+            {/* Sign ConfirmDialog */}
+            <ConfirmDialog
+                open={confirmOpen}
+                title="Firmar Bitácora"
+                message={
+                    selectedBitacora
+                        ? `¿Está seguro de firmar la bitácora "${selectedBitacora.topic}" del proyecto ${selectedBitacora.project_code ?? ''}?`
+                        : ''
+                }
+                confirmLabel={signing ? 'Firmando...' : 'Firmar'}
+                cancelLabel="Cancelar"
+                onConfirm={handleSign}
+                onCancel={() => {
+                    if (!signing) {
+                        setConfirmOpen(false);
+                        setSelectedBitacora(null);
+                        setSignError(null);
+                    }
+                }}
+                variant="default"
+            />
+
+            {/* Sign error dialog */}
+            {signError && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+                    onClick={() => { setSignError(null); setConfirmOpen(true); }}
+                >
+                    <div
+                        className="w-full max-w-md rounded-xl bg-white p-6 shadow-[0_20px_60px_rgba(28,25,23,0.15)]"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-start gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#fee2e2] text-[#dc2626]">
+                                <AlertCircle className="h-5 w-5" />
+                            </div>
+                            <div className="flex flex-col gap-1 flex-1">
+                                <h2 className="text-lg font-bold text-[#1c1917]">Error al firmar</h2>
+                                <p className="text-sm text-[#57534e]">{signError}</p>
+                            </div>
+                            <button
+                                onClick={() => { setSignError(null); setConfirmOpen(true); }}
+                                className="rounded-lg p-1.5 text-[#57534e] transition-colors hover:bg-[#f5f5f4]"
+                                aria-label="Cerrar"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <div className="mt-4 flex justify-end">
+                            <button
+                                onClick={() => { setSignError(null); setConfirmOpen(true); }}
+                                className="inline-flex items-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a]"
+                            >
+                                Reintentar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

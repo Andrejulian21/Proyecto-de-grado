@@ -1,87 +1,55 @@
-import { PageHeader } from '@/components/ui/PageHeader';
 import { StatCard } from '@/components/ui/StatCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { DataTable, type Column } from '@/components/ui/DataTable';
+import { useDirectorProyectos } from '@/hooks/useDirectorProyectos';
+import { useDirectorKpis } from '@/hooks/useDirectorKpis';
+import { useDirectorEntregas, type DirectorEntrega } from '@/hooks/useDirectorEntregas';
 import {
     ClipboardCheck,
-    FolderKanban,
     FileText,
     CheckCircle,
     Eye,
     Users,
     AlertTriangle,
+    ClipboardList,
+    RefreshCw,
+    AlertCircle,
 } from 'lucide-react';
 
-/* ── Mock data ── */
+/* ── Columns for deliveries table ── */
 
-const MOCK_KPIS = [
-    { icon: FolderKanban, label: 'Proyectos supervisando', value: 8, variant: 'default' as const },
-    { icon: FileText, label: 'Entregas por revisar', value: 14, variant: 'warning' as const },
-    { icon: AlertTriangle, label: 'Alertas', value: 2, variant: 'warning' as const },
-    { icon: CheckCircle, label: 'Aprobadas este mes', value: 12, variant: 'success' as const },
-];
-
-interface ProgressProject {
-    id: number;
-    code: string;
-    title: string;
-    students: string;
-    progress: number;
-    color: string;
-}
-
-const MOCK_PROGRESS: ProgressProject[] = [
-    { id: 1, code: 'PG-2401', title: 'Microgrid solar IoT', students: 'Ana Martínez, Luis Rojas', progress: 85, color: 'bg-success' },
-    { id: 2, code: 'PG-2404', title: 'Sistema de deserción ML', students: 'Diana Pardo', progress: 92, color: 'bg-success' },
-    { id: 3, code: 'PG-2402', title: 'IoT ambiental', students: 'Pedro Sánchez', progress: 45, color: 'bg-warning' },
-];
-
-interface Delivery {
-    id: number;
-    student: string;
-    project: string;
-    type: string;
-    date: string;
-    status: 'approved' | 'pending' | 'rejected';
-}
-
-const MOCK_DELIVERIES: Delivery[] = [
-    { id: 1, student: 'Ana Martínez', project: 'Microgrid solar IoT', type: 'Informe de Avance 1', date: '12/06/2026', status: 'pending' },
-    { id: 2, student: 'Pedro Sánchez', project: 'IoT ambiental', type: 'Presentación', date: '08/06/2026', status: 'approved' },
-    { id: 3, student: 'Diana Pardo', project: 'Sistema de deserción ML', type: 'Informe de Avance 2', date: '01/06/2026', status: 'pending' },
-];
-
-/* ── Columns ── */
-
-const deliveryColumns: Column<Delivery>[] = [
+const deliveryColumns: Column<DirectorEntrega>[] = [
     {
-        key: 'student',
-        label: 'Estudiante',
+        key: 'codigo',
+        label: 'Código',
         className: 'font-medium text-text',
     },
     {
-        key: 'project',
+        key: 'proyecto',
         label: 'Proyecto',
         className: 'text-text-muted',
     },
     {
-        key: 'type',
-        label: 'Tipo',
+        key: 'estudiante',
+        label: 'Estudiante',
         className: 'text-text-muted',
     },
     {
-        key: 'date',
+        key: 'title',
+        label: 'Entrega',
+        className: 'text-text-muted',
+    },
+    {
+        key: 'due_date',
         label: 'Fecha',
         className: 'text-text-muted tabular-nums',
     },
     {
         key: 'status',
         label: 'Estado',
-        render: (row: Delivery) => (
-            <StatusBadge
-                variant={row.status === 'approved' ? 'success' : row.status === 'pending' ? 'warning' : 'error'}
-            >
-                {row.status === 'approved' ? 'Aprobado' : row.status === 'pending' ? 'Pendiente' : 'Rechazado'}
+        render: (row: DirectorEntrega) => (
+            <StatusBadge variant="warning">
+                Pendiente
             </StatusBadge>
         ),
     },
@@ -102,28 +70,67 @@ const deliveryColumns: Column<Delivery>[] = [
 
 /* ── Subcomponents ── */
 
-function ProgressCard({ code, title, students, progress, color }: ProgressProject) {
+function ProjectCard({ code, title, estudiantes, current_phase }: {
+    code: string;
+    title: string;
+    estudiantes: { id: number; name: string }[];
+    current_phase: string | null;
+}) {
+    const phaseLabel = current_phase
+        ? current_phase.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+        : 'Sin fase';
+
     return (
-        <div className="rounded-xl border border-border bg-surface p-5 shadow-warm-sm">
-            <div className="mb-3 flex items-start justify-between">
-                <div className="flex flex-col gap-0.5">
-                    <span className="text-xs font-bold uppercase tracking-[0.05em] text-primary">{code}</span>
-                    <h4 className="text-sm font-bold text-text">{title}</h4>
-                    <span className="flex items-center gap-1.5 text-xs text-text-muted">
-                        <Users className="h-3 w-3" />
-                        {students}
-                    </span>
-                </div>
+        <div className="w-[280px] shrink-0 rounded-xl border border-border bg-surface p-5 shadow-warm-sm">
+            <div className="mb-3 flex flex-col gap-0.5">
+                <span className="text-xs font-bold uppercase tracking-[0.05em] text-primary">{code}</span>
+                <h4 className="text-sm font-bold text-text line-clamp-2">{title}</h4>
+                <span className="flex items-center gap-1.5 text-xs text-text-muted mt-1">
+                    <Users className="h-3 w-3 shrink-0" />
+                    {estudiantes.map((e) => e.name).join(', ')}
+                </span>
             </div>
-            <div className="flex items-center gap-3">
-                <div className="flex-1 overflow-hidden rounded-full bg-surface-alt" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label={`Progreso: ${progress}%`}>
-                    <div
-                        className={`h-2.5 rounded-full transition-all duration-500 ${color}`}
-                        style={{ width: `${progress}%` }}
-                    />
-                </div>
-                <span className="text-sm font-bold tabular-nums text-text">{progress}%</span>
+            <div className="mt-2">
+                <span className="inline-flex items-center rounded-full bg-info/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.03em] text-info">
+                    {phaseLabel}
+                </span>
             </div>
+        </div>
+    );
+}
+
+function SkeletonCard() {
+    return (
+        <div className="h-[120px] w-[280px] shrink-0 animate-pulse rounded-xl border border-border bg-surface p-5">
+            <div className="h-3 w-16 rounded bg-surface-alt mb-3" />
+            <div className="h-4 w-40 rounded bg-surface-alt mb-2" />
+            <div className="h-3 w-32 rounded bg-surface-alt" />
+        </div>
+    );
+}
+
+function SkeletonStatCard() {
+    return (
+        <div className="h-[110px] animate-pulse rounded-xl border border-border bg-surface p-5">
+            <div className="h-10 w-10 rounded-xl bg-surface-alt mb-3" />
+            <div className="h-3 w-24 rounded bg-surface-alt mb-1" />
+            <div className="h-7 w-12 rounded bg-surface-alt" />
+        </div>
+    );
+}
+
+function ErrorBanner({ message, onRetry }: { message: string; onRetry: () => void }) {
+    return (
+        <div className="flex items-center gap-3 rounded-lg border border-error/20 bg-error/5 p-4 text-sm text-error">
+            <AlertCircle className="h-5 w-5 shrink-0" />
+            <p className="flex-1">{message}</p>
+            <button
+                onClick={onRetry}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-error/30 px-3 py-1.5 text-xs font-semibold text-error transition-colors hover:bg-error/10"
+            >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Reintentar
+            </button>
         </div>
     );
 }
@@ -131,6 +138,35 @@ function ProgressCard({ code, title, students, progress, color }: ProgressProjec
 /* ── Main component ── */
 
 export default function DirectorDashboard() {
+    const {
+        data: proyectos,
+        loading: loadingProyectos,
+        error: errorProyectos,
+        refetch: refetchProyectos,
+    } = useDirectorProyectos();
+
+    const {
+        data: kpis,
+        loading: loadingKpis,
+        error: errorKpis,
+        refetch: refetchKpis,
+    } = useDirectorKpis();
+
+    const {
+        data: entregas,
+        loading: loadingEntregas,
+        error: errorEntregas,
+        refetch: refetchEntregas,
+    } = useDirectorEntregas();
+
+    const handleRetry = () => {
+        refetchProyectos();
+        refetchKpis();
+        refetchEntregas();
+    };
+
+    const hasError = errorProyectos || errorKpis || errorEntregas;
+
     return (
         <div className="flex flex-col gap-6">
             {/* Bezel header */}
@@ -151,23 +187,81 @@ export default function DirectorDashboard() {
                 </div>
             </div>
 
+            {/* Error banner */}
+            {hasError && (
+                <ErrorBanner
+                    message={errorProyectos || errorKpis || errorEntregas || 'Error al cargar los datos'}
+                    onRetry={handleRetry}
+                />
+            )}
+
             {/* KPI row */}
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                {MOCK_KPIS.map((kpi) => (
-                    <StatCard key={kpi.label} icon={kpi.icon} label={kpi.label} value={kpi.value} variant={kpi.variant} />
-                ))}
+                {loadingKpis ? (
+                    <>
+                        <SkeletonStatCard />
+                        <SkeletonStatCard />
+                        <SkeletonStatCard />
+                        <SkeletonStatCard />
+                    </>
+                ) : kpis ? (
+                    <>
+                        <StatCard
+                            icon={ClipboardList}
+                            label="Proyectos supervisando"
+                            value={kpis.proyectos_supervisando}
+                        />
+                        <StatCard
+                            icon={FileText}
+                            label="Entregas pendientes"
+                            value={kpis.entregas_pendientes}
+                            variant="warning"
+                        />
+                        <StatCard
+                            icon={AlertTriangle}
+                            label="Alertas"
+                            value={kpis.alertas}
+                            variant={kpis.alertas > 0 ? 'warning' : 'success'}
+                        />
+                        <StatCard
+                            icon={CheckCircle}
+                            label="Aprobadas este mes"
+                            value={kpis.aprobadas_mes}
+                            variant="success"
+                        />
+                    </>
+                ) : null}
             </div>
 
-            {/* Progress cards */}
-            <section aria-labelledby="progress-heading">
-                <h2 id="progress-heading" className="mb-4 text-sm font-bold uppercase tracking-[0.05em] text-text-muted">
-                    Avance de Proyectos
+            {/* Project carousel */}
+            <section aria-labelledby="projects-heading">
+                <h2 id="projects-heading" className="mb-4 text-sm font-bold uppercase tracking-[0.05em] text-text-muted">
+                    Mis Proyectos
                 </h2>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    {MOCK_PROGRESS.map((proj) => (
-                        <ProgressCard key={proj.id} {...proj} />
-                    ))}
-                </div>
+
+                {loadingProyectos ? (
+                    <div className="flex gap-4 overflow-x-auto pb-2">
+                        <SkeletonCard />
+                        <SkeletonCard />
+                        <SkeletonCard />
+                    </div>
+                ) : errorProyectos ? null : proyectos.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-text-muted">
+                        No tienes proyectos asignados en semestres activos.
+                    </p>
+                ) : (
+                    <div className="flex gap-4 overflow-x-auto pb-2">
+                        {proyectos.map((proj) => (
+                            <ProjectCard
+                                key={proj.id}
+                                code={proj.code}
+                                title={proj.title}
+                                estudiantes={proj.estudiantes}
+                                current_phase={proj.current_phase}
+                            />
+                        ))}
+                    </div>
+                )}
             </section>
 
             {/* Deliveries table */}
@@ -175,9 +269,11 @@ export default function DirectorDashboard() {
                 <h2 id="deliveries-heading" className="mb-4 text-sm font-bold uppercase tracking-[0.05em] text-text-muted">
                     Últimas Entregas
                 </h2>
-                <DataTable<Delivery>
+                <DataTable<DirectorEntrega>
                     columns={deliveryColumns}
-                    data={MOCK_DELIVERIES}
+                    data={entregas}
+                    loading={loadingEntregas}
+                    emptyMessage={errorEntregas ? 'Error al cargar las entregas.' : 'No hay entregas pendientes por revisar.'}
                     getRowKey={(row) => row.id}
                 />
             </section>

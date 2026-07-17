@@ -79,7 +79,7 @@ class EvaluacionController extends Controller
             'entrega_id' => 'required|exists:entregas,id',
             'criterio' => 'required|string|max:255',
             'percentage' => 'required|numeric|min:0|max:100',
-            'grade' => 'nullable|numeric|min:0|max:100',
+            'grade' => 'nullable|numeric|min:0|max:5',
             'comment' => 'nullable|string',
         ]);
 
@@ -162,7 +162,7 @@ class EvaluacionController extends Controller
         });
 
         $promedio = $totalPercentage > 0
-            ? round(($totalWeighted / $totalPercentage) * 100, 2)
+            ? round(($totalWeighted / $totalPercentage) * 100, 1)
             : null;
 
         return response()->json([

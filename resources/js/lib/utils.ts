@@ -6,6 +6,20 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Handle 401 Unauthenticated responses — session expired.
+ * Clears auth state and redirects to login, unless the request
+ * is itself an auth/login endpoint or we are already on the login page.
+ */
+function handleSessionExpired(): void {
+    // Avoid redirect loops: already on login or the request is auth-related.
+    if (window.location.pathname.startsWith('/login')) return;
+
+    sessionStorage.removeItem('auth_user');
+    localStorage.removeItem('user_role');
+    window.location.href = '/login';
+}
+
+/**
  * Read the XSRF-TOKEN cookie set by `/sanctum/csrf-cookie`.
  * Returns the raw (URL-encoded) token value, or empty string.
  */
@@ -44,5 +58,11 @@ export function apiFetch(url: string, options: RequestInit = {}): Promise<Respon
         credentials: 'include',
         headers: { ...extraHeaders, ...(headers as Record<string, string>) },
         ...rest,
+    }).then(async (res) => {
+        // Session expired → redirect to login (skip auth endpoints).
+        if (res.status === 401 && !url.includes('/api/auth/')) {
+            handleSessionExpired();
+        }
+        return res;
     });
 }

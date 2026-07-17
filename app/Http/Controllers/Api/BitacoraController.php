@@ -141,6 +141,29 @@ class BitacoraController extends Controller
         }
 
         if ($currentStatus === EstadoFirma::Pendiente->value) {
+            // T-009: Director can sign directly from Pendiente → Completada
+            if ($proyecto->director_id === $user->id) {
+                $bitacora->update([
+                    'signature_status' => EstadoFirma::Completada->value,
+                    'director_signed_at' => now(),
+                ]);
+
+                // Notificar a los estudiantes del proyecto
+                $estudiantes = $proyecto->estudiantes()->pluck('user_id');
+                foreach ($estudiantes as $estudianteId) {
+                    Notificacion::create([
+                        'user_id' => $estudianteId,
+                        'sender_id' => $user->id,
+                        'type' => 'bitacora.completada',
+                        'title' => 'Bitácora completada por director',
+                        'content' => "El director ha completado la firma de la bitácora '{$bitacora->topic}'.",
+                        'sent_at' => now(),
+                    ]);
+                }
+
+                return response()->json(['data' => $bitacora->fresh()]);
+            }
+
             // Only a student of this project can sign from Pendiente
             $esEstudiante = $proyecto->estudiantes()
                 ->where('user_id', $user->id)
@@ -219,11 +242,17 @@ class BitacoraController extends Controller
             ->get()
             ->map(function ($bitacora) use ($proyecto) {
                 return [
-                    'id' => $bitacora->id,
-                    'fecha' => $bitacora->created_at->toISO8601String(),
-                    'contenido' => $bitacora->notes ?? '',
-                    'firmada' => $bitacora->signature_status->value === EstadoFirma::Completada->value,
-                    'director_name' => $proyecto->director?->name ?? 'Sin asignar',
+                    'id'               => $bitacora->id,
+                    'topic'            => $bitacora->topic,
+                    'notes'            => $bitacora->notes,
+                    'meeting_date'     => $bitacora->meeting_date?->toDateString(),
+                    'duration_hours'   => $bitacora->duration_hours,
+                    'signature_status' => $bitacora->signature_status?->value,
+                    'fecha'            => $bitacora->created_at->toISO8601String(),
+                    'contenido'        => $bitacora->notes ?? '',
+                    'firmada'          => $bitacora->signature_status->value === EstadoFirma::Completada->value,
+                    'director_name'    => $proyecto->director?->name ?? 'Sin asignar',
+                    'created_at'       => $bitacora->created_at->toISO8601String(),
                 ];
             });
 
@@ -291,6 +320,11 @@ class BitacoraController extends Controller
 
         if (! $proyecto) {
             return false;
+        }
+
+        // Coordinadores tienen acceso global
+        if ($user->role->value === 'Coordinador') {
+            return true;
         }
 
         if ($proyecto->director_id === $user->id) {

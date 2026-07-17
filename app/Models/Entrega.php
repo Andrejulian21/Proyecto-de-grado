@@ -25,6 +25,8 @@ class Entrega extends Model
         'title',
         'description',
         'due_date',
+        'start_date',
+        'start_time',
         'status',
         'consolidated_grade',
         'evaluation_complete',
@@ -39,6 +41,7 @@ class Entrega extends Model
         return [
             'status' => EstadoEntrega::class,
             'due_date' => 'date',
+            'start_date' => 'date',
             'consolidated_grade' => 'decimal:2',
             'evaluation_complete' => 'boolean',
         ];
@@ -46,7 +49,17 @@ class Entrega extends Model
 
     public function getGrupoIdAttribute(): ?int
     {
-        return $this->proyecto?->semester_id;
+        // Try direct proyecto FK first
+        if ($this->proyecto) {
+            return $this->proyecto->semester_id;
+        }
+
+        // Fall back to first pivot project's semester
+        if ($this->relationLoaded('proyectos') && $this->proyectos->isNotEmpty()) {
+            return $this->proyectos->first()->semester_id;
+        }
+
+        return $this->semester_id;
     }
 
     public function proyecto(): BelongsTo

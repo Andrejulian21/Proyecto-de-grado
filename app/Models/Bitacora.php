@@ -32,7 +32,7 @@ class Bitacora extends Model
     {
         return [
             'signature_status' => EstadoFirma::class,
-            'meeting_date' => 'date',
+            'meeting_date' => 'datetime',
             'student_signed_at' => 'datetime',
             'director_signed_at' => 'datetime',
             'duration_hours' => 'decimal:2',

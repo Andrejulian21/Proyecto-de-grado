@@ -27,9 +27,18 @@ Route::get('/up', fn () => response('OK', 200))->name('health');
 Route::get('/auth/redirect', [AuthController::class, 'redirectToGoogle'])->name('auth.google.redirect');
 Route::get('/auth/callback', [AuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
 
+// Serve storage files (bypass SPA catch-all for /storage/* URLs)
+Route::get('/storage/{path}', function (string $path) {
+    $fullPath = storage_path('app/public/' . $path);
+    if (! file_exists($fullPath)) {
+        abort(404);
+    }
+    return response()->file($fullPath);
+})->where('path', '.*')->name('storage.serve');
+
 // SPA catch-all — anything that is not /api/* or an explicit route above
 // serves the Vite/React index.html so client-side routing works.
 // Static assets are served by the web server before reaching here.
 Route::get('/{any?}', function () {
     return view('app');
-})->where('any', '^(?!api).*$')->name('spa');
+})->where('any', '^(?!api|storage).*$')->name('spa');

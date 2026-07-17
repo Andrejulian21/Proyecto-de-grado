@@ -18,6 +18,8 @@ export default function DetalleFirmaBitacora() {
     const [submitting, setSubmitting] = useState(false);
     const [signed, setSigned] = useState(false);
 
+    const topic = 'Revisión de la arquitectura del sistema';
+
     const sessions: SessionDetail[] = [
         { label: 'Estudiante', value: 'Carlos Andrés Méndez', icon: User },
         { label: 'Proyecto', value: 'PG-2026-014 — Sistema Centralizado de Proyectos de Grado', icon: FileText },
@@ -51,8 +53,8 @@ export default function DetalleFirmaBitacora() {
             <div className="flex flex-col gap-6">
                 <PageHeader
                     eyebrow="Bitácora"
-                    title="Bitácora Firmada"
-                    subtitle="La bitácora ha sido firmada digitalmente con éxito"
+                    title={topic}
+                    subtitle="Firmada — La bitácora ha sido firmada digitalmente con éxito"
                     actions={
                         <button
                             onClick={() => navigate('/director/bitacoras')}
@@ -85,7 +87,7 @@ export default function DetalleFirmaBitacora() {
         <div className="flex flex-col gap-6">
             <PageHeader
                 eyebrow="Bitácora"
-                title="Firmar Bitácora"
+                title={topic}
                 subtitle="Revise los detalles de la sesión y firme con su código TOTP"
                 actions={
                     <button
@@ -124,7 +126,7 @@ export default function DetalleFirmaBitacora() {
                         <div className="mb-5 space-y-4">
                             <div>
                                 <p className="text-xs font-semibold text-[#78716c] uppercase tracking-wide mb-1">Tema</p>
-                                <p className="text-sm font-semibold text-[#1c1917]">Revisión de la arquitectura del sistema</p>
+                                <p className="text-sm font-semibold text-[#1c1917]">{topic}</p>
                             </div>
                             <div>
                                 <p className="text-xs font-semibold text-[#78716c] uppercase tracking-wide mb-1">Descripción</p>

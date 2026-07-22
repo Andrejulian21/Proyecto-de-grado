@@ -22,6 +22,7 @@ interface User {
     created_by: { name: string } | null;
     created_at: string;
     last_activity_at?: string | null;
+    codigo_estudiante?: string;
 }
 
 interface PaginationMeta {
@@ -82,6 +83,7 @@ export default function GestionUsuarios() {
     // ── Sección 3: Agregar correos ──
     const [estCorreo, setEstCorreo] = useState('');
     const [estNombre, setEstNombre] = useState('');
+    const [estCodigo, setEstCodigo] = useState('');
     const [dirCorreo, setDirCorreo] = useState('');
     const [dirNombre, setDirNombre] = useState('');
     const [dirAreas, setDirAreas] = useState('');
@@ -95,6 +97,7 @@ export default function GestionUsuarios() {
     const [formEmail, setFormEmail] = useState('');
     const [formName, setFormName] = useState('');
     const [formRole, setFormRole] = useState('Estudiante');
+    const [formCodigoEstudiante, setFormCodigoEstudiante] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
     const [editingIsWhitelist, setEditingIsWhitelist] = useState(false);
@@ -179,6 +182,16 @@ export default function GestionUsuarios() {
         setPage(1);
     }, [searchQuery, roleFilter]);
 
+    function resetForm() {
+        setModalOpen(false);
+        setEditingUser(null);
+        setEditingIsWhitelist(false);
+        setFormName('');
+        setFormEmail('');
+        setFormRole('Estudiante');
+        setFormCodigoEstudiante('');
+    }
+
     function showMsg(type: 'success' | 'error', text: string) {
         setMessage({ type, text });
         setTimeout(() => setMessage(null), 4000);
@@ -194,7 +207,7 @@ export default function GestionUsuarios() {
                 : '/api/admin/whitelist';
             const method = editingUser ? 'PUT' : 'POST';
             const body = editingUser
-                ? { name: formName.trim(), email: formEmail.trim(), role: formRole }
+                ? { name: formName.trim(), email: formEmail.trim(), role: formRole, codigo_estudiante: formCodigoEstudiante.trim() || null }
                 : { email: formEmail.trim(), name: formName.trim() || null, role: formRole };
             
             const res = await apiFetch(url, {
@@ -270,6 +283,7 @@ export default function GestionUsuarios() {
         setFormName(u.name || '');
         setFormEmail(u.email);
         setFormRole(u.role);
+        setFormCodigoEstudiante(u.codigo_estudiante || '');
         setModalOpen(true);
     }
 
@@ -343,7 +357,7 @@ export default function GestionUsuarios() {
             const res = await apiFetch('/api/admin/whitelist', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: estCorreo.trim(), name: estNombre.trim() || null, role: 'Estudiante' }),
+                body: JSON.stringify({ email: estCorreo.trim(), name: estNombre.trim() || null, role: 'Estudiante', codigo_estudiante: estCodigo.trim() || null }),
             });
             if (!res.ok) {
                 const err = await res.json().catch(() => null);
@@ -352,6 +366,7 @@ export default function GestionUsuarios() {
             showMsg('success', 'Estudiante agregado');
             setEstCorreo('');
             setEstNombre('');
+            setEstCodigo('');
             fetchWhitelist();
             fetchUsers();
         } catch (err: any) {
@@ -776,6 +791,18 @@ export default function GestionUsuarios() {
                                     placeholder="Ej: Juan Pérez"
                                 />
                             </div>
+                            <div className="flex flex-col gap-1.5 mb-4">
+                                <label htmlFor="codigo-est" className="text-sm font-semibold text-text">ID Estudiante</label>
+                                <input
+                                    id="codigo-est"
+                                    type="text"
+                                    value={estCodigo}
+                                    onChange={(e) => setEstCodigo(e.target.value)}
+                                    className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-text outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                    placeholder="Ej: U00167215"
+                                />
+                                <span className="text-xs text-[#57534e]">Código asignado por la universidad (opcional)</span>
+                            </div>
                             <button
                                 type="submit"
                                 className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a]"
@@ -852,7 +879,7 @@ export default function GestionUsuarios() {
                                 {editingUser ? 'Cambiar rol' : 'Nuevo usuario'}
                             </h2>
                             <button
-                                onClick={() => { setModalOpen(false); setEditingUser(null); setEditingIsWhitelist(false); }}
+                                onClick={resetForm}
                                 className="rounded-lg p-1.5 text-text-muted transition hover:bg-[#f5f5f4] hover:text-text"
                             >
                                 <X className="h-5 w-5" />
@@ -892,10 +919,22 @@ export default function GestionUsuarios() {
                                     ))}
                                 </select>
                             </div>
+                            {formRole === 'Estudiante' && editingUser && (
+                                <div>
+                                    <label className="mb-1.5 block text-sm font-semibold text-text">Código de Estudiante</label>
+                                    <input
+                                        type="text"
+                                        value={formCodigoEstudiante}
+                                        onChange={(e) => setFormCodigoEstudiante(e.target.value)}
+                                        placeholder="Ej: U00167215"
+                                        className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3.5 py-2.5 text-sm text-text outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                    />
+                                </div>
+                            )}
                             <div className="flex justify-end gap-3 pt-2">
                                 <button
                                     type="button"
-                                    onClick={() => { setModalOpen(false); setEditingUser(null); setEditingIsWhitelist(false); }}
+                                    onClick={resetForm}
                                     className="rounded-lg border border-[#e5e5e5] px-4 py-2.5 text-sm font-medium text-text transition hover:bg-[#f5f5f4]"
                                 >
                                     Cancelar

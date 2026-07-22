@@ -40,6 +40,7 @@ class UpdateUserRequest extends FormRequest
 
         return [
             'role' => ['required', 'string', Rule::in($allowedRoles)],
+            'codigo_estudiante' => ['nullable', 'string', 'max:20'],
         ];
     }
 }

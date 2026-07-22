@@ -55,6 +55,7 @@ class User extends Authenticatable
         'last_failed_at',
         'max_capacity',
         'areas',
+        'codigo_estudiante',
     ];
 
     /**
@@ -89,6 +90,7 @@ class User extends Authenticatable
             'last_failed_at' => 'datetime',
             'max_capacity' => 'integer',
             'areas' => 'string',
+            'codigo_estudiante' => 'string',
         ];
     }
 

@@ -76,6 +76,11 @@ class UserController extends Controller
         $payload = $request->validated();
         $oldRole = $user->role->value;
         $user->role = $payload['role'];
+
+        if (array_key_exists('codigo_estudiante', $payload)) {
+            $user->codigo_estudiante = $payload['codigo_estudiante'];
+        }
+
         $user->save();
 
         AuditEvent::dispatch(
@@ -85,7 +90,11 @@ class UserController extends Controller
             ['subject_id' => $user->id, 'new_role' => $user->role->value],
         );
 
-        return response()->json(['id' => $user->id, 'role' => $user->role->value]);
+        return response()->json([
+            'id' => $user->id,
+            'role' => $user->role->value,
+            'codigo_estudiante' => $user->codigo_estudiante,
+        ]);
     }
 
     /**
@@ -208,6 +217,7 @@ class UserController extends Controller
         $payload = $request->validated();
 
         $areas = $payload['areas'] ?? null;
+        $codigo = $payload['codigo_estudiante'] ?? null;
 
         $email = strtolower($payload['email']);
 
@@ -235,6 +245,7 @@ class UserController extends Controller
                 'password' => null,
                 'role' => $payload['role'],
                 'areas' => $areas,
+                'codigo_estudiante' => $codigo,
             ]);
         }
 

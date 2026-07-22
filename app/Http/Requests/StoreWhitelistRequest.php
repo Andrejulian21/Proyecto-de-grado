@@ -50,6 +50,7 @@ class StoreWhitelistRequest extends FormRequest
             ],
             'name' => ['nullable', 'string', 'max:255'],
             'areas' => ['nullable', 'string', 'max:1000'],
+            'codigo_estudiante' => ['nullable', 'string', 'max:20'],
             'role' => [
                 'required',
                 'string',

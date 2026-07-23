@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '@/lib/utils';
-import { FRONTEND_VALIDATION_MODE } from '@/mocks/validationMode';
 
 interface User {
     id: number;
@@ -54,23 +53,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const sessionCheck = useCallback(async (): Promise<void> => {
         try {
-            // Frontend Validation Mode: trust sessionStorage mock user immediately
-            if (FRONTEND_VALIDATION_MODE) {
-                const storedUser = sessionStorage.getItem('auth_user');
-                if (storedUser) {
-                    try {
-                        const parsed = JSON.parse(storedUser);
-                        if (parsed?.role) {
-                            applyUser(parsed);
-                            setIsLoading(false);
-                            return;
-                        }
-                    } catch {
-                        // fall through
-                    }
-                }
-            }
-
             // Bootstrap Sanctum CSRF cookie — required for SPA auth.
             await fetch('/sanctum/csrf-cookie', {
                 method: 'GET',

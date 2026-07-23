@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiFetch } from '@/lib/utils';
-import { FRONTEND_VALIDATION_MODE, mockDelay } from '@/mocks/validationMode';
-import { getMockEvaluaciones } from '@/mocks/evaluacionesMock';
 
 /* ── Types ── */
 
@@ -64,22 +62,6 @@ export function useEvaluaciones(): UseEvaluacionesResult {
         setError(null);
 
         try {
-            if (FRONTEND_VALIDATION_MODE) {
-                await mockDelay();
-                const raw = getMockEvaluaciones().map((e) => ({
-                    id: e.id,
-                    proyecto_id: e.proyecto_id,
-                    proyecto_nombre: e.proyecto_title,
-                    proyecto_codigo: e.proyecto_code,
-                    estudiantes: e.estudiantes.split(', '),
-                    director: 'Dr. Carlos Andrés Gómez',
-                    fase: e.fase,
-                    evaluadores: e.evaluador_name ? [e.evaluador_name] : [],
-                    nota_promedio: e.nota ?? null,
-                }));
-                setData(normalizarResultados(raw));
-                return;
-            }
             const res = await apiFetch('/api/evaluaciones');
             if (!res.ok) {
                 const body = await res.json().catch(() => null);

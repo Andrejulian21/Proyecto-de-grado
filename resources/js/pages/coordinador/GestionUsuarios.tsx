@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { FRONTEND_VALIDATION_MODE, mockDelay } from '@/mocks/validationMode';
-import { getMockUsuarios, getMockWhitelist } from '@/mocks/usuariosMock';
 import { apiFetch } from '@/lib/utils';
 import {
     Loader2,
@@ -118,20 +116,6 @@ export default function GestionUsuarios() {
 
     const fetchUsers = useCallback(async () => {
         try {
-            if (FRONTEND_VALIDATION_MODE) {
-                await mockDelay();
-                setUsers(
-                    getMockUsuarios().map((u) => ({
-                        id: u.id,
-                        email: u.email,
-                        role: u.role,
-                        name: u.name,
-                        created_by: null,
-                        created_at: u.created_at,
-                    })),
-                );
-                return;
-            }
             const res = await apiFetch('/api/admin/usuarios?per_page=200');
             if (!res.ok) throw new Error('Error al cargar usuarios');
             const json = await res.json();
@@ -144,22 +128,6 @@ export default function GestionUsuarios() {
     const fetchWhitelist = useCallback(async () => {
         setWhitelistLoading(true);
         try {
-            if (FRONTEND_VALIDATION_MODE) {
-                await mockDelay();
-                const entries = getMockWhitelist();
-                setWhitelistEntries(
-                    entries.map((w) => ({
-                        id: w.id,
-                        email: w.email,
-                        role: w.role,
-                        name: w.name,
-                        created_by: null,
-                        created_at: w.created_at,
-                    })),
-                );
-                setWhitelistMeta({ current_page: 1, last_page: 1, total: entries.length });
-                return;
-            }
             const params = new URLSearchParams({ page: String(whitelistPage), per_page: '20' });
             const res = await apiFetch(`/api/admin/whitelist?${params}`);
             if (!res.ok) throw new Error('Error al cargar whitelist');

@@ -2,8 +2,6 @@ import { useState, useReducer, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { FRONTEND_VALIDATION_MODE, mockDelay } from '@/mocks/validationMode';
-import { getMockDirectorEvaluacionesList, getMockEntregaFase, submitMockEvaluacion } from '@/mocks/evaluacionesMock';
 import { apiFetch } from '@/lib/utils';
 import {
     ArrowLeft,
@@ -119,16 +117,6 @@ export default function EvaluacionesDirector() {
         let cancelled = false;
         setLoadingLista(true);
 
-        if (FRONTEND_VALIDATION_MODE) {
-            mockDelay().then(() => {
-                if (!cancelled) {
-                    setProyectos(getMockDirectorEvaluacionesList() as EvaluacionAsignada[]);
-                    setLoadingLista(false);
-                }
-            });
-            return () => { cancelled = true; };
-        }
-
         apiFetch('/api/director/evaluaciones')
             .then(async (res) => {
                 if (!res.ok) {
@@ -167,14 +155,6 @@ export default function EvaluacionesDirector() {
         setErrorEntrega(null);
 
         try {
-            if (FRONTEND_VALIDATION_MODE) {
-                await mockDelay();
-                const data = getMockEntregaFase(proyecto.id, fase);
-                setEntrega(data as unknown as EntregaInfo);
-                setCriterios([{ id: crypto.randomUUID(), criterio: 'Calidad del documento', percentage: 100, grade: '' }]);
-                setLoadingEntrega(false);
-                return;
-            }
             const res = await apiFetch(
                 `/api/director/proyectos/${proyecto.id}/entrega-fase?fase=${encodeURIComponent(fase)}`
             );

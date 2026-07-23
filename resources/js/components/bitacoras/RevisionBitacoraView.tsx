@@ -1,75 +1,202 @@
 import { useState } from 'react';
+import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { DirectorSignaturePanel } from '@/components/bitacoras/DirectorSignaturePanel';
-import { BitacoraSignFlow } from '@/components/bitacoras/BitacoraSignFlow';
-import {
-    type BitacoraMeeting,
-    formatCreatedAt,
-    formatMeetingDate,
-    signatureStatusConfig,
-} from '@/mocks/bitacorasMock';
+import { TOTPInput } from '@/components/ui/TOTPInput';
+import { DataTable, type Column } from '@/components/ui/DataTable';
 import {
     ArrowLeft,
     Calendar,
     User,
-    Users,
     FileText,
-    AlertCircle,
+    ShieldCheck,
+    PenSquare,
+    Loader2,
+    Trash2,
+    Pencil,
+    Save,
 } from 'lucide-react';
+/* --- Tipos locales (reemplazo de mock) --- */
+
+export interface BitacoraSignature {
+    role: 'director' | 'student';
+    name: string;
+    signed: boolean;
+    signedAt: string | null;
+}
+
+export interface BitacoraDetail {
+    id: number;
+    content: string;
+    weeklySummary: string;
+    topic: string;
+    projectCode: string;
+    date: string;
+    createdAt: string;
+    status: string;
+    author: string;
+    projectId: number;
+    signatures: BitacoraSignature[];
+}
+
+function bitacoraStatusEmoji(status: string): string {
+    switch (status) {
+        case 'Completada':
+            return '✅';
+        case 'FirmadaEstudiante':
+            return '👤';
+        case 'FirmadaDirector':
+            return '👤';
+        case 'Sospechosa':
+            return '⚠️';
+        default:
+            return '⏳';
+    }
+}
+
+function bitacoraStatusLabel(status: string): string {
+    switch (status) {
+        case 'Completada':
+            return 'Completada';
+        case 'FirmadaEstudiante':
+            return 'Firmada por Estudiante';
+        case 'FirmadaDirector':
+            return 'Firmada por Director';
+        case 'Sospechosa':
+            return 'Sospechosa';
+        default:
+            return 'Pendiente';
+    }
+}
 
 const cardClass = 'rounded-xl border border-[#e5e5e5] bg-white p-5 shadow-[0_1px_2px_rgba(28,25,23,0.05)]';
 
 export interface RevisionBitacoraViewProps {
-    mode: 'director' | 'coordinador' | 'student';
-    meeting: BitacoraMeeting;
+    mode: 'director' | 'student';
+    bitacora: BitacoraDetail;
     onBack: () => void;
-    onMeetingUpdate?: (updated: BitacoraMeeting) => void;
+    onSign: (totpCode: string) => Promise<void>;
+    onRemoveSignature?: () => void;
+    onSaveContent?: (content: string, weeklySummary: string) => void;
+    currentStudentName?: string;
+    disableSigning?: boolean;
 }
 
 export function RevisionBitacoraView({
     mode,
-    meeting: initialMeeting,
+    bitacora: initialBitacora,
     onBack,
-    onMeetingUpdate,
+    onSign,
+    onRemoveSignature,
+    onSaveContent,
+    currentStudentName = 'Ana Martínez',
+    disableSigning = false,
 }: RevisionBitacoraViewProps) {
-    const [meeting, setMeeting] = useState(initialMeeting);
-    const statusConfig = signatureStatusConfig[meeting.signatureStatus];
-    const canSign = mode === 'director' && meeting.signatureStatus === 'pendiente';
+    const [bitacora, setBitacora] = useState(initialBitacora);
+    const [content, setContent] = useState(bitacora.content);
+    const [weeklySummary, setWeeklySummary] = useState(bitacora.weeklySummary);
+    const [editing, setEditing] = useState(false);
+    const [totpCode, setTotpCode] = useState('');
+    const [totpError, setTotpError] = useState('');
+    const [submitting, setSubmitting] = useState(false);
 
-    function updateMeeting(patch: Partial<BitacoraMeeting>) {
-        setMeeting((prev) => {
-            const next = { ...prev, ...patch };
-            onMeetingUpdate?.(next);
-            return next;
-        });
+    const directorSignature = bitacora.signatures.find((s) => s.role === 'director');
+    const directorSigned = directorSignature?.signed ?? false;
+    const currentUserSigned =
+        mode === 'director'
+            ? (directorSignature?.signed ?? false)
+            : (bitacora.signatures.find((s) => s.role === 'student' && s.name === currentStudentName)?.signed ?? false);
+    const canEditContent = mode === 'student' && !directorSigned;
+
+    const signatureColumns: Column<BitacoraSignature & { id: string }>[] = [
+        {
+            key: 'role',
+            label: 'Rol',
+            render: (row) => (
+                <span className="font-medium text-[#1c1917]">
+                    {row.role === 'director' ? 'Director' : 'Estudiante'}
+                </span>
+            ),
+        },
+        { key: 'name', label: 'Nombre', className: 'text-[#57534e]' },
+        {
+            key: 'signed',
+            label: 'Estado',
+            render: (row) => (
+                <StatusBadge variant={row.signed ? 'success' : 'warning'}>
+                    {row.signed ? 'Firmado' : 'Pendiente'}
+                </StatusBadge>
+            ),
+        },
+        {
+            key: 'signedAt',
+            label: 'Fecha firma',
+            className: 'text-[#57534e] tabular-nums whitespace-nowrap',
+            render: (row) => row.signedAt ?? '—',
+        },
+    ];
+
+    const tableData = bitacora.signatures
+        .filter((s) => s.role === 'director')
+        .map((s, i) => ({ ...s, id: `${s.role}-${i}` }));
+
+    function handleTOTPComplete(code: string) {
+        setTotpCode(code);
+        setTotpError('');
     }
 
-    async function handleSign(_code: string) {
-        const now = new Date();
-        updateMeeting({
-            signatureStatus: 'firmado',
-            signedAt: now.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-            signedTime: now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }),
-            rejectionComment: undefined,
-        });
+    async function handleSign() {
+        if (totpCode.length !== 6) {
+            setTotpError('Debe ingresar el código TOTP de 6 dígitos.');
+            return;
+        }
+        setSubmitting(true);
+        try {
+            await onSign(totpCode);
+            setBitacora((prev) => ({
+                ...prev,
+                status: mode === 'director' ? 'signed' : prev.status,
+                signatures: prev.signatures.map((s) => {
+                    if (mode === 'director' && s.role === 'director') {
+                        return { ...s, signed: true, signedAt: new Date().toLocaleString('es-CO') };
+                    }
+                    if (mode === 'student' && s.role === 'student' && s.name === currentStudentName) {
+                        return { ...s, signed: true, signedAt: new Date().toLocaleString('es-CO') };
+                    }
+                    return s;
+                }),
+            }));
+            setTotpCode('');
+        } catch {
+            setTotpError('Error al firmar. Intente de nuevo.');
+        } finally {
+            setSubmitting(false);
+        }
     }
 
-    async function handleReject(comment: string) {
-        updateMeeting({
-            signatureStatus: 'rechazado',
-            rejectionComment: comment,
-            signedAt: undefined,
-            signedTime: undefined,
-        });
+    function handleRemoveSignature() {
+        onRemoveSignature?.();
+        setBitacora((prev) => ({
+            ...prev,
+            status: 'pending_director',
+            signatures: prev.signatures.map((s) =>
+                s.role === 'director' ? { ...s, signed: false, signedAt: null } : s,
+            ),
+        }));
+    }
+
+    function handleSaveContent() {
+        onSaveContent?.(content, weeklySummary);
+        setBitacora((prev) => ({ ...prev, content, weeklySummary }));
+        setEditing(false);
     }
 
     return (
         <div className="flex flex-col gap-6">
             <PageHeader
                 eyebrow="Bitácora"
-                title={meeting.topic}
-                subtitle={`${meeting.projectCode} · Reunión ${formatMeetingDate(meeting.meetingDate)}`}
+                title={bitacora.topic || 'Revisar Bitácora'}
+                subtitle={`${bitacora.projectCode} · ${bitacora.date ? new Date(bitacora.date).toLocaleString('es-CO') : '—'}`}
                 actions={
                     <button
                         type="button"
@@ -82,106 +209,193 @@ export function RevisionBitacoraView({
                 }
             />
 
-            {meeting.signatureStatus === 'rechazado' && meeting.rejectionComment && (
-                <div className="flex items-start gap-3 rounded-lg border border-[#fee2e2] bg-[#fef2f2] p-4">
-                    <AlertCircle className="h-5 w-5 shrink-0 text-[#dc2626]" />
-                    <div>
-                        <p className="text-sm font-semibold text-[#7f1d1d]">Bitácora rechazada</p>
-                        <p className="mt-1 text-sm text-[#7f1d1d]">{meeting.rejectionComment}</p>
-                    </div>
-                </div>
-            )}
-
-            {meeting.signatureStatus === 'firmado' && (
-                <div className="rounded-lg border border-[#dcfce7] bg-[#dcfce7]/40 p-4 text-sm text-[#14532d]">
-                    Bitácora firmada correctamente el {meeting.signedAt} a las {meeting.signedTime}.
-                </div>
-            )}
-
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-                <div className="flex flex-col gap-6 lg:col-span-3">
+                <div className="lg:col-span-3 flex flex-col gap-6">
+                    {/* Metadata */}
                     <div className={cardClass}>
                         <div className="mb-4 flex flex-wrap items-center gap-3">
-                            <FileText className="h-5 w-5 text-[#c2410c]" />
-                            <h3 className="text-base font-bold text-[#1c1917]">Información de la reunión</h3>
-                            <StatusBadge variant={statusConfig.variant}>{statusConfig.label}</StatusBadge>
+                            <div className="flex items-center gap-2">
+                                <FileText className="h-5 w-5 text-[#c2410c]" />
+                                <h3 className="text-base font-bold text-[#1c1917]">Detalle de la sesión</h3>
+                            </div>
+                            <StatusBadge variant={bitacora.status === 'Completada' ? 'success' : 'warning'}>
+                                {bitacoraStatusLabel(bitacora.status)}
+                            </StatusBadge>
                         </div>
-
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div className="flex items-center gap-3 rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-3.5">
                                 <Calendar className="h-5 w-5 text-[#c2410c]" />
                                 <div>
                                     <p className="text-xs text-[#78716c]">Fecha de reunión</p>
-                                    <p className="text-sm font-semibold text-[#1c1917]">
-                                        {formatMeetingDate(meeting.meetingDate)}
-                                    </p>
+                                    <p className="text-sm font-semibold text-[#1c1917]">{bitacora.date ? new Date(bitacora.date).toLocaleString('es-CO') : '—'}</p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3 rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-3.5">
                                 <Calendar className="h-5 w-5 text-[#4f46e5]" />
                                 <div>
-                                    <p className="text-xs text-[#78716c]">Fecha de creación</p>
-                                    <p className="text-sm font-semibold text-[#1c1917]">
-                                        {formatCreatedAt(meeting.createdAt)}
-                                    </p>
+                                    <p className="text-xs text-[#78716c]">Creada el</p>
+                                    <p className="text-sm font-semibold text-[#1c1917]">{bitacora.createdAt ? new Date(bitacora.createdAt).toLocaleString('es-CO') : '—'}</p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3 rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-3.5">
                                 <User className="h-5 w-5 text-[#4f46e5]" />
                                 <div>
-                                    <p className="text-xs text-[#78716c]">Director</p>
-                                    <p className="text-sm font-semibold text-[#1c1917]">{meeting.directorName}</p>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-3 rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-3.5">
-                                <Users className="h-5 w-5 text-[#4f46e5]" />
-                                <div>
-                                    <p className="text-xs text-[#78716c]">Integrantes</p>
-                                    <p className="text-sm font-semibold text-[#1c1917]">{meeting.members.join(', ')}</p>
+                                    <p className="text-xs text-[#78716c]">Autor</p>
+                                    <p className="text-sm font-semibold text-[#1c1917]">{bitacora.author}</p>
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        <div className="mt-4 rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-3.5">
-                            <p className="text-xs font-bold uppercase tracking-[0.05em] text-[#57534e]">Proyecto</p>
-                            <p className="mt-1 text-sm font-semibold text-[#1c1917]">
-                                {meeting.projectCode} — {meeting.projectName}
+                    {/* Content */}
+                    <div className={cardClass}>
+                        <div className="mb-4 flex items-center justify-between gap-3">
+                            <h3 className="text-base font-bold text-[#1c1917]">Contenido</h3>
+                            {canEditContent && !editing && (
+                                <button
+                                    type="button"
+                                    onClick={() => setEditing(true)}
+                                    className="inline-flex min-h-[36px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-white px-3 py-1.5 text-xs font-semibold text-[#1c1917] transition-colors hover:bg-[#f5f5f4]"
+                                >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                    Editar
+                                </button>
+                            )}
+                        </div>
+
+                        {directorSigned && mode === 'student' && (
+                            <p className="mb-3 text-xs text-[#78716c]">
+                                El contenido está bloqueado porque el director ya firmó esta bitácora.
                             </p>
-                        </div>
+                        )}
+
+                        {editing ? (
+                            <div className="flex flex-col gap-4">
+                                <div>
+                                    <label htmlFor="bitacora-content" className="mb-1.5 block text-xs font-bold uppercase tracking-[0.05em] text-[#57534e]">
+                                        Contenido
+                                    </label>
+                                    <textarea
+                                        id="bitacora-content"
+                                        rows={5}
+                                        value={content}
+                                        onChange={(e) => setContent(e.target.value)}
+                                        className="w-full rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                    />
+                                </div>
+                                <div>
+                                    <label htmlFor="bitacora-summary" className="mb-1.5 block text-xs font-bold uppercase tracking-[0.05em] text-[#57534e]">
+                                        Resumen semanal
+                                    </label>
+                                    <textarea
+                                        id="bitacora-summary"
+                                        rows={2}
+                                        value={weeklySummary}
+                                        onChange={(e) => setWeeklySummary(e.target.value)}
+                                        className="w-full rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                    />
+                                </div>
+                                <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveContent}
+                                        className="inline-flex min-h-[36px] items-center gap-2 rounded-lg bg-[#c2410c] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#9a330a]"
+                                    >
+                                        <Save className="h-3.5 w-3.5" />
+                                        Guardar
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setContent(bitacora.content);
+                                            setWeeklySummary(bitacora.weeklySummary);
+                                            setEditing(false);
+                                        }}
+                                        className="inline-flex min-h-[36px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-white px-3 py-1.5 text-xs font-semibold text-[#57534e] hover:bg-[#f5f5f4]"
+                                    >
+                                        Cancelar
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col gap-4">
+                                <p className="text-sm leading-relaxed text-[#57534e]">{content}</p>
+                                <div>
+                                    <p className="text-xs font-bold uppercase tracking-[0.05em] text-[#57534e]">Resumen semanal</p>
+                                    <p className="mt-1 text-sm text-[#57534e]">{weeklySummary}</p>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
+                    {/* Signatures table */}
                     <div className={cardClass}>
-                        <h3 className="mb-3 text-base font-bold text-[#1c1917]">Resumen</h3>
-                        <p className="text-sm leading-relaxed text-[#57534e]">{meeting.summary}</p>
-                    </div>
-
-                    <div className={cardClass}>
-                        <h3 className="mb-3 text-base font-bold text-[#1c1917]">Contenido completo</h3>
-                        <p className="text-sm leading-relaxed text-[#57534e]">{meeting.content}</p>
+                        <h3 className="mb-4 text-base font-bold text-[#1c1917]">Tabla de firmas</h3>
+                        <DataTable
+                            columns={signatureColumns}
+                            data={tableData}
+                            getRowKey={(row) => row.id}
+                        />
                     </div>
                 </div>
 
-                <div className="flex flex-col gap-6 lg:col-span-2">
-                    <DirectorSignaturePanel
-                        directorName={meeting.directorName}
-                        status={meeting.signatureStatus}
-                        signedAt={meeting.signedAt}
-                        signedTime={meeting.signedTime}
-                    />
+                {/* TOTP panel — hidden for coordinator */}
+                <div className={cn("lg:col-span-2", disableSigning && "hidden")}>
+                    <div className="sticky top-20 rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
+                        <div className="mb-5 flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#e0e7ff]">
+                                <ShieldCheck className="h-5 w-5 text-[#4f46e5]" />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-bold text-[#1c1917]">Firma Digital</h3>
+                                <p className="text-xs text-[#57534e]">Verificación TOTP (mock)</p>
+                            </div>
+                        </div>
 
-                    {canSign && (
-                        <BitacoraSignFlow
-                            currentStatus={meeting.signatureStatus}
-                            onSign={handleSign}
-                            onReject={handleReject}
-                        />
-                    )}
-
-                    {mode === 'coordinador' && (
-                        <p className="text-xs text-[#78716c]">
-                            Vista de solo lectura para coordinación académica.
-                        </p>
-                    )}
+                        {mode === 'director' && (
+                            currentUserSigned ? (
+                                <div className="flex flex-col gap-3">
+                                    <div className="rounded-lg border border-[#dcfce7] bg-[#dcfce7]/40 p-4 text-sm text-[#14532d]">
+                                        Ya has firmado esta bitácora.
+                                    </div>
+                                    {onRemoveSignature && (
+                                        <button
+                                            type="button"
+                                            onClick={handleRemoveSignature}
+                                            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[#dc2626] bg-white px-4 py-3 text-sm font-semibold text-[#dc2626] transition-colors hover:bg-[#fee2e2]"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                            Quitar firma
+                                        </button>
+                                    )}
+                                </div>
+                            ) : (
+                                <>
+                                    <p className="mb-4 text-xs text-[#57534e]">
+                                        Ingrese el código de 6 dígitos para firmar esta bitácora.
+                                    </p>
+                                    <TOTPInput
+                                        onComplete={handleTOTPComplete}
+                                        error={totpError}
+                                        disabled={submitting}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleSign}
+                                        disabled={submitting || totpCode.length !== 6}
+                                        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#c2410c] px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a] disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                        {submitting ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <PenSquare className="h-4 w-4" />
+                                        )}
+                                        Firmar Bitácora
+                                    </button>
+                                </>
+                            )
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

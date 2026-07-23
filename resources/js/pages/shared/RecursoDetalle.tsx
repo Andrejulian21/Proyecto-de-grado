@@ -16,8 +16,6 @@ import {
     ArrowLeft,
     ExternalLink,
 } from 'lucide-react';
-import { FRONTEND_VALIDATION_MODE, mockDelay } from '@/mocks/validationMode';
-import { getRecursoById } from '@/mocks/recursosMock';
 import { apiFetch } from '@/lib/utils';
 
 type ResourceType = 'reglamento' | 'guia' | 'plantilla' | 'tutorial';
@@ -105,29 +103,6 @@ export default function RecursoDetalle() {
             setError(null);
             setRecurso(null);
             try {
-                if (FRONTEND_VALIDATION_MODE) {
-                    await mockDelay();
-                    const r = getRecursoById(Number(id));
-                    if (!r) throw new Error('El recurso no existe o ha sido eliminado.');
-                    if (!cancelled) {
-                        setRecurso({
-                            id: r.id,
-                            title: r.title,
-                            type: (['reglamento', 'guia', 'plantilla', 'tutorial'].includes(r.category)
-                                ? r.category
-                                : 'guia') as ResourceType,
-                            description: r.description,
-                            body: r.description,
-                            file_path: r.file_path ?? null,
-                            link: r.link ?? null,
-                            author: r.author,
-                            size: r.file_size ? `${r.file_size} KB` : '—',
-                            downloads: r.downloads,
-                            accesses: r.downloads,
-                        });
-                    }
-                    return;
-                }
                 const res = await apiFetch(`/api/recursos/${id}`);
                 if (!res.ok) {
                     if (res.status === 404) throw new Error('El recurso no existe o ha sido eliminado.');

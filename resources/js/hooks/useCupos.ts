@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiFetch } from '@/lib/utils';
-import { FRONTEND_VALIDATION_MODE, mockDelay } from '@/mocks/validationMode';
-import { MOCK_DIRECTORES } from '@/mocks/proyectosMock';
 
 export interface DirectorCupo {
     id: number;
@@ -20,19 +18,6 @@ export function useCupos() {
         setLoading(true);
         setError(null);
         try {
-            if (FRONTEND_VALIDATION_MODE) {
-                await mockDelay();
-                setData(
-                    MOCK_DIRECTORES.map((d) => ({
-                        id: d.id,
-                        name: d.name,
-                        areas: d.areas.split(', '),
-                        active_projects: d.current_load,
-                        max_capacity: d.max_capacity,
-                    })),
-                );
-                return;
-            }
             const res = await apiFetch('/api/admin/directores/cupos');
             if (!res.ok) {
                 const body = await res.json().catch(() => null);
@@ -64,21 +49,6 @@ export function useCupos() {
         }
 
         try {
-            if (FRONTEND_VALIDATION_MODE) {
-                await mockDelay(200);
-                setData((prev) =>
-                    prev.map((d) =>
-                        d.id === directorId
-                            ? {
-                                  ...d,
-                                  max_capacity: newMax,
-                                  areas: newAreas !== undefined ? newAreas.split(', ') : d.areas,
-                              }
-                            : d,
-                    ),
-                );
-                return { ok: true };
-            }
             const body: Record<string, unknown> = { max_capacity: newMax };
             if (newAreas !== undefined) {
                 body.areas = newAreas;

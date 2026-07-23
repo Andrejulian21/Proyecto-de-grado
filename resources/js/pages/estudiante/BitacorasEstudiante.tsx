@@ -5,8 +5,6 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { FRONTEND_VALIDATION_MODE, mockDelay } from '@/mocks/validationMode';
-import { getEstudianteBitacoras, getEstudianteProyecto } from '@/mocks/estudianteMock';
 import { apiFetch } from '@/lib/utils';
 
 /* ── Types ── */
@@ -112,27 +110,6 @@ export default function BitacorasEstudiante() {
 
         async function fetchData() {
             try {
-                if (FRONTEND_VALIDATION_MODE) {
-                    await mockDelay();
-                    const proyectoId = getEstudianteProyecto().id;
-                    if (!proyectoId) {
-                        if (!cancelled) { setPageState('empty'); setLoading(false); }
-                        return;
-                    }
-                    const mapped: Binnacle[] = getEstudianteBitacoras().map((b) => ({
-                        id: b.id,
-                        date: formatDate(b.meeting_date || b.fecha_reunion),
-                        topic: b.tema || b.topic || 'Sin titulo',
-                        description: b.notes || b.observaciones || '',
-                        duration: b.duration_hours ? `${b.duration_hours}h` : '—',
-                        signatureStatus: mapSignStatus(b.signature_status || b.estado_firma),
-                    }));
-                    if (!cancelled) {
-                        setBinnacles(mapped);
-                        setPageState(mapped.length > 0 ? 'data' : 'empty');
-                    }
-                    return;
-                }
                 // First, get the student's project to know the project_id
                 const proyRes = await apiFetch('/api/estudiante/proyecto');
                 if (!proyRes.ok) {

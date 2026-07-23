@@ -2,8 +2,6 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
-import { FRONTEND_VALIDATION_MODE, mockDelay } from '@/mocks/validationMode';
-import { getEstudianteProyecto } from '@/mocks/estudianteMock';
 import { apiFetch } from '@/lib/utils';
 
 export default function NuevaBitacora() {
@@ -25,15 +23,6 @@ export default function NuevaBitacora() {
 
         setSubmitting(true);
         try {
-            if (FRONTEND_VALIDATION_MODE) {
-                await mockDelay(500);
-                if (!getEstudianteProyecto()?.id) {
-                    setError('No tienes un proyecto asignado.');
-                    return;
-                }
-                navigate('/bitacora');
-                return;
-            }
             // Get the student's project first
             const proyRes = await apiFetch('/api/estudiante/proyecto');
             if (!proyRes.ok) {

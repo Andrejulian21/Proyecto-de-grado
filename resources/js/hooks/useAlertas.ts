@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiFetch } from '@/lib/utils';
-import { FRONTEND_VALIDATION_MODE, mockDelay } from '@/mocks/validationMode';
-import { getMockAlertas } from '@/mocks/coordinadorMock';
 
 export interface Alerta {
     id: string;
@@ -54,11 +52,6 @@ export function useAlertas(): UseAlertasResult {
         setError(null);
 
         try {
-            if (FRONTEND_VALIDATION_MODE) {
-                await mockDelay();
-                setData(getMockAlertas());
-                return;
-            }
             // Fetch source data from existing endpoints
             const [bitacorasRes, entregasRes] = await Promise.all([
                 apiFetch('/api/admin/bitacoras?limit=200'),

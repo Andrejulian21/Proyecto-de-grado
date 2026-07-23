@@ -13,8 +13,6 @@ import {
     AlertCircle,
     ExternalLink,
 } from 'lucide-react';
-import { FRONTEND_VALIDATION_MODE, mockDelay } from '@/mocks/validationMode';
-import { getRecursos } from '@/mocks/recursosMock';
 import { apiFetch } from '@/lib/utils';
 
 type ResourceType = 'reglamento' | 'guia' | 'plantilla' | 'tutorial';
@@ -147,27 +145,6 @@ export default function Recursos() {
             setLoading(true);
             setError(null);
             try {
-                if (FRONTEND_VALIDATION_MODE) {
-                    await mockDelay();
-                    if (!cancelled) {
-                        setRecursos(
-                            getRecursos().map((r) => ({
-                                id: r.id,
-                                title: r.title,
-                                type: (['reglamento', 'guia', 'plantilla', 'tutorial'].includes(r.category)
-                                    ? r.category
-                                    : 'guia') as ResourceType,
-                                description: r.description,
-                                file_path: r.file_path ?? null,
-                                link: r.link ?? null,
-                                author: r.author,
-                                size: r.file_size ? `${r.file_size} KB` : '—',
-                                downloads: r.downloads,
-                            })),
-                        );
-                    }
-                    return;
-                }
                 const res = await apiFetch('/api/recursos');
                 if (!res.ok) throw new Error('Error al cargar recursos');
                 const body = await res.json();

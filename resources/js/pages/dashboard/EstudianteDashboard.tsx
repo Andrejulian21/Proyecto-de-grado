@@ -5,8 +5,6 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { PageHeader } from '@/components/ui/PageHeader';
 import DeliveryAccordion from '@/components/DeliveryAccordion';
 import { PhaseStepper, type PhaseStep } from '@/components/project/PhaseStepper';
-import { FRONTEND_VALIDATION_MODE, mockDelay } from '@/mocks/validationMode';
-import { getEstudianteEntregas, getEstudianteProyecto } from '@/mocks/estudianteMock';
 import { apiFetch } from '@/lib/utils';
 import type { EntregaData } from '@/types/estudiante';
 
@@ -54,14 +52,6 @@ export default function EstudianteDashboard() {
         let cancel = false;
         (async () => {
             try {
-                if (FRONTEND_VALIDATION_MODE) {
-                    await mockDelay();
-                    if (cancel) return;
-                    setProyecto(getEstudianteProyecto());
-                    setEntregas(getEstudianteEntregas());
-                    setLoading(false);
-                    return;
-                }
                 const [pr, er] = await Promise.all([apiFetch('/api/estudiante/proyecto'), apiFetch('/api/estudiante/entregas')]);
                 if (cancel) return;
                 if (!pr.ok || !er.ok) { setError('Error al cargar los datos.'); setLoading(false); return; }
@@ -73,14 +63,10 @@ export default function EstudianteDashboard() {
                     deadline: toDate(e.fecha_limite || e.due_date),
                     grade: e.nota ?? e.consolidated_grade ?? null,
                     versions: (e.versiones || []).map((v: any) => ({
-                        version: v.numero_version ?? v.version_number ?? 0,
-                        date: toDate(v.subido_en || v.uploaded_at || v.created_at),
+                        version: v.numero_version ?? 0,
+                        date: toDate(v.subido_en || v.created_at),
                         status: (v.estado || v.status) === 'aprobado' ? 'approved' : (v.estado || v.status) === 'rechazado' ? 'rejected' : 'pending',
-                        fileName: v.original_name || (v.ruta_archivo || v.file_path || '').split('/').pop() || 'documento.pdf',
-                        hasObservation: Boolean(v.director_notes?.trim?.() ?? v.director_notes),
-                        reviewStatus: v.director_notes?.trim?.()
-                            ? ((e.estado || e.status) === 'aprobada' ? 'aprobada' : 'necesita_ajustes')
-                            : 'sin_revisar',
+                        fileName: (v.ruta_archivo || '').split('/').pop() || 'documento.pdf',
                     })),
                 })));
             } catch { if (!cancel) setError('Error de conexion.'); }
@@ -136,7 +122,7 @@ export default function EstudianteDashboard() {
                                     <DeliveryAccordion delivery={d} />
                                     <div className="flex justify-end border-x border-b border-[#e5e5e5] rounded-b-xl bg-white px-4 pb-3 pt-0">
                                         <button
-                                            onClick={() => navigate(`/mi-proyecto/entregas/${d.id}`)}
+                                            onClick={() => navigate(`/estudiante/entregas/${d.id}`)}
                                             className="inline-flex items-center gap-1.5 rounded-lg bg-[#c2410c] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#9a330a] active:scale-[0.98]"
                                         >
                                             <Eye className="h-3.5 w-3.5" />

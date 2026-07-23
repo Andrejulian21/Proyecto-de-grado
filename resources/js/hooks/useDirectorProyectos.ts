@@ -1,7 +1,5 @@
 import { useEffect, useReducer, useCallback, useState } from 'react';
 import { apiFetch } from '@/lib/utils';
-import { FRONTEND_VALIDATION_MODE, mockDelay } from '@/mocks/validationMode';
-import { MOCK_DIRECTOR_PROYECTOS } from '@/mocks/proyectosMock';
 
 export interface DirectorProyecto {
     id: number;
@@ -52,13 +50,6 @@ export function useDirectorProyectos() {
             dispatch({ type: 'FETCH_START' });
 
             try {
-                if (FRONTEND_VALIDATION_MODE) {
-                    await mockDelay();
-                    if (!cancelled) {
-                        dispatch({ type: 'FETCH_SUCCESS', payload: structuredClone(MOCK_DIRECTOR_PROYECTOS) });
-                    }
-                    return;
-                }
                 const res = await apiFetch('/api/director/proyectos');
 
                 if (!res.ok) {

@@ -1,7 +1,5 @@
 import { useEffect, useCallback, useReducer } from 'react';
 import { apiFetch } from '@/lib/utils';
-import { FRONTEND_VALIDATION_MODE, mockDelay } from '@/mocks/validationMode';
-import { getAllRecursosAdmin } from '@/mocks/recursosMock';
 
 export interface Recurso {
     id: number;
@@ -107,21 +105,6 @@ export function useRecursos() {
     const fetchData = useCallback(async () => {
         dispatch({ type: 'FETCH_START' });
         try {
-            if (FRONTEND_VALIDATION_MODE) {
-                await mockDelay();
-                const mapped: Recurso[] = getAllRecursosAdmin().map((r) => ({
-                    id: r.id,
-                    title: r.title,
-                    description: r.description,
-                    type: r.link ? 'link' : 'document',
-                    file_path: r.file_path ?? undefined,
-                    file_size: r.file_size ? `${r.file_size} KB` : undefined,
-                    uploaded_at: r.created_at,
-                    downloads: r.downloads,
-                }));
-                dispatch({ type: 'FETCH_SUCCESS', payload: mapped });
-                return;
-            }
             const res = await apiFetch('/api/admin/recursos');
             if (!res.ok) {
                 const body = await res.json().catch(() => null);

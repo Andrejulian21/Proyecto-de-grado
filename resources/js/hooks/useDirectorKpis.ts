@@ -1,7 +1,5 @@
 import { useEffect, useReducer, useCallback, useState } from 'react';
 import { apiFetch } from '@/lib/utils';
-import { FRONTEND_VALIDATION_MODE, mockDelay } from '@/mocks/validationMode';
-import { MOCK_DIRECTOR_KPIS } from '@/mocks/proyectosMock';
 
 export interface DirectorKpis {
     proyectos_supervisando: number;
@@ -49,17 +47,6 @@ export function useDirectorKpis() {
             dispatch({ type: 'FETCH_START' });
 
             try {
-                if (FRONTEND_VALIDATION_MODE) {
-                    await mockDelay();
-                    const payload: DirectorKpis = {
-                        proyectos_supervisando: MOCK_DIRECTOR_KPIS.proyectos_activos,
-                        entregas_pendientes: MOCK_DIRECTOR_KPIS.entregas_pendientes,
-                        alertas: MOCK_DIRECTOR_KPIS.bitacoras_pendientes,
-                        aprobadas_mes: 3,
-                    };
-                    if (!cancelled) dispatch({ type: 'FETCH_SUCCESS', payload });
-                    return;
-                }
                 const res = await apiFetch('/api/director/kpis');
 
                 if (!res.ok) {

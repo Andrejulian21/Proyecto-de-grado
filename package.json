@@ -6,11 +6,10 @@
         "build": "vite build"
     },
     "devDependencies": {
-        "@tailwindcss/postcss": "^4.3.3",
+        "@tailwindcss/postcss": "^4.3.2",
         "axios": "^1.6.4",
         "laravel-vite-plugin": "^3.1",
         "playwright": "^1.61.1",
-        "postcss": "^8.5.22",
         "vite": "^8.1"
     },
     "dependencies": {
@@ -20,6 +19,7 @@
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "lucide-react": "^1.24.0",
+        "postcss": "^8.5.19",
         "react": "^19.2",
         "react-dom": "^19.2",
         "react-router-dom": "^7.18.1",

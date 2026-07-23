@@ -1,7 +1,5 @@
 import { useEffect, useCallback, useReducer } from 'react';
 import { apiFetch } from '@/lib/utils';
-import { FRONTEND_VALIDATION_MODE, mockDelay } from '@/mocks/validationMode';
-import { MOCK_ADMIN_PROYECTOS } from '@/mocks/proyectosMock';
 
 export interface Proyecto {
     id: number;
@@ -96,21 +94,6 @@ export function useProyectos(grupoId?: number | null, filters?: { search?: strin
     const fetchData = useCallback(async () => {
         dispatch({ type: 'FETCH_START' });
         try {
-            if (FRONTEND_VALIDATION_MODE) {
-                await mockDelay();
-                let data = structuredClone(MOCK_ADMIN_PROYECTOS);
-                if (grupoId != null) data = data.filter((p) => p.semester_id === grupoId);
-                if (filters?.search) {
-                    const q = filters.search.toLowerCase();
-                    data = data.filter(
-                        (p) =>
-                            p.title.toLowerCase().includes(q) ||
-                            p.code.toLowerCase().includes(q),
-                    );
-                }
-                dispatch({ type: 'FETCH_SUCCESS', payload: data });
-                return;
-            }
             const params = new URLSearchParams();
             if (grupoId != null) {
                 params.set('grupo_id', String(grupoId));
@@ -143,27 +126,6 @@ export function useProyectos(grupoId?: number | null, filters?: { search?: strin
     const crear = useCallback(async (payload: CreateProyectoPayload) => {
         dispatch({ type: 'MUTATION_START' });
         try {
-            if (FRONTEND_VALIDATION_MODE) {
-                await mockDelay(200);
-                const created: Proyecto = {
-                    id: Date.now(),
-                    code: `PG-2026${String(Date.now()).slice(-3)}`,
-                    title: payload.title,
-                    estudiantes: payload.student_ids.map((sid) => ({
-                        id: sid,
-                        name: `Estudiante ${sid}`,
-                    })),
-                    director: MOCK_ADMIN_PROYECTOS.find((p) => p.director?.id === payload.director_id)?.director ?? {
-                        id: payload.director_id,
-                        name: 'Director',
-                    },
-                    current_phase: 'anteproyecto',
-                    status: 'active',
-                    semester_id: payload.semester_id,
-                };
-                dispatch({ type: 'CREATE_SUCCESS', payload: created });
-                return;
-            }
             const res = await apiFetch('/api/admin/proyectos', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -186,14 +148,6 @@ export function useProyectos(grupoId?: number | null, filters?: { search?: strin
         async (id: number, payload: UpdateProyectoPayload) => {
             dispatch({ type: 'MUTATION_START' });
             try {
-                if (FRONTEND_VALIDATION_MODE) {
-                    await mockDelay(200);
-                    const existing = MOCK_ADMIN_PROYECTOS.find((p) => p.id === id);
-                    if (!existing) throw new Error('Proyecto no encontrado');
-                    const updated: Proyecto = { ...existing, ...payload };
-                    dispatch({ type: 'UPDATE_SUCCESS', payload: updated });
-                    return updated;
-                }
                 const res = await apiFetch(`/api/admin/proyectos/${id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
@@ -219,11 +173,6 @@ export function useProyectos(grupoId?: number | null, filters?: { search?: strin
     const eliminar = useCallback(async (id: number) => {
         dispatch({ type: 'MUTATION_START' });
         try {
-            if (FRONTEND_VALIDATION_MODE) {
-                await mockDelay(200);
-                dispatch({ type: 'DELETE_SUCCESS', payload: id });
-                return;
-            }
             const res = await apiFetch(`/api/admin/proyectos/${id}`, {
                 method: 'DELETE',
             });

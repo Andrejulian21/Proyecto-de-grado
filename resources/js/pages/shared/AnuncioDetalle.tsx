@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Loader2, ArrowLeft, Calendar, User, Paperclip, FileDown, FileText, AlertCircle } from 'lucide-react';
+import { FRONTEND_VALIDATION_MODE, mockDelay } from '@/mocks/validationMode';
+import { getAnuncioById } from '@/mocks/anunciosMock';
 import { apiFetch } from '@/lib/utils';
 
 interface Attachment {
@@ -69,6 +71,23 @@ export default function AnuncioDetalle() {
             setError(null);
             setAnuncio(null);
             try {
+                if (FRONTEND_VALIDATION_MODE) {
+                    await mockDelay();
+                    const a = getAnuncioById(Number(id));
+                    if (!a) throw new Error('El anuncio no existe o ha sido eliminado.');
+                    if (!cancelled) {
+                        setAnuncio({
+                            id: a.id,
+                            title: a.title,
+                            category: a.category,
+                            date: new Date(a.published_at).toLocaleDateString('es-CO'),
+                            author: a.author,
+                            body: a.content,
+                            attachments: a.attachments,
+                        });
+                    }
+                    return;
+                }
                 const res = await apiFetch(`/api/anuncios/${id}`);
                 if (!res.ok) {
                     if (res.status === 404) throw new Error('El anuncio no existe o ha sido eliminado.');

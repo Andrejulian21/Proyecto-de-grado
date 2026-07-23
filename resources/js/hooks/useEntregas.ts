@@ -1,5 +1,7 @@
 import { useEffect, useCallback, useReducer } from 'react';
 import { apiFetch } from '@/lib/utils';
+import { FRONTEND_VALIDATION_MODE, mockDelay } from '@/mocks/validationMode';
+import { getMockAdminEntregas } from '@/mocks/coordinadorMock';
 
 export const FASE_SEQUENCE = [
     'anteproyecto',
@@ -148,6 +150,15 @@ export function useEntregas(filters?: EntregasFilters) {
     const fetchData = useCallback(async () => {
         dispatch({ type: 'FETCH_START' });
         try {
+            if (FRONTEND_VALIDATION_MODE) {
+                await mockDelay();
+                let data = getMockAdminEntregas() as Entrega[];
+                if (filters?.grupo_id != null) data = data.filter((e) => e.grupo_id === filters.grupo_id);
+                if (filters?.fase) data = data.filter((e) => e.phase === filters.fase);
+                if (filters?.entrega_id != null) data = data.filter((e) => e.id === filters.entrega_id);
+                dispatch({ type: 'FETCH_SUCCESS', payload: data });
+                return;
+            }
             const res = await apiFetch(buildUrl());
             if (!res.ok) {
                 const body = await res.json().catch(() => null);
@@ -168,6 +179,12 @@ export function useEntregas(filters?: EntregasFilters) {
     const crear = useCallback(async (payload: CreateEntregaPayload) => {
         dispatch({ type: 'MUTATION_START' });
         try {
+            if (FRONTEND_VALIDATION_MODE) {
+                await mockDelay(200);
+                await fetchData();
+                dispatch({ type: 'MUTATION_END' });
+                return;
+            }
             const res = await apiFetch('/api/admin/entregas', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -190,6 +207,12 @@ export function useEntregas(filters?: EntregasFilters) {
     const actualizar = useCallback(async (id: number, payload: UpdateEntregaPayload) => {
         dispatch({ type: 'MUTATION_START' });
         try {
+            if (FRONTEND_VALIDATION_MODE) {
+                await mockDelay(200);
+                const existing = getMockAdminEntregas().find((e) => e.id === id);
+                if (existing) dispatch({ type: 'UPDATE_SUCCESS', payload: { ...existing, ...payload } as Entrega });
+                return;
+            }
             const res = await apiFetch(`/api/admin/entregas/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -211,6 +234,11 @@ export function useEntregas(filters?: EntregasFilters) {
     const eliminar = useCallback(async (id: number) => {
         dispatch({ type: 'MUTATION_START' });
         try {
+            if (FRONTEND_VALIDATION_MODE) {
+                await mockDelay(200);
+                dispatch({ type: 'DELETE_SUCCESS', payload: id });
+                return;
+            }
             const res = await apiFetch(`/api/admin/entregas/${id}`, {
                 method: 'DELETE',
             });

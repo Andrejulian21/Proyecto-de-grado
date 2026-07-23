@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { AlertTriangle, Eye, EyeOff } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
+import { FRONTEND_VALIDATION_MODE, mockDelay } from '@/mocks/validationMode';
 import { useAuth } from '@/hooks/useAuth';
 
 interface FieldError {
@@ -39,6 +40,24 @@ export function LoginExterno() {
         setIsSubmitting(true);
 
         try {
+            if (FRONTEND_VALIDATION_MODE) {
+                await mockDelay(400);
+                const mockUsers: Record<string, { role: string; name: string }> = {
+                    'juliarteaga938@gmail.com': { role: 'Estudiante', name: 'Julian Estudiante' },
+                    'nicorfire1.4@gmail.com': { role: 'Estudiante', name: 'Nicolas Estudiante Test' },
+                    'julian21arteaga@gmail.com': { role: 'Director', name: 'Julian Director' },
+                    'pedro.eval@externo.com': { role: 'EvaluadorExterno', name: 'Pedro Evaluador' },
+                };
+                const profile = mockUsers[email.trim().toLowerCase()];
+                if (!profile || password !== 'Pruebas123!') {
+                    setErrors({ general: 'Credenciales inválidas. Verifica tu correo y contraseña.' });
+                    return;
+                }
+                const user = { id: 1, email: email.trim(), name: profile.name, role: profile.role, es_externo: true };
+                sessionStorage.setItem('auth_user', JSON.stringify(user));
+                window.location.href = `/dashboard/${profile.role.toLowerCase()}`;
+                return;
+            }
             const res = await apiFetch('/api/auth/externo/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },

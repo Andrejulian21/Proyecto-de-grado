@@ -1,5 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { apiFetch } from '@/lib/utils';
+import { FRONTEND_VALIDATION_MODE, mockDelay } from '@/mocks/validationMode';
+import { searchEstudiantes } from '@/mocks/proyectosMock';
 
 export interface StudentUser {
     id: number;
@@ -61,6 +63,18 @@ export function useStudentSearch() {
         setLoading(true);
 
         timerRef.current = setTimeout(async () => {
+            if (FRONTEND_VALIDATION_MODE) {
+                await mockDelay(150);
+                const data = searchEstudiantes(query.trim()).map((s) => ({
+                    id: s.id,
+                    name: s.name,
+                    email: s.email,
+                }));
+                setResults(data);
+                setError(null);
+                setLoading(false);
+                return;
+            }
             // Abort previous request
             if (abortRef.current) abortRef.current.abort();
             const controller = new AbortController();

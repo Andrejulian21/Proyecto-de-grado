@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useReducer } from 'react';
 import { apiFetch } from '@/lib/utils';
+import { FRONTEND_VALIDATION_MODE, mockDelay } from '@/mocks/validationMode';
+import { getMockEvaluadorProyectoAsignaciones, getMockUsuarios } from '@/mocks/usuariosMock';
 
 /* ── Types ── */
 
@@ -129,6 +131,11 @@ export function useEvaluadorProyecto() {
     const refetch = useCallback(async () => {
         dispatch({ type: 'FETCH_START' });
         try {
+            if (FRONTEND_VALIDATION_MODE) {
+                await mockDelay();
+                dispatch({ type: 'FETCH_SUCCESS', payload: getMockEvaluadorProyectoAsignaciones() as EvaluadorProyecto[] });
+                return;
+            }
             const res = await apiFetch('/api/admin/evaluador-proyecto');
             if (!res.ok) {
                 const body = await res.json().catch(() => null);
@@ -243,6 +250,14 @@ export function useEvaluadorUsers(): UseEvaluadorUsersResult {
         setLoading(true);
         setError(null);
         try {
+            if (FRONTEND_VALIDATION_MODE) {
+                await mockDelay();
+                const users = getMockUsuarios().filter((u) =>
+                    u.role === 'EvaluadorExterno' || u.role === 'Director',
+                );
+                setData(users.map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role })));
+                return;
+            }
             // Fetch both evaluadores externos and directores for the selector
             const [evalRes, dirRes] = await Promise.all([
                 apiFetch('/api/admin/usuarios?role=evaluadorexterno&per_page=500'),

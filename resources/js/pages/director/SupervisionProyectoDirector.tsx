@@ -4,25 +4,20 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PhaseStepper, type PhaseStep } from '@/components/project/PhaseStepper';
+import DeliverySupervisionRow from '@/components/entregas/DeliverySupervisionRow';
+import DeliveryTimelineStatusLegend from '@/components/entregas/DeliveryTimelineStatusLegend';
+import { getSupervisionDeliveries } from '@/mocks/entregasMock';
+import { FRONTEND_VALIDATION_MODE, mockDelay } from '@/mocks/validationMode';
+import { getDirectorProyectoDetail } from '@/mocks/proyectosMock';
 import { useDirectorProyectos, type DirectorProyecto } from '@/hooks/useDirectorProyectos';
 import { apiFetch } from '@/lib/utils';
 import {
     ArrowLeft, Search, BookOpen, GraduationCap, FileText,
-    Calendar, Clock, User, Award, ChevronDown, ChevronRight,
+    Calendar, Clock, User, Award,
     Eye, RefreshCw, Loader2, AlertCircle, Users,
 } from 'lucide-react';
 
 /* ── Types ── */
-
-interface ProjectDelivery {
-    id: number;
-    title: string;
-    description?: string;
-    due_date: string;
-    phase: string;
-    status: string;
-    grade?: string | number | null;
-}
 
 interface ProjectDetail {
     id: number;
@@ -36,15 +31,7 @@ interface ProjectDetail {
     period?: string;
     start_date?: string;
     end_date?: string;
-    entregas?: ProjectDelivery[];
 }
-
-const deliveryStatusConfig: Record<string, { label: string; variant: 'success' | 'warning' | 'error' | 'info' | 'inactivo' }> = {
-    approved: { label: 'Aprobado', variant: 'success' },
-    pending: { label: 'Pendiente', variant: 'warning' },
-    corrections: { label: 'Correcciones', variant: 'error' },
-    rejected: { label: 'Rechazado', variant: 'error' },
-};
 
 const projectStatusConfig: Record<string, { label: string; variant: 'success' | 'inactivo' | 'warning' | 'info' }> = {
     active: { label: 'Activo', variant: 'success' },
@@ -222,7 +209,7 @@ function ProjectCard({ project }: { project: DirectorProyecto }) {
                     Ver Proyecto
                 </button>
                 <button
-                    onClick={() => navigate(`/supervision/${project.id}/bitacoras`)}
+                    onClick={() => navigate(`/bitacoras/proyectos/${project.id}`)}
                     className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-xs font-semibold text-[#1c1917] transition-colors hover:border-[#c2410c] hover:bg-[#fed7aa] hover:text-[#c2410c]"
                 >
                     <FileText className="h-3.5 w-3.5" />
@@ -253,6 +240,13 @@ function ProjectDetailView({ proyectoId }: { proyectoId: number }) {
             setError(null);
 
             try {
+                if (FRONTEND_VALIDATION_MODE) {
+                    await mockDelay();
+                    const detail = getDirectorProyectoDetail(proyectoId);
+                    if (!detail) throw new Error('Proyecto no encontrado.');
+                    if (!cancelled) setProject(detail);
+                    return;
+                }
                 const res = await apiFetch(`/api/director/proyectos/${proyectoId}`);
 
                 if (!res.ok) {
@@ -331,7 +325,7 @@ function ProjectDetailView({ proyectoId }: { proyectoId: number }) {
     }
 
     const estudianteName = project.estudiantes?.map((e) => e.name).join(', ') ?? '';
-    const deliveries = project.entregas ?? [];
+    const deliveries = getSupervisionDeliveries(proyectoId);
 
     const PHASE_IDS = ['anteproyecto', 'presentacion_anteproyecto', 'desarrollo', 'presentacion_final'];
     const PHASE_LABELS: Record<string, string> = {
@@ -461,8 +455,11 @@ function ProjectDetailView({ proyectoId }: { proyectoId: number }) {
 
             {/* Deliveries */}
             <div className="rounded-xl border border-[#e5e5e5] bg-white shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
-                <div className="border-b border-[#e5e5e5] px-6 py-4">
-                    <h3 className="text-base font-bold text-[#1c1917]">Entregas ({filteredDeliveries.length})</h3>
+                <div className="flex flex-col gap-3 border-b border-[#e5e5e5] px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <h3 className="text-base font-bold text-[#1c1917]">
+                        Entregas ({filteredDeliveries.length})
+                    </h3>
+                    <DeliveryTimelineStatusLegend />
                 </div>
 
                 {filteredDeliveries.length === 0 ? (
@@ -476,59 +473,17 @@ function ProjectDetailView({ proyectoId }: { proyectoId: number }) {
                     </div>
                 ) : (
                     <div className="divide-y divide-[#e5e5e5]">
-                        {filteredDeliveries.map((d) => {
-                            const config = deliveryStatusConfig[d.status] ?? deliveryStatusConfig.pending;
-                            const isExpanded = expandedDelivery === d.id;
-                            return (
-                                <div key={d.id}>
-                                    <button
-                                        onClick={() => setExpandedDelivery(isExpanded ? null : d.id)}
-                                        className="flex w-full items-center justify-between gap-4 px-6 py-4 text-left transition-colors hover:bg-[#fafaf9]"
-                                    >
-                                        <div className="flex items-center gap-4 min-w-0">
-                                            {isExpanded ? (
-                                                <ChevronDown className="h-4 w-4 shrink-0 text-[#78716c]" />
-                                            ) : (
-                                                <ChevronRight className="h-4 w-4 shrink-0 text-[#78716c]" />
-                                            )}
-                                            <div className="min-w-0">
-                                                <p className="text-sm font-semibold text-[#1c1917] truncate">{d.title}</p>
-                                                <p className="text-xs text-[#78716c]">
-                                                    {new Date(d.due_date).toLocaleDateString('es-CO')}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-3 shrink-0">
-                                            <StatusBadge variant={config.variant}>{config.label}</StatusBadge>
-                                            {d.grade != null && (
-                                                <span className="text-sm font-bold text-[#1c1917] tabular-nums">{d.grade}</span>
-                                            )}
-                                        </div>
-                                    </button>
-                                    {isExpanded && (
-                                        <div className="border-t border-[#e5e5e5] bg-[#fafaf9] px-6 py-4">
-                                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                                <p className="text-sm text-[#57534e]">
-                                                    {d.status === 'pending'
-                                                        ? 'El estudiante aún no ha realizado esta entrega.'
-                                                        : d.status === 'corrections'
-                                                            ? 'Se solicitaron correcciones. Pendiente de re-entrega.'
-                                                            : 'Entrega revisada y aprobada.'}
-                                                </p>
-                                                <div className="flex items-center gap-2">
-                                                    <button
-                                                        onClick={() => navigate(`/entregas/${d.id}/revisar`)}
-                                                        className="inline-flex min-h-[36px] items-center gap-2 rounded-lg bg-[#c2410c] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#9a330a] active:scale-[0.98]"
-                                                    >
-                                                        Revisar
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
+                        {filteredDeliveries.map((d) => (
+                            <DeliverySupervisionRow
+                                key={d.id}
+                                delivery={d}
+                                isExpanded={expandedDelivery === d.id}
+                                onToggle={() =>
+                                    setExpandedDelivery(expandedDelivery === d.id ? null : d.id)
+                                }
+                                onReview={() => navigate(`/entregas/${d.id}/revisar`)}
+                            />
+                        ))}
                     </div>
                 )}
             </div>

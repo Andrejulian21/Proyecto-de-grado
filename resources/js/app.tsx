@@ -39,7 +39,7 @@ const CoordinadorBitacoras = lazy(() => import('@/pages/coordinador/CoordinadorB
 const GestionAlertas = lazy(() => import('@/pages/coordinador/GestionAlertas'));
 const RecursosAdmin = lazy(() => import('@/pages/coordinador/RecursosAdmin'));
 const DirectoresPage = lazy(() => import('@/pages/coordinador/DirectoresPage'));
-const VerBitacorasCoordinador = lazy(() => import('@/pages/coordinador/VerBitacorasCoordinador'));
+const CoordinadorBitacorasProyecto = lazy(() => import('@/pages/coordinador/CoordinadorBitacorasProyecto'));
 const RevisionBitacoraCoordinador = lazy(() => import('@/pages/coordinador/RevisionBitacoraCoordinador'));
 const EvaluarProyecto = lazy(() => import('@/pages/evaluador/EvaluarProyecto'));
 const EvaluadorCalificar = lazy(() => import('@/pages/evaluador/EvaluadorCalificar'));
@@ -86,6 +86,21 @@ function SupervisionReadOnlyWrapper() {
     return <SupervisionReadOnly projectId={id ? Number(id) : undefined} />;
 }
 
+function RedirectSupervisionBitacoras() {
+    const { proyectoId } = useParams<{ proyectoId: string }>();
+    return <Navigate to={`/bitacoras/proyectos/${proyectoId}`} replace />;
+}
+
+function RedirectDirectoresBitacoras() {
+    const { proyectoId } = useParams<{ proyectoId: string }>();
+    return <Navigate to={`/coordinador/bitacoras/proyectos/${proyectoId}`} replace />;
+}
+
+function RedirectDirectoresRevision() {
+    const { id } = useParams<{ id: string }>();
+    return <Navigate to={`/coordinador/bitacoras/${id}/revision`} replace />;
+}
+
 function App() {
     return (
         <Routes>
@@ -123,9 +138,9 @@ function App() {
                                 {/* PR6: Director pages */}
                                 <Route path="/supervision" element={<ProtectedRoute allowedRoles={['Director']}><SuspenseWrapper><SupervisionProyectoDirector /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/supervision/:proyectoId" element={<ProtectedRoute allowedRoles={['Director']}><SuspenseWrapper><SupervisionProyectoDirector /></SuspenseWrapper></ProtectedRoute>} />
-                                <Route path="/supervision/:proyectoId/bitacoras" element={<ProtectedRoute allowedRoles={['Director']}><SuspenseWrapper><BitacorasProyecto /></SuspenseWrapper></ProtectedRoute>} />
+                                <Route path="/supervision/:proyectoId/bitacoras" element={<ProtectedRoute allowedRoles={['Director']}><RedirectSupervisionBitacoras /></ProtectedRoute>} />
                                 <Route path="/bitacoras/proyectos" element={<ProtectedRoute allowedRoles={['Director']}><SuspenseWrapper><SeleccionProyectosBitacoras /></SuspenseWrapper></ProtectedRoute>} />
-                                {/* PR7: Director bitacoras */}
+                                <Route path="/bitacoras/proyectos/:proyectoId" element={<ProtectedRoute allowedRoles={['Director']}><SuspenseWrapper><BitacorasProyecto /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/bitacoras" element={<ProtectedRoute allowedRoles={['Director']}><SuspenseWrapper><BitacorasDirector /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/bitacoras/:id/revision" element={<ProtectedRoute allowedRoles={['Director']}><SuspenseWrapper><RevisionBitacoraDirector /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/bitacoras/:id/firmar" element={<ProtectedRoute allowedRoles={['Director']}><SuspenseWrapper><DetalleFirmaBitacora /></SuspenseWrapper></ProtectedRoute>} />
@@ -136,8 +151,8 @@ function App() {
                                 {/* PR9: Coordinador proyectos */}
                                 <Route path="/proyectos" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><GestionProyectos /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/directores" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><DirectoresPage /></SuspenseWrapper></ProtectedRoute>} />
-                                <Route path="/directores/proyectos/:proyectoId/bitacoras" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><VerBitacorasCoordinador /></SuspenseWrapper></ProtectedRoute>} />
-                                <Route path="/directores/bitacoras/:id/revision" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><RevisionBitacoraCoordinador /></SuspenseWrapper></ProtectedRoute>} />
+                                <Route path="/directores/proyectos/:proyectoId/bitacoras" element={<ProtectedRoute allowedRoles={['Coordinador']}><RedirectDirectoresBitacoras /></ProtectedRoute>} />
+                                <Route path="/directores/bitacoras/:id/revision" element={<ProtectedRoute allowedRoles={['Coordinador']}><RedirectDirectoresRevision /></ProtectedRoute>} />
                                 <Route path="/directores/proyectos/:proyectoId/entregas/:entregaId" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><DetalleEntregaCoordinador /></SuspenseWrapper></ProtectedRoute>} />
                                 {/* PR10: Coordinador admin */}
                                 <Route path="/anuncios/admin" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><AnunciosAdmin /></SuspenseWrapper></ProtectedRoute>} />
@@ -145,6 +160,8 @@ function App() {
                                 {/* PR11: Coordinador seguimiento */}
                                 <Route path="/coordinador/entregas" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><CoordinadorEntregas /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/coordinador/bitacoras" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><CoordinadorBitacoras /></SuspenseWrapper></ProtectedRoute>} />
+                                <Route path="/coordinador/bitacoras/proyectos/:proyectoId" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><CoordinadorBitacorasProyecto /></SuspenseWrapper></ProtectedRoute>} />
+                                <Route path="/coordinador/bitacoras/:id/revision" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><RevisionBitacoraCoordinador /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/alertas" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><GestionAlertas /></SuspenseWrapper></ProtectedRoute>} />
                                 {/* PR12: Coordinador reports (removed) */}
                                 <Route path="/recursos/admin" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><RecursosAdmin /></SuspenseWrapper></ProtectedRoute>} />

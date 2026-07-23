@@ -13,6 +13,10 @@ export interface VersionData {
     date: string;
     status: 'approved' | 'pending' | 'rejected';
     fileName: string;
+    /** Whether this version has a director observation (ENT-ACCORDION) */
+    hasObservation?: boolean;
+    /** Per-version review status label source */
+    reviewStatus?: 'sin_revisar' | 'aprobada' | 'necesita_ajustes';
 }
 
 export interface PhaseStep {

@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiFetch } from '@/lib/utils';
+import { FRONTEND_VALIDATION_MODE, mockDelay } from '@/mocks/validationMode';
+import { MOCK_KPIS as MOCK_KPIS_DATA } from '@/mocks/proyectosMock';
 
 export interface KpiResponse {
     proyectos_activos: number;
@@ -25,6 +27,11 @@ export function useKpis(): UseKpisResult {
         setError(null);
 
         try {
+            if (FRONTEND_VALIDATION_MODE) {
+                await mockDelay();
+                setData(MOCK_KPIS_DATA);
+                return;
+            }
             const res = await apiFetch('/api/admin/proyectos/kpis');
 
             if (!res.ok) {

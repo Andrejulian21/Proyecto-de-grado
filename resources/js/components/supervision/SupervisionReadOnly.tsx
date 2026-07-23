@@ -9,6 +9,9 @@ import {
 } from 'lucide-react';
 import { useEffect, useState, useCallback } from 'react';
 import { apiFetch } from '@/lib/utils';
+import { FRONTEND_VALIDATION_MODE, mockDelay } from '@/mocks/validationMode';
+import { getAdminProyectoDetail } from '@/mocks/proyectosMock';
+import { getEntregasByProjectId } from '@/mocks/entregasMock';
 
 /* ── Types ── */
 
@@ -128,6 +131,32 @@ export default function SupervisionReadOnly({ projectCode, projectTitle, project
         setLoading(true);
         setFetchError(null);
         try {
+            if (FRONTEND_VALIDATION_MODE) {
+                await mockDelay();
+                const p = getAdminProyectoDetail(projectId);
+                if (!p) throw new Error('Proyecto no encontrado');
+                setProjectInfo({
+                    code: p.code,
+                    title: p.title,
+                    students: p.estudiantes.map((s) => s.name).join(', '),
+                    type: '',
+                    period: '2026-1',
+                    startDate: '01 feb 2026',
+                    endDate: '30 jun 2026',
+                    currentPhase: p.current_phase ?? '',
+                });
+                setDeliveries(
+                    getEntregasByProjectId(projectId).map((e) => ({
+                        id: e.id,
+                        name: e.title,
+                        date: e.dueDate ? new Date(e.dueDate).toLocaleDateString('es-CO') : '—',
+                        phase: e.phase,
+                        status: e.status === 'aprobada' ? 'approved' : 'pending',
+                        grade: '—',
+                    })),
+                );
+                return;
+            }
             const res = await apiFetch(`/api/admin/proyectos/${projectId}`);
             if (!res.ok) {
                 const body = await res.json().catch(() => null);

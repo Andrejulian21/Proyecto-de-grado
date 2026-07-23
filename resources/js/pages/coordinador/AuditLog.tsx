@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
+import { FRONTEND_VALIDATION_MODE, mockDelay } from '@/mocks/validationMode';
+import { getMockAuditLogs } from '@/mocks/coordinadorMock';
 import { Search, Calendar, ChevronLeft, ChevronRight, Loader2, RotateCcw } from 'lucide-react';
 
 interface AuditEntry {
@@ -61,6 +63,23 @@ export default function AuditLog() {
     const fetchLogs = useCallback(async () => {
         setLoading(true);
         try {
+            if (FRONTEND_VALIDATION_MODE) {
+                await mockDelay();
+                const json = getMockAuditLogs(page, 50);
+                setLogs(
+                    json.data.map((row) => ({
+                        id: row.id,
+                        user: row.user_name ? { name: row.user_name, email: '' } : null,
+                        action: row.action,
+                        description: row.description,
+                        ip_address: row.ip_address,
+                        user_agent: 'Mock Browser',
+                        created_at: row.created_at,
+                    })),
+                );
+                setMeta(json.meta);
+                return;
+            }
             const params = new URLSearchParams({ page: String(page), per_page: '50' });
             if (actionFilter) params.set('action', actionFilter);
             if (dateFrom) params.set('date_from', dateFrom);

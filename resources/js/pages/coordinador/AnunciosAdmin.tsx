@@ -4,6 +4,8 @@ import { StatCard } from '@/components/ui/StatCard';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Megaphone, Plus, Trash2, Pin, Send, Loader2, Eye, Pencil } from 'lucide-react';
+import { FRONTEND_VALIDATION_MODE, mockDelay } from '@/mocks/validationMode';
+import { createAnuncio, deleteAnuncio, getAnuncios, updateAnuncio } from '@/mocks/anunciosMock';
 import { apiFetch } from '@/lib/utils';
 
 interface Announcement {
@@ -58,6 +60,11 @@ export default function AnunciosAdmin() {
         setLoading(true);
         setError(null);
         try {
+            if (FRONTEND_VALIDATION_MODE) {
+                await mockDelay();
+                setAnnouncements(getAnuncios().map(fromApi));
+                return;
+            }
             const res = await apiFetch('/api/anuncios');
             if (!res.ok) throw new Error('Error al cargar anuncios');
             const body = await res.json();
@@ -106,6 +113,26 @@ export default function AnunciosAdmin() {
         if (!formTitle.trim() || !formContent.trim()) return;
         setSubmitting(true);
         try {
+            if (FRONTEND_VALIDATION_MODE) {
+                await mockDelay(400);
+                if (editingId !== null) {
+                    updateAnuncio(editingId, {
+                        title: formTitle.trim(),
+                        content: formContent.trim(),
+                        is_active: formIsActive,
+                    });
+                } else {
+                    createAnuncio({
+                        title: formTitle.trim(),
+                        content: formContent.trim(),
+                        is_active: formIsActive,
+                        category: 'informativo',
+                    });
+                }
+                await fetchAnnouncements();
+                closeForm();
+                return;
+            }
             const payload: Record<string, unknown> = {
                 title: formTitle.trim(),
                 content: formContent.trim(),
@@ -159,6 +186,13 @@ export default function AnunciosAdmin() {
         if (!deleteTarget) return;
         setSubmitting(true);
         try {
+            if (FRONTEND_VALIDATION_MODE) {
+                await mockDelay(300);
+                deleteAnuncio(deleteTarget.id);
+                setAnnouncements((prev) => prev.filter((a) => a.id !== deleteTarget.id));
+                setDeleteTarget(null);
+                return;
+            }
             const res = await apiFetch(`/api/admin/anuncios/${deleteTarget.id}`, {
                 method: 'DELETE',
             });

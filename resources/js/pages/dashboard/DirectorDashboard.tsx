@@ -1,9 +1,14 @@
 import { StatCard } from '@/components/ui/StatCard';
-import { StatusBadge } from '@/components/ui/StatusBadge';
 import { DataTable, type Column } from '@/components/ui/DataTable';
+import DeliveryTimelineStatusBadge from '@/components/entregas/DeliveryTimelineStatusBadge';
+import DeliveryTimelineStatusLegend from '@/components/entregas/DeliveryTimelineStatusLegend';
+import {
+    getDirectorDashboardEntregas,
+    type DirectorDashboardEntregaRow,
+} from '@/mocks/entregasMock';
 import { useDirectorProyectos } from '@/hooks/useDirectorProyectos';
 import { useDirectorKpis } from '@/hooks/useDirectorKpis';
-import { useDirectorEntregas, type DirectorEntrega } from '@/hooks/useDirectorEntregas';
+import { useEffect, useState } from 'react';
 import {
     ClipboardCheck,
     FileText,
@@ -18,7 +23,7 @@ import {
 
 /* ── Columns for deliveries table ── */
 
-const deliveryColumns: Column<DirectorEntrega>[] = [
+const deliveryColumns: Column<DirectorDashboardEntregaRow>[] = [
     {
         key: 'codigo',
         label: 'Código',
@@ -45,22 +50,20 @@ const deliveryColumns: Column<DirectorEntrega>[] = [
         className: 'text-text-muted tabular-nums',
     },
     {
-        key: 'status',
-        label: 'Estado',
-        render: (row: DirectorEntrega) => (
-            <StatusBadge variant="warning">
-                Pendiente
-            </StatusBadge>
+        key: 'timelineStatus',
+        label: 'Estado de plazo',
+        render: (row: DirectorDashboardEntregaRow) => (
+            <DeliveryTimelineStatusBadge status={row.timelineStatus} />
         ),
     },
     {
         key: 'actions',
         label: 'Acciones',
         className: 'text-right',
-        render: () => (
+        render: (row: DirectorDashboardEntregaRow) => (
             <button
                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-alt hover:text-primary"
-                aria-label="Revisar entrega"
+                aria-label={`Revisar entrega ${row.title}`}
             >
                 <Eye className="h-4 w-4" />
             </button>
@@ -152,20 +155,28 @@ export default function DirectorDashboard() {
         refetch: refetchKpis,
     } = useDirectorKpis();
 
-    const {
-        data: entregas,
-        loading: loadingEntregas,
-        error: errorEntregas,
-        refetch: refetchEntregas,
-    } = useDirectorEntregas();
+    const [entregas, setEntregas] = useState<DirectorDashboardEntregaRow[]>([]);
+    const [loadingEntregas, setLoadingEntregas] = useState(true);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setEntregas(getDirectorDashboardEntregas());
+            setLoadingEntregas(false);
+        }, 350);
+        return () => clearTimeout(timer);
+    }, []);
 
     const handleRetry = () => {
         refetchProyectos();
         refetchKpis();
-        refetchEntregas();
+        setLoadingEntregas(true);
+        setTimeout(() => {
+            setEntregas(getDirectorDashboardEntregas());
+            setLoadingEntregas(false);
+        }, 350);
     };
 
-    const hasError = errorProyectos || errorKpis || errorEntregas;
+    const hasError = errorProyectos || errorKpis;
 
     return (
         <div className="flex flex-col gap-6">
@@ -190,7 +201,7 @@ export default function DirectorDashboard() {
             {/* Error banner */}
             {hasError && (
                 <ErrorBanner
-                    message={errorProyectos || errorKpis || errorEntregas || 'Error al cargar los datos'}
+                    message={errorProyectos || errorKpis || 'Error al cargar los datos'}
                     onRetry={handleRetry}
                 />
             )}
@@ -266,14 +277,17 @@ export default function DirectorDashboard() {
 
             {/* Deliveries table */}
             <section aria-labelledby="deliveries-heading">
-                <h2 id="deliveries-heading" className="mb-4 text-sm font-bold uppercase tracking-[0.05em] text-text-muted">
-                    Últimas Entregas
-                </h2>
-                <DataTable<DirectorEntrega>
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <h2 id="deliveries-heading" className="text-sm font-bold uppercase tracking-[0.05em] text-text-muted">
+                        Últimas Entregas
+                    </h2>
+                    <DeliveryTimelineStatusLegend />
+                </div>
+                <DataTable<DirectorDashboardEntregaRow>
                     columns={deliveryColumns}
                     data={entregas}
                     loading={loadingEntregas}
-                    emptyMessage={errorEntregas ? 'Error al cargar las entregas.' : 'No hay entregas pendientes por revisar.'}
+                    emptyMessage="No hay entregas registradas."
                     getRowKey={(row) => row.id}
                 />
             </section>

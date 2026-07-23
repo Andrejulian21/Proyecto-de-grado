@@ -4,6 +4,8 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Loader2, ArrowRight, Megaphone, Calendar, AlertCircle } from 'lucide-react';
+import { FRONTEND_VALIDATION_MODE, mockDelay } from '@/mocks/validationMode';
+import { getAnuncios } from '@/mocks/anunciosMock';
 import { apiFetch } from '@/lib/utils';
 
 interface Announcement {
@@ -59,6 +61,21 @@ export default function AnunciosPublica() {
             setLoading(true);
             setError(null);
             try {
+                if (FRONTEND_VALIDATION_MODE) {
+                    await mockDelay();
+                    if (!cancelled) {
+                        setAnuncios(
+                            getAnuncios(true).map((a) => ({
+                                id: a.id,
+                                title: a.title,
+                                category: a.category,
+                                date: new Date(a.published_at).toLocaleDateString('es-CO'),
+                                excerpt: a.excerpt,
+                            })),
+                        );
+                    }
+                    return;
+                }
                 const res = await apiFetch('/api/anuncios');
                 if (!res.ok) throw new Error('Error al cargar anuncios');
                 const body = await res.json();

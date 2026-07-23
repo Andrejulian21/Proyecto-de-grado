@@ -1,0 +1,10 @@
+export { FRONTEND_VALIDATION_MODE, mockDelay } from '@/mocks/validationMode';
+export * from '@/mocks/estudianteMock';
+export * from '@/mocks/proyectosMock';
+export * from '@/mocks/anunciosMock';
+export * from '@/mocks/recursosMock';
+export * from '@/mocks/coordinadorMock';
+export * from '@/mocks/usuariosMock';
+export * from '@/mocks/evaluacionesMock';
+export * from '@/mocks/bitacorasMock';
+export * from '@/mocks/entregasMock';

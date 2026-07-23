@@ -187,6 +187,7 @@ export default function RevisionEntregaDirector() {
                     status: decision,
                     consolidated_grade: null,
                     director_notes: directorNotes || null,
+                    version_id: selectedVersion?.id,
                 }),
             });
 

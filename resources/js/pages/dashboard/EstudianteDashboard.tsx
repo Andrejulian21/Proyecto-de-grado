@@ -58,15 +58,18 @@ export default function EstudianteDashboard() {
                 const pd = await pr.json(), ed = await er.json();
                 setProyecto(pd.data);
                 setEntregas((ed.data || []).map((e: any) => ({
-                    id: e.id, fase: e.fase, label: LABELS[e.fase] || e.titulo || e.title || `Entrega #${e.id}`,
+                    id: e.id, fase: e.fase,
+                    title: e.titulo || e.title || `Entrega #${e.id}`,
                     status: mapStatus(e.estado || e.status),
                     deadline: toDate(e.fecha_limite || e.due_date),
+                    startDate: toDate(e.fecha_inicio || e.start_date),
                     grade: e.nota ?? e.consolidated_grade ?? null,
                     versions: (e.versiones || []).map((v: any) => ({
                         version: v.numero_version ?? 0,
                         date: toDate(v.subido_en || v.created_at),
                         status: (v.estado || v.status) === 'aprobado' ? 'approved' : (v.estado || v.status) === 'rechazado' ? 'rejected' : 'pending',
                         fileName: (v.ruta_archivo || '').split('/').pop() || 'documento.pdf',
+                        observaciones: v.observaciones || null,
                     })),
                 })));
             } catch { if (!cancel) setError('Error de conexion.'); }
@@ -119,7 +122,7 @@ export default function EstudianteDashboard() {
                                 <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-[#e5e5e5] bg-white py-12 text-sm text-[#78716c]"><FileText className="h-8 w-8 text-[#d6d3d1]" />No hay entregas para esta fase.</div>
                             ) : filtered.map((d) => (
                                 <div key={d.id} className="flex flex-col">
-                                    <DeliveryAccordion delivery={d} />
+                                    <DeliveryAccordion delivery={d} faseLabel={LABELS[d.fase] || d.fase} />
                                     <div className="flex justify-end border-x border-b border-[#e5e5e5] rounded-b-xl bg-white px-4 pb-3 pt-0">
                                         <button
                                             onClick={() => navigate(`/estudiante/entregas/${d.id}`)}

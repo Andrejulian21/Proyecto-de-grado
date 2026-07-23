@@ -263,11 +263,21 @@ it('director puede aprobar entrega con nota y feedback', function () {
         'status' => 'enviada',
     ]);
 
+    $version = \App\Models\VersionDocumento::create([
+        'entrega_id' => $entrega->id,
+        'version_number' => 1,
+        'file_path' => 'entregas/test.pdf',
+        'file_size' => 1024,
+        'original_name' => 'test.pdf',
+        'uploaded_at' => now(),
+    ]);
+
     $response = $this->actingAs($this->director)
         ->putJson("/api/admin/entregas/{$entrega->id}/revisar", [
             'status' => 'aprobada',
             'consolidated_grade' => 4.5,
             'director_notes' => 'Buen trabajo',
+            'version_id' => $version->id,
         ]);
 
     $response->assertOk();
@@ -286,10 +296,20 @@ it('estudiante NO puede revisar entrega (403)', function () {
         'status' => 'enviada',
     ]);
 
+    $version = \App\Models\VersionDocumento::create([
+        'entrega_id' => $entrega->id,
+        'version_number' => 1,
+        'file_path' => 'entregas/test.pdf',
+        'file_size' => 1024,
+        'original_name' => 'test.pdf',
+        'uploaded_at' => now(),
+    ]);
+
     $response = $this->actingAs($this->estudiante)
         ->putJson("/api/admin/entregas/{$entrega->id}/revisar", [
             'status' => 'aprobada',
             'consolidated_grade' => 4.5,
+            'version_id' => $version->id,
         ]);
 
     $response->assertStatus(403);
@@ -320,11 +340,21 @@ it('al aprobar ultima entrega de fase avanza proyecto a siguiente fase', functio
         'status' => 'enviada',
     ]);
 
+    $version = \App\Models\VersionDocumento::create([
+        'entrega_id' => $entrega->id,
+        'version_number' => 1,
+        'file_path' => 'entregas/test.pdf',
+        'file_size' => 1024,
+        'original_name' => 'test.pdf',
+        'uploaded_at' => now(),
+    ]);
+
     $this->actingAs($this->director)
         ->putJson("/api/admin/entregas/{$entrega->id}/revisar", [
             'status' => 'aprobada',
             'consolidated_grade' => 4.5,
             'director_notes' => 'Aprobado',
+            'version_id' => $version->id,
         ]);
 
     $this->proyecto->refresh();

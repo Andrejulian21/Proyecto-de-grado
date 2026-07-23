@@ -164,8 +164,9 @@ export default function DetalleEntregaDirector() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     status: reviewStatus,
-                    consolidated_grade: parsedGrade, // Direct 0.0–5.0 scale (backend stores the same)
+                    consolidated_grade: parsedGrade,
                     director_notes: directorNotes || null,
+                    version_id: delivery.versiones?.length > 0 ? delivery.versiones[delivery.versiones.length - 1].id : null,
                 }),
             });
 

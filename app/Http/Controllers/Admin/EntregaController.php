@@ -593,6 +593,7 @@ class EntregaController extends Controller
             'status' => 'required|string|in:aprobada,rechazada,revisada',
             'consolidated_grade' => 'nullable|numeric|min:0|max:5',
             'director_notes' => 'nullable|string',
+            'version_id' => 'required|integer|exists:versiones_documento,id',
         ]);
 
         if ($validator->fails()) {
@@ -607,15 +608,13 @@ class EntregaController extends Controller
             'evaluation_complete' => true,
         ]);
 
-        // Save director notes to the latest version (for any status)
+        // Save director notes to the specific version sent by the frontend
         if (! empty($data['director_notes'])) {
-            $latestVersion = VersionDocumento::where('entrega_id', $id)
-                ->orderByDesc('version_number')
-                ->first();
+            $version = VersionDocumento::where('entrega_id', $id)
+                ->where('id', $data['version_id'])
+                ->firstOrFail();
 
-            if ($latestVersion) {
-                $latestVersion->update(['director_notes' => $data['director_notes']]);
-            }
+            $version->update(['director_notes' => $data['director_notes']]);
         }
 
         // Auto-advance phase if all entregas in the current phase are approved

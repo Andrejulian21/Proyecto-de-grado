@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CheckCircle2, Clock, Lock, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckCircle2, Clock, Lock, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import type { EntregaData, VersionData } from '@/types/estudiante';
 
@@ -20,7 +20,12 @@ const badgeVar: Record<string, 'success' | 'warning' | 'inactivo' | 'info'> = {
     enviada: 'info', locked: 'inactivo',
 };
 
-export default function DeliveryAccordion({ delivery }: { delivery: EntregaData }) {
+interface DeliveryAccordionProps {
+    delivery: EntregaData;
+    faseLabel?: string;
+}
+
+export default function DeliveryAccordion({ delivery, faseLabel }: DeliveryAccordionProps) {
     const [expanded, setExpanded] = useState(false);
 
     return (
@@ -32,10 +37,14 @@ export default function DeliveryAccordion({ delivery }: { delivery: EntregaData 
                     {iconMap[delivery.status]}
                 </div>
                 <div className="flex flex-1 flex-col gap-0.5 min-w-0">
-                    <span className="text-sm font-semibold text-[#1c1917]">{delivery.label}</span>
-                    <span className="text-xs text-[#57534e]">
-                        {delivery.status === 'locked' ? `Disponible: ${delivery.deadline}` : `Limite: ${delivery.deadline}`}
-                    </span>
+                    <span className="text-base font-bold text-[#1c1917]">{delivery.title}</span>
+                    <div className="flex items-center gap-2 text-xs text-[#57534e] flex-wrap">
+                        {faseLabel && <span className="font-medium text-[#c2410c]">{faseLabel}</span>}
+                        <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {delivery.startDate || '—'} &middot; {delivery.deadline}
+                        </span>
+                    </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                     <StatusBadge variant={badgeVar[delivery.status]}>{labelMap[delivery.status]}</StatusBadge>
@@ -47,7 +56,13 @@ export default function DeliveryAccordion({ delivery }: { delivery: EntregaData 
                 <div className="border-t border-[#e5e5e5]">
                     <table className="w-full text-left text-sm tabular-nums">
                         <thead className="bg-[#f5f5f4] text-[11px] font-bold uppercase tracking-[0.05em] text-[#57534e]">
-                            <tr><th className="px-4 py-2.5">Version</th><th className="px-4 py-2.5">Fecha</th><th className="px-4 py-2.5">Archivo</th><th className="px-4 py-2.5">Estado</th></tr>
+                            <tr>
+                                <th className="px-4 py-2.5">Versión</th>
+                                <th className="px-4 py-2.5">Fecha</th>
+                                <th className="px-4 py-2.5">Archivo</th>
+                                <th className="px-4 py-2.5">Estado</th>
+                                <th className="px-4 py-2.5">Observaciones</th>
+                            </tr>
                         </thead>
                         <tbody>
                             {delivery.versions.map((v: VersionData) => (
@@ -60,6 +75,15 @@ export default function DeliveryAccordion({ delivery }: { delivery: EntregaData 
                                             {v.status === 'approved' ? 'Aprobado' : v.status === 'rejected' ? 'Rechazado' : 'Pendiente'}
                                         </StatusBadge>
                                     </td>
+                                    <td className="px-4 py-2.5 text-center text-sm">
+                                        {v.observaciones ? (
+                                            <span className="inline-flex items-center gap-1 text-[#c2410c] cursor-help" title={v.observaciones}>
+                                                📝
+                                            </span>
+                                        ) : (
+                                            <span className="text-[#d6d3d1]">—</span>
+                                        )}
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -69,7 +93,7 @@ export default function DeliveryAccordion({ delivery }: { delivery: EntregaData 
 
             {expanded && delivery.versions.length === 0 && (
                 <div className="border-t border-[#e5e5e5] px-4 py-6 text-center text-sm text-[#78716c]">
-                    {delivery.status === 'pending' ? 'Aun no has subido ninguna version.' : 'Esta entrega no esta disponible aun.'}
+                    {delivery.status === 'pending' ? 'Aún no has subido ninguna versión.' : 'Esta entrega no está disponible aún.'}
                 </div>
             )}
         </div>

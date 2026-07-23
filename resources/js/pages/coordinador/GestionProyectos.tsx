@@ -116,6 +116,7 @@ export default function GestionProyectos() {
 
     /* ── Delete confirm state ──────────────────────────────────────── */
     const [deleteTarget, setDeleteTarget] = useState<Proyecto | null>(null);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
 
     /* ── Cupo editing state ────────────────────────────────────────── */
     const [editingCupoId, setEditingCupoId] = useState<number | null>(null);
@@ -195,12 +196,13 @@ export default function GestionProyectos() {
     /* ── Delete project ────────────────────────────────────────────── */
     const handleDelete = useCallback(async () => {
         if (!deleteTarget) return;
+        setDeleteError(null);
         try {
             await eliminarProyecto(deleteTarget.id);
-        } catch {
-            // error handled by hook
-        } finally {
             setDeleteTarget(null);
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Error al eliminar el proyecto';
+            setDeleteError(msg);
         }
     }, [deleteTarget, eliminarProyecto]);
 
@@ -790,11 +792,22 @@ export default function GestionProyectos() {
             <ConfirmDialog
                 open={deleteTarget !== null}
                 title="Eliminar proyecto"
-                message={`¿Está seguro de eliminar el proyecto ${deleteTarget?.code}? Esta acción no se puede deshacer.`}
-                confirmLabel="Eliminar"
-                variant="danger"
-                onConfirm={handleDelete}
-                onCancel={() => setDeleteTarget(null)}
+                message={
+                    deleteError
+                        ? `No se pudo eliminar: ${deleteError}`
+                        : `¿Está seguro de eliminar el proyecto ${deleteTarget?.code}? Esta acción no se puede deshacer.`
+                }
+                confirmLabel={deleteError ? 'Cerrar' : 'Eliminar'}
+                variant={deleteError ? 'warning' : 'danger'}
+                onConfirm={() => {
+                    if (deleteError) {
+                        setDeleteError(null);
+                        setDeleteTarget(null);
+                    } else {
+                        handleDelete();
+                    }
+                }}
+                onCancel={() => { setDeleteError(null); setDeleteTarget(null); }}
             />
         </div>
     );

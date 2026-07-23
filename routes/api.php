@@ -191,7 +191,7 @@ Route::middleware(['auth:sanctum', 'single_session', 'activity', 'role:Coordinad
 
         // Proyectos CRUD (T-002).
         Route::apiResource('proyectos', ProyectoController::class)
-            ->only(['index', 'store', 'show']);
+            ->only(['index', 'store', 'show', 'destroy']);
 
         // Semestres CRUD (T-001).
         Route::apiResource('semestres', SemestreController::class)

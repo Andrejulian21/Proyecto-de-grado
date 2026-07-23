@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\EstadoProyecto;
+use App\Events\AuditEvent;
 use App\Http\Controllers\Controller;
+use App\Models\Entrega;
+use App\Models\Evaluacion;
 use App\Models\Proyecto;
 use App\Models\Semestre;
 use App\Models\User;
@@ -142,5 +145,47 @@ class ProyectoController extends Controller
             'alertas_sin_revisar' => $alertas,
             'tasa_cumplimiento' => $tasa,
         ]);
+    }
+
+    public function destroy(Request $request, Proyecto $proyecto): JsonResponse
+    {
+        // 1. Verificar si tiene entregas con versiones
+        $tieneEntregas = Entrega::paraProyecto($proyecto->id)
+            ->whereHas('versiones')
+            ->exists();
+
+        if ($tieneEntregas) {
+            return response()->json([
+                'error' => 'No se puede eliminar el proyecto porque ya tiene entregas con versiones subidas.',
+            ], 422);
+        }
+
+        // 2. Hard delete en orden
+        $proyecto->bitacoras()->forceDelete();
+
+        $entregas = Entrega::paraProyecto($proyecto->id)->get();
+        foreach ($entregas as $e) {
+            $e->versiones()->forceDelete();
+            $e->forceDelete();
+        }
+
+        $proyecto->estudiantes()->detach();
+
+        // Clean evaluador_proyecto pivot (no relationship method on Proyecto)
+        \DB::table('evaluador_proyecto')->where('proyecto_id', $proyecto->id)->delete();
+
+        Evaluacion::where('proyecto_id', $proyecto->id)->forceDelete();
+
+        $proyecto->forceDelete();
+
+        // 3. AuditEvent
+        AuditEvent::dispatch(
+            $request->user(),
+            'proyecto.deleted',
+            "Proyecto {$proyecto->code} eliminado",
+            ['proyecto_id' => $proyecto->id]
+        );
+
+        return response()->json(['message' => 'Proyecto eliminado correctamente.']);
     }
 }

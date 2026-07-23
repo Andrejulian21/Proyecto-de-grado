@@ -40,6 +40,16 @@ class TestUsersSeeder extends Seeder
             ['name' => 'Juan Arteaga', 'role' => UserRole::Coordinador, 'es_externo' => false],
         );
 
+        User::updateOrCreate(
+            ['email' => 'mafanador856@unab.edu.co'],
+            ['name' => 'Miguel Afanador', 'role' => UserRole::Coordinador, 'es_externo' => false],
+        );
+
+        AuthorizedEmail::updateOrCreate(
+            ['email' => 'mafanador856@unab.edu.co'],
+            ['name' => 'Miguel Afanador', 'role' => UserRole::Coordinador],
+        );
+
         // ── 2. Estudiantes (login externo con credenciales) ─────────────
 
         $estudianteJulian = User::updateOrCreate(

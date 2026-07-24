@@ -162,6 +162,19 @@ class UserController extends Controller
             'password_changed_at' => null, // force change on first login
         ]);
 
+        // Also add to whitelist so it appears in the unified user listing
+        // and there's traceability of who created it.
+        AuthorizedEmail::withTrashed()
+            ->where('email', $user->email)
+            ->forceDelete();
+
+        AuthorizedEmail::create([
+            'email' => $user->email,
+            'name' => $payload['name'],
+            'role' => UserRole::EvaluadorExterno->value,
+            'created_by' => $request->user()?->id,
+        ]);
+
         AuditEvent::dispatch(
             $request->user(),
             'user.created_external',

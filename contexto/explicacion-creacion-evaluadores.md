@@ -12,7 +12,11 @@ Coordinador llena el formulario
 POST /api/admin/evaluadores
        ↓
 Se crea el User directamente en la BD
-(No pasa por la whitelist)
+
+     ↓
+Se agrega también a la whitelist (authorized_emails)
+para que aparezca en la tabla unificada de usuarios
+y quede trazabilidad de quién lo creó
        ↓
 Se genera contraseña temporal
        ↓
@@ -28,7 +32,7 @@ El evaluador hace login externo y cambia su contraseña
 | | Estudiantes / Directores | Evaluadores Externos |
 |---|---|---|
 | **Método de autenticación** | Google OAuth (correo institucional) | Credenciales (correo + contraseña) |
-| **¿Pasa por whitelist?** | ✅ Sí, se agrega a `authorized_emails` primero | ❌ No, se crea directo en `users` |
+| **¿Pasa por whitelist?** | ✅ Sí, se agrega a `authorized_emails` primero | ✅ Sí, también se agrega a `authorized_emails` |
 | **Columna `es_externo`** | `false` | `true` |
 | **Contraseña** | `null` (usa OAuth) | Generada automáticamente, obliga a cambiar en primer login |
 | **Restricción de correo** | Debe terminar en `@unab.edu.co` | Cualquier correo válido |

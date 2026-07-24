@@ -81,11 +81,13 @@ class UserController extends Controller
             $user->codigo_estudiante = $payload['codigo_estudiante'];
         }
 
-        // If the new role is no longer EvaluadorExterno, clear the external flag
-        // and mark password as changed so the middleware doesn't block them.
+        // If the new role is no longer EvaluadorExterno, mark the password
+        // as changed so the middleware doesn't block them, but keep es_externo
+        // as true so they can still log in with their credentials.
         if ($user->role->value !== UserRole::EvaluadorExterno->value) {
-            $user->es_externo = false;
-            $user->password_changed_at = now();
+            if ($user->es_externo) {
+                $user->password_changed_at = now();
+            }
         }
 
         $user->save();

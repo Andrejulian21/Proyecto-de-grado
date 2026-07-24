@@ -756,20 +756,23 @@ export default function GestionUsuarios() {
                                             </td>
                                             <td className="px-4 py-3 text-right">
                                                 <div className="inline-flex gap-0.5">
-                                                    <button className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#f5f5f4] hover:text-[#c2410c]" title="Editar">
+                                                    <button
+                                                        onClick={() => openEdit(ev, false)}
+                                                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#f5f5f4] hover:text-[#c2410c]" title="Editar"
+                                                    >
                                                         <Pencil className="h-4 w-4" />
                                                     </button>
                                                     <button
-                                                        onClick={() => {
-                                                            setEditingUser(ev);
-                                                            setEditingIsWhitelist(false);
-                                                            setFormName(ev.name || '');
-                                                            setFormEmail(ev.email);
-                                                            setFormRole(ev.role);
-                                                            setFormCodigoEstudiante(ev.codigo_estudiante || '');
-                                                            setFormExternalPassword(ev.last_temp_password || '---');
-                                                            setResetPasswordSuccess(null);
-                                                            setModalOpen(true);
+                                                        onClick={async () => {
+                                                            if (!confirm(`¿Restablecer contraseña de ${ev.email}?`)) return;
+                                                            try {
+                                                                const res = await apiFetch(`/api/admin/usuarios/${ev.id}/reset-password`, { method: 'PUT' });
+                                                                if (!res.ok) throw new Error('Error');
+                                                                const json = await res.json();
+                                                                showMsg('success', `Nueva contraseña para ${json.user.name}: ${json.new_password}`);
+                                                            } catch {
+                                                                showMsg('error', 'Error al restablecer contraseña');
+                                                            }
                                                         }}
                                                         className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#f5f5f4] hover:text-[#c2410c]" title="Restablecer contraseña"
                                                     >

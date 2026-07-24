@@ -163,6 +163,8 @@ Route::middleware(['auth:sanctum', 'single_session', 'activity', 'role:Coordinad
             ->name('usuarios.index');
         Route::put('/usuarios/{user}', [UserController::class, 'updateUsuario'])
             ->name('usuarios.update');
+        Route::put('/usuarios/{user}/reset-password', [UserController::class, 'resetPassword'])
+            ->name('usuarios.reset-password');
         Route::delete('/usuarios/{user}', [UserController::class, 'destroyUsuario'])
             ->name('usuarios.destroy');
 

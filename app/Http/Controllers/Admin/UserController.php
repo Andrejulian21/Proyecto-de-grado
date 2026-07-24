@@ -109,6 +109,47 @@ class UserController extends Controller
     }
 
     /**
+     * PUT /api/admin/usuarios/{id}/reset-password
+     *
+     * Generate a new temporary password for an external user.
+     * Returns the new password in plain text so the coordinator can share it.
+     */
+    public function resetPassword(Request $request, User $user): JsonResponse
+    {
+        if ($request->user()->role->value !== 'Coordinador') {
+            return response()->json(['error' => 'No autorizado.'], 403);
+        }
+
+        if (! $user->es_externo) {
+            return response()->json(['error' => 'Solo usuarios externos pueden usar esta opción.'], 422);
+        }
+
+        $newPassword = Str::password(length: 16, symbols: true);
+
+        $user->password = Hash::make($newPassword);
+        $user->last_temp_password = $newPassword;
+        $user->password_changed_at = null;
+        $user->save();
+
+        AuditEvent::dispatch(
+            $request->user(),
+            'user.password_reset',
+            "Password reset for {$user->email}",
+            ['subject_id' => $user->id],
+        );
+
+        return response()->json([
+            'message' => 'Contraseña restablecida.',
+            'user' => [
+                'id' => $user->id,
+                'email' => $user->email,
+                'name' => $user->name,
+            ],
+            'new_password' => $newPassword,
+        ]);
+    }
+
+    /**
      * DELETE /api/admin/usuarios/{id}
      *
      * Soft-delete or remove a user from the system.
@@ -171,6 +212,7 @@ class UserController extends Controller
             'role' => UserRole::EvaluadorExterno->value,
             'es_externo' => true,
             'password_changed_at' => null, // force change on first login
+            'last_temp_password' => $temporaryPassword, // store plain text for coordinator reference
         ]);
 
         // Also add to whitelist so it appears in the unified user listing

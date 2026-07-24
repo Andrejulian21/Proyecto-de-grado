@@ -10,6 +10,7 @@ import {
     UserPlus,
     Pencil,
     RefreshCw,
+    CheckCircle2,
     Search,
     Users,
 } from 'lucide-react';
@@ -23,6 +24,8 @@ interface User {
     created_at: string;
     last_activity_at?: string | null;
     codigo_estudiante?: string;
+    es_externo?: boolean;
+    last_temp_password?: string;
 }
 
 interface PaginationMeta {
@@ -99,6 +102,9 @@ export default function GestionUsuarios() {
     const [formRole, setFormRole] = useState('Estudiante');
     const [formCodigoEstudiante, setFormCodigoEstudiante] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const [formExternalPassword, setFormExternalPassword] = useState('');
+    const [resettingPassword, setResettingPassword] = useState(false);
+    const [resetPasswordSuccess, setResetPasswordSuccess] = useState<string | null>(null);
 
     const [editingIsWhitelist, setEditingIsWhitelist] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<any>(null);
@@ -190,6 +196,30 @@ export default function GestionUsuarios() {
         setFormEmail('');
         setFormRole('Estudiante');
         setFormCodigoEstudiante('');
+        setFormExternalPassword('');
+        setResetPasswordSuccess(null);
+    }
+
+    async function handleResetPassword() {
+        if (!editingUser || resettingPassword) return;
+        setResettingPassword(true);
+        setResetPasswordSuccess(null);
+        try {
+            const res = await apiFetch(`/api/admin/usuarios/${editingUser.id}/reset-password`, {
+                method: 'PUT',
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => null);
+                throw new Error(err?.error || 'Error al regenerar contraseña');
+            }
+            const json = await res.json();
+            setFormExternalPassword(json.new_password);
+            setResetPasswordSuccess(json.new_password);
+        } catch (err: any) {
+            showMsg('error', err.message);
+        } finally {
+            setResettingPassword(false);
+        }
     }
 
     function showMsg(type: 'success' | 'error', text: string) {
@@ -284,6 +314,8 @@ export default function GestionUsuarios() {
         setFormEmail(u.email);
         setFormRole(u.role);
         setFormCodigoEstudiante(u.codigo_estudiante || '');
+        setFormExternalPassword(u.last_temp_password || '---');
+        setResetPasswordSuccess(null);
         setModalOpen(true);
     }
 
@@ -438,7 +470,7 @@ export default function GestionUsuarios() {
                     </span>
                     <h2 className="mt-2 text-2xl font-bold text-text">Gestión de Usuarios y Accesos</h2>
                     <p className="mt-1 text-sm text-text-muted">
-                        Administre los correos institucionales autorizados y cree cuentas para evaluadores externos.
+                        Administre los correos institucionales autorizados y cree cuentas para usuarios externos.
                     </p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -577,11 +609,11 @@ export default function GestionUsuarios() {
                     )}
             </section>
 
-            {/* ═══ SECCIÓN 2: Evaluadores Externos — Crear Cuentas ═══ */}
+            {/* ═══ SECCIÓN 2: Usuarios Externos — Crear Cuentas ═══ */}
             <section id="crear-evaluador" className="rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                 <div className="mb-5 flex items-center gap-2 flex-wrap">
                     <UserPlus className="h-4 w-4 text-[#c2410c]" />
-                    <h2 className="text-lg font-bold text-text">Evaluadores Externos - Crear Cuentas</h2>
+                    <h2 className="text-lg font-bold text-text">Usuarios Externos - Crear Cuentas</h2>
                     <span className="ml-auto rounded-full bg-[#e7e5e4] px-2.5 py-0.5 text-xs font-semibold text-[#57534e]">
                         {evaluadores.length} cuentas
                     </span>
@@ -665,7 +697,7 @@ export default function GestionUsuarios() {
                             className="inline-flex items-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a]"
                         >
                             <UserPlus className="h-4 w-4" />
-                            Crear cuenta de evaluador
+                            Crear usuario externo
                         </button>
                     </div>
                 </form>
@@ -679,7 +711,7 @@ export default function GestionUsuarios() {
                         <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
                         <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                     </svg>
-                    <h3 className="text-md font-bold text-text">Evaluadores Creados</h3>
+                    <h3 className="text-md font-bold text-text">Usuarios Creados</h3>
                 </div>
 
                 <div className="w-full overflow-x-auto rounded-lg border border-[#e5e5e5] bg-white">
@@ -699,7 +731,7 @@ export default function GestionUsuarios() {
                             {evaluadores.length === 0 ? (
                                 <tr>
                                     <td colSpan={7} className="px-4 py-12 text-center text-sm text-[#57534e]">
-                                        No hay evaluadores externos registrados.
+                                        No hay usuarios externos registrados.
                                     </td>
                                 </tr>
                             ) : (
@@ -727,7 +759,20 @@ export default function GestionUsuarios() {
                                                     <button className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#f5f5f4] hover:text-[#c2410c]" title="Editar">
                                                         <Pencil className="h-4 w-4" />
                                                     </button>
-                                                    <button className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#f5f5f4] hover:text-[#c2410c]" title="Restablecer contraseña">
+                                                    <button
+                                                        onClick={() => {
+                                                            setEditingUser(ev);
+                                                            setEditingIsWhitelist(false);
+                                                            setFormName(ev.name || '');
+                                                            setFormEmail(ev.email);
+                                                            setFormRole(ev.role);
+                                                            setFormCodigoEstudiante(ev.codigo_estudiante || '');
+                                                            setFormExternalPassword(ev.last_temp_password || '---');
+                                                            setResetPasswordSuccess(null);
+                                                            setModalOpen(true);
+                                                        }}
+                                                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#f5f5f4] hover:text-[#c2410c]" title="Restablecer contraseña"
+                                                    >
                                                         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /><path d="M12 15v-2" /><circle cx="12" cy="18" r="0.5" fill="currentColor" /></svg>
                                                     </button>
                                                 </div>
@@ -929,6 +974,36 @@ export default function GestionUsuarios() {
                                         placeholder="Ej: U00167215"
                                         className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3.5 py-2.5 text-sm text-text outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
                                     />
+                                </div>
+                            )}
+                            {editingUser?.es_externo && editingUser && (
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="mb-1.5 block text-sm font-semibold text-text">Contraseña actual</label>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                value={formExternalPassword}
+                                                readOnly
+                                                className="flex-1 min-h-[40px] rounded-lg border border-[#e5e5e5] bg-gray-50 px-3.5 py-2.5 text-sm font-mono text-text outline-none"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={handleResetPassword}
+                                                disabled={resettingPassword}
+                                                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-3 py-2 text-xs font-semibold text-[#57534e] transition-colors hover:bg-[#f5f5f4] hover:text-[#c2410c] disabled:opacity-50"
+                                            >
+                                                {resettingPassword ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                                                Regenerar
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {resetPasswordSuccess && (
+                                        <div className="flex items-center gap-2 rounded-lg border border-[#dcfce7] bg-[#dcfce7] px-4 py-3 text-sm text-[#15803d]">
+                                            <CheckCircle2 className="h-4 w-4 shrink-0" />
+                                            <span>Nueva contraseña generada: <strong>{resetPasswordSuccess}</strong>. Compártela con el usuario.</span>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                             <div className="flex justify-end gap-3 pt-2">

@@ -56,6 +56,7 @@ class User extends Authenticatable
         'max_capacity',
         'areas',
         'codigo_estudiante',
+        'last_temp_password',
     ];
 
     /**

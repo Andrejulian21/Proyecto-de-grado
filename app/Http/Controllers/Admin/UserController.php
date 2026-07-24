@@ -203,16 +203,16 @@ class UserController extends Controller
     {
         $payload = $request->validated();
 
-        $temporaryPassword = Str::password(length: 16, symbols: true);
+        $plainPassword = $payload['password'];
 
         $user = User::create([
             'name' => $payload['name'],
             'email' => $payload['email'],
-            'password' => Hash::make($temporaryPassword),
+            'password' => Hash::make($plainPassword),
             'role' => UserRole::EvaluadorExterno->value,
             'es_externo' => true,
-            'password_changed_at' => null, // force change on first login
-            'last_temp_password' => $temporaryPassword, // store plain text for coordinator reference
+            'password_changed_at' => null,
+            'last_temp_password' => $plainPassword,
         ]);
 
         // Also add to whitelist so it appears in the unified user listing
@@ -246,7 +246,7 @@ class UserController extends Controller
                 'role' => $user->role->value,
                 'es_externo' => $user->es_externo,
             ],
-            'temporary_password' => $temporaryPassword,
+            'temporary_password' => $plainPassword,
         ], 201);
     }
 

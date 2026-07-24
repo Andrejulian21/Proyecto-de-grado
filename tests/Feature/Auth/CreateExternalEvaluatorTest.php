@@ -18,13 +18,16 @@ uses(RefreshDatabase::class);
  * payload and the plain password so the coordinator can share it
  * manually. Every action writes an audit log.
  */
-it('coordinator can create an external evaluator with a generated password', function () {
+it('coordinator can create an external evaluator with a password', function () {
     $coord = User::factory()->coordinador()->create();
+    $pass = 'MiPassword123!';
 
     $response = $this->actingAs($coord)
         ->postJson('/api/admin/evaluadores', [
             'name' => 'Pedro Evaluador',
             'email' => 'pedro@evaluador.com',
+            'password' => $pass,
+            'password_confirmation' => $pass,
         ]);
 
     $response->assertStatus(201)
@@ -37,26 +40,22 @@ it('coordinator can create an external evaluator with a generated password', fun
         ->and($response->json('user.es_externo'))->toBeTrue()
         ->and($response->json('user.email'))->toBe('pedro@evaluador.com');
 
-    // The temporary password is a non-empty string (we don't enforce
-    // a specific length, but it should look like a generated token).
     $password = $response->json('temporary_password');
-    expect($password)->toBeString()
-        ->and(strlen($password))->toBeGreaterThanOrEqual(8);
+    expect($password)->toBe($pass);
 
-    // The user exists in the DB and the password hashes correctly.
     $user = User::query()->where('email', 'pedro@evaluador.com')->first();
     expect($user)->not->toBeNull()
-        ->and(Hash::check($password, $user->password))->toBeTrue()
+        ->and(Hash::check($pass, $user->password))->toBeTrue()
         ->and($user->mustChangePassword())->toBeTrue();
 });
 
-it('validates that name and email are required', function () {
+it('validates that name, email and password are required', function () {
     $coord = User::factory()->coordinador()->create();
 
     $this->actingAs($coord)
         ->postJson('/api/admin/evaluadores', [])
         ->assertStatus(422)
-        ->assertJsonValidationErrors(['name', 'email']);
+        ->assertJsonValidationErrors(['name', 'email', 'password']);
 });
 
 it('rejects a duplicate email with 422', function () {
@@ -67,6 +66,8 @@ it('rejects a duplicate email with 422', function () {
         ->postJson('/api/admin/evaluadores', [
             'name' => 'Pedro Dup',
             'email' => 'pedro@evaluador.com',
+            'password' => 'MiPassword123!',
+            'password_confirmation' => 'MiPassword123!',
         ])
         ->assertStatus(422)
         ->assertJsonValidationErrors(['email']);
@@ -79,6 +80,8 @@ it('non-coordinador cannot create external evaluators (403)', function () {
         ->postJson('/api/admin/evaluadores', [
             'name' => 'Pedro Forbidden',
             'email' => 'pedro@evaluador.com',
+            'password' => 'MiPassword123!',
+            'password_confirmation' => 'MiPassword123!',
         ])
         ->assertStatus(403);
 });
@@ -87,6 +90,8 @@ it('an unauthenticated client cannot create evaluators (401)', function () {
     $this->postJson('/api/admin/evaluadores', [
         'name' => 'Pedro Anonymous',
         'email' => 'pedro@evaluador.com',
+        'password' => 'MiPassword123!',
+        'password_confirmation' => 'MiPassword123!',
     ])->assertStatus(401);
 });
 
@@ -97,6 +102,8 @@ it('audit log captures user.created_external on creation', function () {
         ->postJson('/api/admin/evaluadores', [
             'name' => 'Pedro Evaluador',
             'email' => 'pedro@evaluador.com',
+            'password' => 'MiPassword123!',
+            'password_confirmation' => 'MiPassword123!',
         ]);
 
     $createdUser = User::query()->where('email', 'pedro@evaluador.com')->first();
@@ -120,6 +127,8 @@ it('validates that the email is a valid format', function () {
         ->postJson('/api/admin/evaluadores', [
             'name' => 'Bad Email',
             'email' => 'not-an-email',
+            'password' => 'MiPassword123!',
+            'password_confirmation' => 'MiPassword123!',
         ])
         ->assertStatus(422)
         ->assertJsonValidationErrors(['email']);

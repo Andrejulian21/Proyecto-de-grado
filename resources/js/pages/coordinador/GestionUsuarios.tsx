@@ -365,6 +365,8 @@ export default function GestionUsuarios() {
                 body: JSON.stringify({
                     email: evalCorreo.trim(),
                     name: evalNombre.trim(),
+                    password: evalPass,
+                    password_confirmation: evalPass2,
                 }),
             });
             if (!res.ok) {

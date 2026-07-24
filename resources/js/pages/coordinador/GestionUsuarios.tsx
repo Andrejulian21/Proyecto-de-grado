@@ -762,22 +762,6 @@ export default function GestionUsuarios() {
                                                     >
                                                         <Pencil className="h-4 w-4" />
                                                     </button>
-                                                    <button
-                                                        onClick={async () => {
-                                                            if (!confirm(`¿Restablecer contraseña de ${ev.email}?`)) return;
-                                                            try {
-                                                                const res = await apiFetch(`/api/admin/usuarios/${ev.id}/reset-password`, { method: 'PUT' });
-                                                                if (!res.ok) throw new Error('Error');
-                                                                const json = await res.json();
-                                                                showMsg('success', `Nueva contraseña para ${json.user.name}: ${json.new_password}`);
-                                                            } catch {
-                                                                showMsg('error', 'Error al restablecer contraseña');
-                                                            }
-                                                        }}
-                                                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#f5f5f4] hover:text-[#c2410c]" title="Restablecer contraseña"
-                                                    >
-                                                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /><path d="M12 15v-2" /><circle cx="12" cy="18" r="0.5" fill="currentColor" /></svg>
-                                                    </button>
                                                 </div>
                                             </td>
                                         </tr>

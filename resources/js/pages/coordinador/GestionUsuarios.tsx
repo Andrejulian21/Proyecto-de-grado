@@ -966,29 +966,30 @@ export default function GestionUsuarios() {
                             {editingUser?.es_externo && editingUser && (
                                 <div className="space-y-3">
                                     <div>
-                                        <label className="mb-1.5 block text-sm font-semibold text-text">Contraseña actual</label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="text"
-                                                value={formExternalPassword}
-                                                readOnly
-                                                className="flex-1 min-h-[40px] rounded-lg border border-[#e5e5e5] bg-gray-50 px-3.5 py-2.5 text-sm font-mono text-text outline-none"
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={handleResetPassword}
-                                                disabled={resettingPassword}
-                                                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-3 py-2 text-xs font-semibold text-[#57534e] transition-colors hover:bg-[#f5f5f4] hover:text-[#c2410c] disabled:opacity-50"
-                                            >
-                                                {resettingPassword ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                                                Regenerar
-                                            </button>
-                                        </div>
+                                        <label className="mb-1.5 block text-sm font-semibold text-text">
+                                            Contraseña
+                                        </label>
+                                        <p className="mb-2 text-xs text-[#57534e]">
+                                            {formExternalPassword === '---' ? 'El usuario ya tiene una contraseña asignada.' : `Contraseña actual: ${formExternalPassword}`}
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={handleResetPassword}
+                                            disabled={resettingPassword}
+                                            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[#e5e5e5] px-4 py-2.5 text-sm font-semibold text-[#57534e] transition-colors hover:bg-[#f5f5f4] hover:text-[#c2410c] disabled:opacity-50"
+                                        >
+                                            {resettingPassword ? (
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                                <RefreshCw className="h-4 w-4" />
+                                            )}
+                                            Generar nueva contraseña
+                                        </button>
                                     </div>
                                     {resetPasswordSuccess && (
                                         <div className="flex items-center gap-2 rounded-lg border border-[#dcfce7] bg-[#dcfce7] px-4 py-3 text-sm text-[#15803d]">
                                             <CheckCircle2 className="h-4 w-4 shrink-0" />
-                                            <span>Nueva contraseña generada: <strong>{resetPasswordSuccess}</strong>. Compártela con el usuario.</span>
+                                            <span>Nueva contraseña: <strong className="font-mono">{resetPasswordSuccess}</strong>. Compártela con el usuario.</span>
                                         </div>
                                     )}
                                 </div>

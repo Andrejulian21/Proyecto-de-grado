@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '@/lib/utils';
 
@@ -25,7 +25,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const navigate = useNavigate();
-    const refreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const isAuthenticated = user !== null;
     const role = user?.role ?? null;
@@ -40,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 return await res.json();
             }
         } catch {
-            // ignore
+            // ignore network errors — treat as unauthenticated
         }
         return null;
     }, []);
@@ -52,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, []);
 
     const sessionCheck = useCallback(async (): Promise<void> => {
+        setIsLoading(true);
         try {
             // Bootstrap Sanctum CSRF cookie — required for SPA auth.
             await fetch('/sanctum/csrf-cookie', {
@@ -59,45 +59,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 credentials: 'include',
             });
 
-            // Try the API with retries (the Sanctum cookie may take a moment).
-            for (let attempt = 0; attempt < 6; attempt++) {
-                const data = await fetchUser();
-                if (data) {
-                    applyUser(data);
-                    setIsLoading(false);
-                    return;
-                }
-                await new Promise(r => setTimeout(r, 600));
+            const data = await fetchUser();
+            if (data) {
+                applyUser(data);
+                return;
             }
 
-            // API failed — fallback to sessionStorage (external evaluator or offline).
+            // Fallback for external evaluator login (sets sessionStorage before redirect).
             const storedUser = sessionStorage.getItem('auth_user');
             if (storedUser) {
                 try {
-                    const parsed = JSON.parse(storedUser);
+                    const parsed = JSON.parse(storedUser) as User;
                     if (parsed?.role) {
                         applyUser(parsed);
-                        // Schedule a background refresh to catch up with the real session.
-                        if (!refreshRef.current) {
-                            refreshRef.current = setInterval(async () => {
-                                const data = await fetchUser();
-                                if (data && data.role !== parsed.role) {
-                                    applyUser(data);
-                                }
-                                if (data) {
-                                    clearInterval(refreshRef.current!);
-                                    refreshRef.current = null;
-                                }
-                            }, 2000);
-                            // Stop after 30 seconds to avoid infinite polling.
-                            setTimeout(() => {
-                                if (refreshRef.current) {
-                                    clearInterval(refreshRef.current);
-                                    refreshRef.current = null;
-                                }
-                            }, 30000);
-                        }
-                        setIsLoading(false);
+                        // Re-validate against the real session without delaying navigation.
+                        void fetchUser().then((fresh) => {
+                            if (fresh) applyUser(fresh);
+                        });
                         return;
                     }
                 } catch {
@@ -115,12 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, [fetchUser, applyUser]);
 
     useEffect(() => {
-        sessionCheck();
-        return () => {
-            if (refreshRef.current) {
-                clearInterval(refreshRef.current);
-            }
-        };
+        void sessionCheck();
     }, [sessionCheck]);
 
     // Stub — external login is handled by LoginExterno component,
@@ -131,12 +104,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, []);
 
     async function logout() {
-        // Clear the poll interval before logout (H-006).
-        if (refreshRef.current) {
-            clearInterval(refreshRef.current);
-            refreshRef.current = null;
-        }
-
         try {
             await apiFetch('/api/auth/logout', {
                 method: 'POST',

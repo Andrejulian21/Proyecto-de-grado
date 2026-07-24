@@ -161,12 +161,17 @@ class AuthController extends Controller
         // cleanup, device A's Sanctum SPA cookie would stay valid
         // after device B logs in with the same Google account.
         $user->tokens()->delete();
-        $this->purgePriorSessions($user);
         $user->update(['last_activity_at' => now()]);
 
         // 6. Log the user into the session (Sanctum SPA cookie auth).
         // No Bearer token — cookie-only per H-004.
         Auth::login($user, remember: false);
+        $request->session()->regenerate();
+
+        // Purge OTHER sessions after the new session id exists so we
+        // never delete the session we just authenticated.
+        $this->purgePriorSessions($user, $request->session()->getId());
+        $request->session()->save();
 
         // 7. Audit success.
         AuditEvent::dispatch(
@@ -179,12 +184,11 @@ class AuthController extends Controller
             ],
         );
 
-        // 8. Redirect to the role dashboard. The SPA reads the
-        // Sanctum cookie set by the response and renders the right
-        // page from there.
-        $dashboard = $this->dashboardForRole($user->role);
-
-        return redirect($dashboard);
+        // 8. Redirect to a PUBLIC SPA completion route. Redirecting
+        // straight into a ProtectedRoute dashboard races the React
+        // AuthProvider bootstrap and can bounce first-time logins
+        // back to /login even though Auth::login already succeeded.
+        return redirect('/auth/complete');
     }
 
     /**
@@ -220,17 +224,21 @@ class AuthController extends Controller
 
     /**
      * Issue #10 — invalidate every existing session row for the
-     * given user. Sanctum's `tokens()->delete()` covers API tokens
-     * but NOT the cookie-backed session row written by `Auth::login()`
-     * via the `database` session driver. Without this call, a user
-     * logging in on device B leaves device A's Sanctum SPA cookie
-     * valid. The `sessions` table is created by the framework's
-     * default `0001_01_01_000000_create_users_table` migration —
-     * no project migration needed.
+     * given user except the current session (when provided). Sanctum's
+     * `tokens()->delete()` covers API tokens but NOT the cookie-backed
+     * session row written by `Auth::login()` via the `database` session
+     * driver. Without this call, a user logging in on device B leaves
+     * device A's Sanctum SPA cookie valid.
      */
-    private function purgePriorSessions(User $user): void
+    private function purgePriorSessions(User $user, ?string $exceptSessionId = null): void
     {
-        DB::table('sessions')->where('user_id', $user->id)->delete();
+        $query = DB::table('sessions')->where('user_id', $user->id);
+
+        if ($exceptSessionId !== null && $exceptSessionId !== '') {
+            $query->where('id', '!=', $exceptSessionId);
+        }
+
+        $query->delete();
     }
 
     /**
@@ -245,19 +253,6 @@ class AuthController extends Controller
         $hd = $googleUser->user['hd'] ?? null;
 
         return ($hd !== null && $hd !== '') ? (string) $hd : null;
-    }
-
-    /**
-     * Return the role-keyed dashboard path for the SPA to render.
-     */
-    private function dashboardForRole(UserRole $role): string
-    {
-        return match ($role) {
-            UserRole::Estudiante => '/dashboard/estudiante',
-            UserRole::Director => '/dashboard/director',
-            UserRole::Coordinador => '/dashboard/coordinador',
-            UserRole::EvaluadorExterno => '/dashboard/evaluador-externo',
-        };
     }
 
     /**

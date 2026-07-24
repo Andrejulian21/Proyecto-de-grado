@@ -176,7 +176,12 @@ export function useProyectos(grupoId?: number | null, filters?: { search?: strin
             const res = await apiFetch(`/api/admin/proyectos/${id}`, {
                 method: 'DELETE',
             });
-            if (!res.ok) throw new Error(`Error ${res.status}`);
+            if (!res.ok) {
+                const body = await res.json().catch(() => null);
+                throw new Error(
+                    body?.error ?? body?.message ?? `Error ${res.status}`,
+                );
+            }
             dispatch({ type: 'DELETE_SUCCESS', payload: id });
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Error desconocido';

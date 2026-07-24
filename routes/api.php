@@ -189,9 +189,9 @@ Route::middleware(['auth:sanctum', 'single_session', 'activity', 'role:Coordinad
         Route::get('/proyectos/kpis', [ProyectoController::class, 'kpis'])
             ->name('proyectos.kpis');
 
-        // Proyectos CRUD (T-002).
+        // Proyectos CRUD (T-002) + destroy with delivery guard.
         Route::apiResource('proyectos', ProyectoController::class)
-            ->only(['index', 'store', 'show']);
+            ->only(['index', 'store', 'show', 'destroy']);
 
         // Semestres CRUD (T-001).
         Route::apiResource('semestres', SemestreController::class)

@@ -13,6 +13,8 @@ export interface VersionData {
     date: string;
     status: 'approved' | 'pending' | 'rejected';
     fileName: string;
+    /** Truncated director observation preview for accordion UI */
+    observationPreview: string | null;
 }
 
 export interface PhaseStep {

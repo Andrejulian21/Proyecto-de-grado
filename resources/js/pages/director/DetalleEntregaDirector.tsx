@@ -106,6 +106,7 @@ export default function DetalleEntregaDirector() {
     const [gradeInput, setGradeInput] = useState('');
     const [reviewStatus, setReviewStatus] = useState<string>('aprobada');
     const [directorNotes, setDirectorNotes] = useState('');
+    const [selectedVersionId, setSelectedVersionId] = useState<number | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const [submitSuccess, setSubmitSuccess] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
@@ -133,6 +134,11 @@ export default function DetalleEntregaDirector() {
                     if (data.consolidated_grade !== null) {
                         setGradeInput(String(data.consolidated_grade));
                     }
+                    const latest = [...data.versiones].sort(
+                        (a, b) => b.version_number - a.version_number,
+                    )[0];
+                    setSelectedVersionId(latest?.id ?? null);
+                    setDirectorNotes(latest?.director_notes ?? '');
                 }
             } catch (err) {
                 if (!cancelled) {
@@ -145,6 +151,20 @@ export default function DetalleEntregaDirector() {
         fetchDetail();
         return () => { cancelled = true; };
     }, [id]);
+
+    const sortedVersions = [...(state.data?.versiones ?? [])].sort(
+        (a, b) => b.version_number - a.version_number,
+    );
+    const selectedVersion =
+        sortedVersions.find((v) => v.id === selectedVersionId) ?? sortedVersions[0] ?? null;
+
+    useEffect(() => {
+        if (!selectedVersion) {
+            setDirectorNotes('');
+            return;
+        }
+        setDirectorNotes(selectedVersion.director_notes ?? '');
+    }, [selectedVersion?.id]);
 
     async function handleSubmitReview() {
         if (!id) return;
@@ -166,6 +186,7 @@ export default function DetalleEntregaDirector() {
                     status: reviewStatus,
                     consolidated_grade: parsedGrade, // Direct 0.0–5.0 scale (backend stores the same)
                     director_notes: directorNotes || null,
+                    version_id: selectedVersion?.id ?? null,
                 }),
             });
 
@@ -367,17 +388,40 @@ export default function DetalleEntregaDirector() {
                             </div>
                         </div>
 
-                        {/* Director notes */}
+                        {/* Director notes (bound to selected version) */}
                         <div>
                             <label htmlFor="director-notes" className="mb-1.5 block text-xs font-bold uppercase tracking-[0.05em] text-[#57534e]">
                                 Notas del director
+                                {selectedVersion ? ` · Versión ${selectedVersion.version_number}` : ''}
                             </label>
+                            {sortedVersions.length > 1 && (
+                                <div className="mb-2 flex flex-wrap gap-1">
+                                    {sortedVersions.map((v) => (
+                                        <button
+                                            key={v.id}
+                                            type="button"
+                                            onClick={() => setSelectedVersionId(v.id)}
+                                            className={`inline-flex min-h-[32px] items-center rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                                selectedVersion?.id === v.id
+                                                    ? 'bg-[#c2410c] text-white shadow-sm'
+                                                    : 'bg-[#f5f5f4] text-[#57534e] hover:bg-[#e7e5e4]'
+                                            }`}
+                                        >
+                                            v{v.version_number}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                             <textarea
                                 id="director-notes"
                                 rows={4}
                                 value={directorNotes}
                                 onChange={(e) => setDirectorNotes(e.target.value)}
-                                placeholder="Escriba sus observaciones sobre esta entrega..."
+                                placeholder={
+                                    selectedVersion
+                                        ? `Escriba sus observaciones sobre la versión ${selectedVersion.version_number}...`
+                                        : 'Escriba sus observaciones sobre esta entrega...'
+                                }
                                 className="w-full rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
                             />
                         </div>
@@ -433,10 +477,26 @@ export default function DetalleEntregaDirector() {
                     <h3 className="text-base font-bold text-[#1c1917]">Versiones entregadas</h3>
                 </div>
 
-                {delivery.versiones.length > 0 ? (
+                {sortedVersions.length > 0 ? (
                     <div className="flex flex-col gap-4">
-                        {delivery.versiones.map((v) => (
-                            <div key={v.id} className="rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-4">
+                        {sortedVersions.map((v) => (
+                            <div
+                                key={v.id}
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => setSelectedVersionId(v.id)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        setSelectedVersionId(v.id);
+                                    }
+                                }}
+                                className={`rounded-lg border bg-[#fafaf9] p-4 transition-colors ${
+                                    selectedVersion?.id === v.id
+                                        ? 'border-[#c2410c] ring-1 ring-[#c2410c]'
+                                        : 'border-[#e5e5e5] hover:border-[#d6d3d1]'
+                                }`}
+                            >
                                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                     <div className="flex flex-col gap-1 min-w-0">
                                         <span className="text-sm font-semibold text-[#1c1917]">

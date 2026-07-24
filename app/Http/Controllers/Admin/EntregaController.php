@@ -593,6 +593,7 @@ class EntregaController extends Controller
             'status' => 'required|string|in:aprobada,rechazada,revisada',
             'consolidated_grade' => 'nullable|numeric|min:0|max:5',
             'director_notes' => 'nullable|string',
+            'version_id' => 'nullable|integer',
         ]);
 
         if ($validator->fails()) {
@@ -601,20 +602,35 @@ class EntregaController extends Controller
 
         $data = $validator->validated();
 
+        $targetVersion = null;
+        if (! empty($data['version_id'])) {
+            $targetVersion = VersionDocumento::where('entrega_id', $id)
+                ->where('id', $data['version_id'])
+                ->first();
+
+            if (! $targetVersion) {
+                return response()->json([
+                    'error' => 'La versión indicada no pertenece a esta entrega.',
+                ], 422);
+            }
+        }
+
         $entrega->update([
             'status' => $data['status'],
             'consolidated_grade' => $data['consolidated_grade'] ?? null,
             'evaluation_complete' => true,
         ]);
 
-        // Save director notes to the latest version (for any status)
+        // Save director notes on the selected version (or latest for backward compatibility)
         if (! empty($data['director_notes'])) {
-            $latestVersion = VersionDocumento::where('entrega_id', $id)
-                ->orderByDesc('version_number')
-                ->first();
+            if (! $targetVersion) {
+                $targetVersion = VersionDocumento::where('entrega_id', $id)
+                    ->orderByDesc('version_number')
+                    ->first();
+            }
 
-            if ($latestVersion) {
-                $latestVersion->update(['director_notes' => $data['director_notes']]);
+            if ($targetVersion) {
+                $targetVersion->update(['director_notes' => $data['director_notes']]);
             }
         }
 

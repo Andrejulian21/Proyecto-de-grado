@@ -172,6 +172,17 @@ export default function RevisionEntregaDirector() {
         setSelectedVersionIdx(0);
     }, [entrega?.id]);
 
+    const sortedVersions = [...(entrega?.versiones ?? [])].sort(
+        (a, b) => b.version_number - a.version_number,
+    );
+    const safeVersionIdx = Math.min(selectedVersionIdx, Math.max(0, sortedVersions.length - 1));
+    const selectedVersion: Version | null = sortedVersions[safeVersionIdx] ?? null;
+
+    /* ── Sync editable notes with the selected version ── */
+    useEffect(() => {
+        setDirectorNotes(selectedVersion?.director_notes ?? '');
+    }, [selectedVersion?.id]);
+
     /* ── Submit review ── */
     async function handleSubmitReview() {
         if (!entregaId || !decision) return;
@@ -187,6 +198,7 @@ export default function RevisionEntregaDirector() {
                     status: decision,
                     consolidated_grade: null,
                     director_notes: directorNotes || null,
+                    version_id: selectedVersion?.id ?? null,
                 }),
             });
 
@@ -210,12 +222,6 @@ export default function RevisionEntregaDirector() {
     const projectCode = mainProyecto?.code ?? '';
     const projectTitle = mainProyecto?.title ?? '';
     const backPath = proyectoId ? `/supervision/${proyectoId}` : '/supervision';
-
-    const sortedVersions = [...(entrega?.versiones ?? [])].sort(
-        (a, b) => b.version_number - a.version_number,
-    );
-    const safeVersionIdx = Math.min(selectedVersionIdx, Math.max(0, sortedVersions.length - 1));
-    const selectedVersion: Version | null = sortedVersions[safeVersionIdx] ?? null;
 
     /* ══════════════════════════════════════════════════
        Loading state
@@ -520,13 +526,18 @@ export default function RevisionEntregaDirector() {
                                 className="mb-1.5 block text-xs font-bold uppercase tracking-[0.05em] text-[#57534e]"
                             >
                                 Observaciones
+                                {selectedVersion ? ` · Versión ${selectedVersion.version_number}` : ''}
                             </label>
                             <textarea
                                 id="director-notes"
                                 rows={5}
                                 value={directorNotes}
                                 onChange={(e) => setDirectorNotes(e.target.value)}
-                                placeholder="Escriba sus observaciones sobre la entrega..."
+                                placeholder={
+                                    selectedVersion
+                                        ? `Escriba sus observaciones sobre la versión ${selectedVersion.version_number}...`
+                                        : 'Escriba sus observaciones sobre la entrega...'
+                                }
                                 className="w-full min-h-[100px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y"
                             />
                         </div>

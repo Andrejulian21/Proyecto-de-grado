@@ -193,3 +193,67 @@ it('fase y estado son los enums correctos', function () {
     expect($proyecto->status)->toBe(EstadoProyecto::EnCurso);
     expect($proyecto->status->value)->toBe('en_curso');
 });
+
+// -- Eliminación ----------------------------------------------------------
+
+it('coordinador puede eliminar proyecto sin entregas', function () {
+    $proyecto = \App\Models\Proyecto::create([
+        'title' => 'Proyecto sin entregas',
+        'semester_id' => $this->semestre->id,
+    ]);
+    $proyecto->estudiantes()->attach($this->estudiante);
+
+    $response = $this->actingAs($this->coordinador)
+        ->deleteJson("/api/admin/proyectos/{$proyecto->id}");
+
+    $response->assertOk();
+    expect(\App\Models\Proyecto::find($proyecto->id))->toBeNull();
+});
+
+it('no se puede eliminar proyecto con entrega por FK', function () {
+    $proyecto = \App\Models\Proyecto::create([
+        'title' => 'Proyecto con entrega FK',
+        'semester_id' => $this->semestre->id,
+    ]);
+
+    \App\Models\Entrega::create([
+        'proyecto_id' => $proyecto->id,
+        'phase' => 'anteproyecto',
+        'title' => 'Entrega 1',
+        'due_date' => '2026-03-01',
+    ]);
+
+    $response = $this->actingAs($this->coordinador)
+        ->deleteJson("/api/admin/proyectos/{$proyecto->id}");
+
+    $response->assertStatus(422)
+        ->assertJsonFragment([
+            'error' => 'No se puede eliminar el proyecto porque ya posee entregas registradas.',
+        ]);
+    expect(\App\Models\Proyecto::find($proyecto->id))->not->toBeNull();
+});
+
+it('no se puede eliminar proyecto con entrega solo por pivote', function () {
+    $proyecto = \App\Models\Proyecto::create([
+        'title' => 'Proyecto con entrega pivote',
+        'semester_id' => $this->semestre->id,
+    ]);
+
+    $entrega = \App\Models\Entrega::create([
+        'proyecto_id' => null,
+        'semester_id' => $this->semestre->id,
+        'phase' => 'anteproyecto',
+        'title' => 'Entrega compartida',
+        'due_date' => '2026-03-01',
+    ]);
+    $proyecto->entregasPivot()->attach($entrega->id);
+
+    $response = $this->actingAs($this->coordinador)
+        ->deleteJson("/api/admin/proyectos/{$proyecto->id}");
+
+    $response->assertStatus(422)
+        ->assertJsonFragment([
+            'error' => 'No se puede eliminar el proyecto porque ya posee entregas registradas.',
+        ]);
+    expect(\App\Models\Proyecto::find($proyecto->id))->not->toBeNull();
+});

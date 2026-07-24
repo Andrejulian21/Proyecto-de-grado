@@ -13,7 +13,6 @@ use App\Models\Semestre;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 
 class TestUsersSeeder extends Seeder
 {
@@ -56,7 +55,8 @@ class TestUsersSeeder extends Seeder
             ['email' => 'juliarteaga938@gmail.com'],
             [
                 'name'       => 'Julian Estudiante',
-                'password'   => Hash::make('Pruebas123!'),
+                // Plain text — User model casts password as 'hashed'.
+                'password'   => 'Pruebas123!',
                 'role'       => UserRole::Estudiante,
                 'es_externo' => true,
             ],
@@ -66,7 +66,7 @@ class TestUsersSeeder extends Seeder
             ['email' => 'nicorfire1.4@gmail.com'],
             [
                 'name'                => 'Nicolas Estudiante Test',
-                'password'            => Hash::make('Pruebas123!'),
+                'password'            => 'Pruebas123!',
                 'role'                => UserRole::Estudiante,
                 'es_externo'          => true,
                 'password_changed_at' => now(),
@@ -79,7 +79,7 @@ class TestUsersSeeder extends Seeder
             ['email' => 'julian21arteaga@gmail.com'],
             [
                 'name'       => 'Julian Director',
-                'password'   => Hash::make('Pruebas123!'),
+                'password'   => 'Pruebas123!',
                 'role'       => UserRole::Director,
                 'es_externo' => true,
             ],

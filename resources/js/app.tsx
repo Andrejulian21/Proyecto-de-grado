@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { AppShell } from '@/components/layout/AppShell';
 import LoginInstitucional from '@/pages/auth/LoginInstitucional';
 import LoginExterno from '@/pages/auth/LoginExterno';
+import AuthComplete from '@/pages/auth/AuthComplete';
 import GestionUsuarios from '@/pages/coordinador/GestionUsuarios';
 import AuditLog from '@/pages/coordinador/AuditLog';
 import DashboardRouter from '@/pages/DashboardRouter';
@@ -91,6 +92,7 @@ function App() {
         <Routes>
             <Route path="/login" element={<LoginInstitucional />} />
             <Route path="/login/externo" element={<LoginExterno />} />
+            <Route path="/auth/complete" element={<AuthComplete />} />
             <Route path="/" element={<LandingPage />} />
 
             <Route

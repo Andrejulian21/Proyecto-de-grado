@@ -1,10 +1,47 @@
+import { useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertTriangle } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
-interface LoginInstitucionalProps {
-    error?: string | null;
+const ERROR_MESSAGES: Record<string, string> = {
+    access_denied: 'No tienes acceso autorizado a esta plataforma.',
+    oauth_error: 'No se pudo completar el inicio de sesión con Google. Intenta de nuevo.',
+    session: 'La sesión no pudo confirmarse. Inicia sesión nuevamente.',
+    cancelled: 'Inicio de sesión cancelado.',
+};
+
+function dashboardPathForRole(role: string): string {
+    switch (role) {
+        case 'Estudiante':
+            return '/dashboard/estudiante';
+        case 'Director':
+            return '/dashboard/director';
+        case 'Coordinador':
+            return '/dashboard/coordinador';
+        case 'EvaluadorExterno':
+            return '/dashboard/evaluador-externo';
+        default:
+            return '/';
+    }
 }
 
-export function LoginInstitucional({ error = null }: LoginInstitucionalProps) {
+export function LoginInstitucional() {
+    const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const { isAuthenticated, role, isLoading } = useAuth();
+
+    const errorKey = searchParams.get('error');
+    const error = errorKey
+        ? (ERROR_MESSAGES[errorKey] ?? 'No se pudo iniciar sesión. Intenta de nuevo.')
+        : null;
+
+    useEffect(() => {
+        if (isLoading) return;
+        if (isAuthenticated && role) {
+            navigate(dashboardPathForRole(role), { replace: true });
+        }
+    }, [isLoading, isAuthenticated, role, navigate]);
+
     return (
         <div
             className="flex min-h-screen flex-col items-center justify-center bg-[#fafaf9] px-4 py-8"

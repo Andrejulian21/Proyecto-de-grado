@@ -71,21 +71,45 @@ class EstudianteController extends Controller
         }
 
         $entregas = Entrega::paraProyecto($proyecto->id)
-            ->with('versiones')
+            ->with(['versiones' => fn ($q) => $q->orderBy('version_number')])
             ->orderBy('due_date')
             ->get()
             ->map(function ($entrega) {
+                $statusValue = $entrega->status?->value ?? $entrega->status;
+
+                $versiones = $entrega->versiones->map(function ($version) use ($statusValue) {
+                    $hasNotes = filled($version->director_notes);
+                    $estadoVersion = 'pendiente';
+                    if ($hasNotes) {
+                        $estadoVersion = $statusValue === 'aprobada' ? 'aprobado' : 'rechazado';
+                    }
+
+                    $uploadedAt = $version->uploaded_at ?? $version->created_at;
+
+                    return [
+                        'numero_version'  => $version->version_number,
+                        'nombre_archivo'  => $version->original_name,
+                        'ruta_archivo'    => $version->file_path,
+                        'subido_en'       => $uploadedAt
+                            ? \Illuminate\Support\Carbon::parse($uploadedAt)->toIso8601String()
+                            : null,
+                        'observacion'     => $version->director_notes,
+                        'estado'          => $estadoVersion,
+                    ];
+                })->values();
+
                 return [
                     'id'               => $entrega->id,
                     'fase'             => $entrega->phase?->value ?? $entrega->phase,
                     'titulo'           => $entrega->title,
                     'descripcion'      => $entrega->description,
                     'fecha_limite'     => $entrega->due_date?->toDateString(),
-                    'estado'           => $entrega->status?->value ?? $entrega->status,
+                    'estado'           => $statusValue,
                     'nota'             => $entrega->consolidated_grade,
                     'criterios'        => $entrega->acceptance_criteria,
-                    'total_versiones'  => $entrega->versiones->count(),
-                    'ultima_version'   => $entrega->versiones->last()?->version_number,
+                    'total_versiones'  => $versiones->count(),
+                    'ultima_version'   => $versiones->last()['numero_version'] ?? null,
+                    'versiones'        => $versiones,
                 ];
             });
 

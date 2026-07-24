@@ -31,12 +31,38 @@ function toDate(d: string | undefined) {
     return d ? new Date(d).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 }
 
+function toDateTime(d: string | undefined) {
+    if (!d) return '—';
+    return new Date(d).toLocaleString('es-CO', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+
+const OBSERVATION_PREVIEW_LIMIT = 80;
+
+function previewObservation(text: string | null | undefined): string | null {
+    if (!text || !text.trim()) return null;
+    const trimmed = text.trim();
+    if (trimmed.length <= OBSERVATION_PREVIEW_LIMIT) return trimmed;
+    return `${trimmed.slice(0, OBSERVATION_PREVIEW_LIMIT)}…`;
+}
+
 function mapStatus(s: string | undefined): EntregaData['status'] {
     if (s === 'aprobada' || s === 'Aprobada') return 'approved';
     if (s === 'enviada' || s === 'Enviada') return 'enviada';
     if (s === 'pendiente' || s === 'Pendiente') return 'pending';
     // Any other status (creacion, solicitada, etc.) → pending, not locked
     // Locked is determined by start_date in the detail view, not by status
+    return 'pending';
+}
+
+function mapVersionStatus(s: string | undefined): EntregaData['versions'][number]['status'] {
+    if (s === 'aprobado' || s === 'aprobada') return 'approved';
+    if (s === 'rechazado' || s === 'rechazada' || s === 'revisada') return 'rejected';
     return 'pending';
 }
 
@@ -58,15 +84,18 @@ export default function EstudianteDashboard() {
                 const pd = await pr.json(), ed = await er.json();
                 setProyecto(pd.data);
                 setEntregas((ed.data || []).map((e: any) => ({
-                    id: e.id, fase: e.fase, label: LABELS[e.fase] || e.titulo || e.title || `Entrega #${e.id}`,
+                    id: e.id,
+                    fase: e.fase,
+                    label: e.titulo || e.title || LABELS[e.fase] || `Entrega #${e.id}`,
                     status: mapStatus(e.estado || e.status),
                     deadline: toDate(e.fecha_limite || e.due_date),
                     grade: e.nota ?? e.consolidated_grade ?? null,
                     versions: (e.versiones || []).map((v: any) => ({
-                        version: v.numero_version ?? 0,
-                        date: toDate(v.subido_en || v.created_at),
-                        status: (v.estado || v.status) === 'aprobado' ? 'approved' : (v.estado || v.status) === 'rechazado' ? 'rejected' : 'pending',
-                        fileName: (v.ruta_archivo || '').split('/').pop() || 'documento.pdf',
+                        version: v.numero_version ?? v.version_number ?? 0,
+                        date: toDateTime(v.subido_en || v.uploaded_at || v.created_at),
+                        status: mapVersionStatus(v.estado || v.status),
+                        fileName: v.nombre_archivo || v.original_name || (v.ruta_archivo || '').split('/').pop() || 'documento.pdf',
+                        observationPreview: previewObservation(v.observacion ?? v.director_notes),
                     })),
                 })));
             } catch { if (!cancel) setError('Error de conexion.'); }

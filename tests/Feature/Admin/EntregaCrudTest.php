@@ -295,6 +295,135 @@ it('estudiante NO puede revisar entrega (403)', function () {
     $response->assertStatus(403);
 });
 
+it('director guarda director_notes por version_id sin sobrescribir otras versiones', function () {
+    $entrega = Entrega::create([
+        'proyecto_id' => $this->proyecto->id,
+        'phase' => 'anteproyecto',
+        'title' => 'Entrega multi-versión',
+        'due_date' => '2026-03-01',
+        'status' => 'enviada',
+    ]);
+
+    $v1 = VersionDocumento::create([
+        'entrega_id' => $entrega->id,
+        'version_number' => 1,
+        'file_path' => 'path/v1.pdf',
+        'original_name' => 'v1.pdf',
+    ]);
+    $v2 = VersionDocumento::create([
+        'entrega_id' => $entrega->id,
+        'version_number' => 2,
+        'file_path' => 'path/v2.pdf',
+        'original_name' => 'v2.pdf',
+    ]);
+    $v3 = VersionDocumento::create([
+        'entrega_id' => $entrega->id,
+        'version_number' => 3,
+        'file_path' => 'path/v3.pdf',
+        'original_name' => 'v3.pdf',
+    ]);
+
+    $this->actingAs($this->director)
+        ->putJson("/api/admin/entregas/{$entrega->id}/revisar", [
+            'status' => 'revisada',
+            'director_notes' => 'Corregir introducción.',
+            'version_id' => $v1->id,
+        ])
+        ->assertOk();
+
+    $this->actingAs($this->director)
+        ->putJson("/api/admin/entregas/{$entrega->id}/revisar", [
+            'status' => 'revisada',
+            'director_notes' => 'Corregir metodología.',
+            'version_id' => $v2->id,
+        ])
+        ->assertOk();
+
+    $this->actingAs($this->director)
+        ->putJson("/api/admin/entregas/{$entrega->id}/revisar", [
+            'status' => 'aprobada',
+            'director_notes' => 'Aprobada.',
+            'version_id' => $v3->id,
+        ])
+        ->assertOk();
+
+    expect($v1->fresh()->director_notes)->toBe('Corregir introducción.');
+    expect($v2->fresh()->director_notes)->toBe('Corregir metodología.');
+    expect($v3->fresh()->director_notes)->toBe('Aprobada.');
+});
+
+it('revisar con version_id de otra entrega retorna 422', function () {
+    $entrega = Entrega::create([
+        'proyecto_id' => $this->proyecto->id,
+        'phase' => 'anteproyecto',
+        'title' => 'Entrega A',
+        'due_date' => '2026-03-01',
+        'status' => 'enviada',
+    ]);
+    VersionDocumento::create([
+        'entrega_id' => $entrega->id,
+        'version_number' => 1,
+        'file_path' => 'path/a.pdf',
+        'original_name' => 'a.pdf',
+    ]);
+
+    $otraEntrega = Entrega::create([
+        'proyecto_id' => $this->proyecto->id,
+        'phase' => 'anteproyecto',
+        'title' => 'Entrega B',
+        'due_date' => '2026-03-15',
+        'status' => 'enviada',
+    ]);
+    $versionAjena = VersionDocumento::create([
+        'entrega_id' => $otraEntrega->id,
+        'version_number' => 1,
+        'file_path' => 'path/b.pdf',
+        'original_name' => 'b.pdf',
+    ]);
+
+    $this->actingAs($this->director)
+        ->putJson("/api/admin/entregas/{$entrega->id}/revisar", [
+            'status' => 'revisada',
+            'director_notes' => 'No debe guardarse',
+            'version_id' => $versionAjena->id,
+        ])
+        ->assertStatus(422);
+});
+
+it('revisar sin version_id guarda notas en la ultima version', function () {
+    $entrega = Entrega::create([
+        'proyecto_id' => $this->proyecto->id,
+        'phase' => 'anteproyecto',
+        'title' => 'Entrega fallback',
+        'due_date' => '2026-03-01',
+        'status' => 'enviada',
+    ]);
+
+    $v1 = VersionDocumento::create([
+        'entrega_id' => $entrega->id,
+        'version_number' => 1,
+        'file_path' => 'path/v1.pdf',
+        'original_name' => 'v1.pdf',
+        'director_notes' => 'Nota histórica v1',
+    ]);
+    $v2 = VersionDocumento::create([
+        'entrega_id' => $entrega->id,
+        'version_number' => 2,
+        'file_path' => 'path/v2.pdf',
+        'original_name' => 'v2.pdf',
+    ]);
+
+    $this->actingAs($this->director)
+        ->putJson("/api/admin/entregas/{$entrega->id}/revisar", [
+            'status' => 'revisada',
+            'director_notes' => 'Nota en última',
+        ])
+        ->assertOk();
+
+    expect($v1->fresh()->director_notes)->toBe('Nota histórica v1');
+    expect($v2->fresh()->director_notes)->toBe('Nota en última');
+});
+
 // -- Banco de documentos aprobados ------------------------------------------
 
 it('entregas finales endpoint devuelve documentos aprobados', function () {

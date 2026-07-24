@@ -20,6 +20,12 @@ const badgeVar: Record<string, 'success' | 'warning' | 'inactivo' | 'info'> = {
     enviada: 'info', locked: 'inactivo',
 };
 
+const versionStatusLabel: Record<VersionData['status'], string> = {
+    approved: 'Aprobado',
+    rejected: 'Necesita ajustes',
+    pending: 'Sin revisar',
+};
+
 export default function DeliveryAccordion({ delivery }: { delivery: EntregaData }) {
     const [expanded, setExpanded] = useState(false);
 
@@ -44,21 +50,38 @@ export default function DeliveryAccordion({ delivery }: { delivery: EntregaData 
             </button>
 
             {expanded && delivery.versions.length > 0 && (
-                <div className="border-t border-[#e5e5e5]">
+                <div className="border-t border-[#e5e5e5] overflow-x-auto">
                     <table className="w-full text-left text-sm tabular-nums">
                         <thead className="bg-[#f5f5f4] text-[11px] font-bold uppercase tracking-[0.05em] text-[#57534e]">
-                            <tr><th className="px-4 py-2.5">Version</th><th className="px-4 py-2.5">Fecha</th><th className="px-4 py-2.5">Archivo</th><th className="px-4 py-2.5">Estado</th></tr>
+                            <tr>
+                                <th className="px-4 py-2.5">Versión</th>
+                                <th className="px-4 py-2.5">Fecha</th>
+                                <th className="px-4 py-2.5">Archivo</th>
+                                <th className="px-4 py-2.5">Estado</th>
+                                <th className="px-4 py-2.5">Observación</th>
+                            </tr>
                         </thead>
                         <tbody>
                             {delivery.versions.map((v: VersionData) => (
                                 <tr key={v.version} className="border-b border-[#e5e5e5] last:border-none">
                                     <td className="px-4 py-2.5 font-medium text-[#1c1917]">v{v.version}</td>
-                                    <td className="px-4 py-2.5 text-[#57534e]">{v.date}</td>
-                                    <td className="px-4 py-2.5 text-[#57534e]">{v.fileName}</td>
+                                    <td className="px-4 py-2.5 text-[#57534e] whitespace-nowrap">{v.date}</td>
+                                    <td className="px-4 py-2.5 text-[#57534e] max-w-[160px] truncate" title={v.fileName}>
+                                        {v.fileName}
+                                    </td>
                                     <td className="px-4 py-2.5">
-                                        <StatusBadge variant={v.status === 'approved' ? 'success' : v.status === 'rejected' ? 'error' : 'warning'}>
-                                            {v.status === 'approved' ? 'Aprobado' : v.status === 'rejected' ? 'Rechazado' : 'Pendiente'}
+                                        <StatusBadge variant={v.status === 'approved' ? 'success' : v.status === 'rejected' ? 'warning' : 'info'}>
+                                            {versionStatusLabel[v.status]}
                                         </StatusBadge>
+                                    </td>
+                                    <td className="px-4 py-2.5 text-[#57534e] max-w-[220px]">
+                                        {v.observationPreview ? (
+                                            <span className="line-clamp-2" title={v.observationPreview}>
+                                                {v.observationPreview}
+                                            </span>
+                                        ) : (
+                                            <span className="text-[#a8a29e] italic">Sin observaciones</span>
+                                        )}
                                     </td>
                                 </tr>
                             ))}

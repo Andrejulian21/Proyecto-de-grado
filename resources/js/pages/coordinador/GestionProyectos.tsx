@@ -116,6 +116,7 @@ export default function GestionProyectos() {
 
     /* ── Delete confirm state ──────────────────────────────────────── */
     const [deleteTarget, setDeleteTarget] = useState<Proyecto | null>(null);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
 
     /* ── Cupo editing state ────────────────────────────────────────── */
     const [editingCupoId, setEditingCupoId] = useState<number | null>(null);
@@ -195,11 +196,16 @@ export default function GestionProyectos() {
     /* ── Delete project ────────────────────────────────────────────── */
     const handleDelete = useCallback(async () => {
         if (!deleteTarget) return;
+        setDeleteError(null);
         try {
             await eliminarProyecto(deleteTarget.id);
-        } catch {
-            // error handled by hook
-        } finally {
+            setDeleteTarget(null);
+        } catch (err) {
+            setDeleteError(
+                err instanceof Error
+                    ? err.message
+                    : 'No se pudo eliminar el proyecto.',
+            );
             setDeleteTarget(null);
         }
     }, [deleteTarget, eliminarProyecto]);
@@ -288,6 +294,7 @@ export default function GestionProyectos() {
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
+                            setDeleteError(null);
                             setDeleteTarget(row);
                         }}
                         className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#fee2e2] hover:text-[#dc2626] active:scale-[0.98]"
@@ -421,6 +428,7 @@ export default function GestionProyectos() {
                 {proyError && (
                     <ErrorBanner message={proyError} onRetry={refetchProyectos} />
                 )}
+                {deleteError && <ErrorBanner message={deleteError} />}
 
                 {proyLoading ? (
                     <SectionLoading rows={5} />

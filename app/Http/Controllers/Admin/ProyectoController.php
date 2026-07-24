@@ -115,6 +115,30 @@ class ProyectoController extends Controller
         return response()->json(['data' => $proyecto], 201);
     }
 
+    /**
+     * DELETE /api/admin/proyectos/{proyecto}
+     *
+     * Only projects with no associated deliveries (FK or pivot) may be deleted.
+     */
+    public function destroy(Proyecto $proyecto): JsonResponse
+    {
+        $hasEntregas = $proyecto->entregas()->exists()
+            || $proyecto->entregasPivot()->exists();
+
+        if ($hasEntregas) {
+            $message = 'No se puede eliminar el proyecto porque ya posee entregas registradas.';
+
+            return response()->json([
+                'error' => $message,
+                'message' => $message,
+            ], 422);
+        }
+
+        $proyecto->delete();
+
+        return response()->json(['message' => 'Proyecto eliminado correctamente.']);
+    }
+
     public function kpis(): JsonResponse
     {
         $activos = Proyecto::enSemestresActivos()

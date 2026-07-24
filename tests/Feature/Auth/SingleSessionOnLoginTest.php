@@ -100,6 +100,8 @@ it('loginExterno deletes prior session rows for the same user', function () {
  * stubbed Socialite user.
  */
 it('handleGoogleCallback deletes prior session rows for the same user', function () {
+    config(['session.driver' => 'database']);
+
     $user = User::factory()->create([
         'email' => 'maria@unab.edu.co',
         'role' => UserRole::Coordinador->value,
@@ -136,9 +138,43 @@ it('handleGoogleCallback deletes prior session rows for the same user', function
     $socialite->shouldReceive('user')->andReturn($abstractUser);
     Socialite::shouldReceive('driver')->with('google')->andReturn($socialite);
 
-    $this->get('/auth/callback');
+    $response = $this->get('/auth/callback');
 
-    // Device A's session was wiped by the callback, but a new session
-    // is created for the callback request itself (SESSION_DRIVER=database).
+    $response->assertRedirect('/auth/complete');
+    $this->assertAuthenticatedAs($user);
+
+    // Device A's session was wiped; the callback session remains.
+    expect(DB::table('sessions')->where('id', 'device-a-session-id')->exists())->toBeFalse();
     expect(DB::table('sessions')->where('user_id', $user->id)->count())->toBe(1);
+
+    $this->getJson('/api/auth/user')
+        ->assertOk()
+        ->assertJsonPath('email', 'maria@unab.edu.co');
+});
+
+it('handleGoogleCallback redirects to auth complete not protected dashboard', function () {
+    $user = User::factory()->create([
+        'email' => 'carlos@unab.edu.co',
+        'role' => UserRole::Estudiante->value,
+        'es_externo' => false,
+    ]);
+    AuthorizedEmail::create([
+        'email' => 'carlos@unab.edu.co',
+        'role' => UserRole::Estudiante->value,
+    ]);
+
+    $socialite = Mockery::mock(Provider::class);
+    $abstractUser = new Laravel\Socialite\Two\User;
+    $abstractUser->id = 'google-999';
+    $abstractUser->name = 'Carlos';
+    $abstractUser->email = 'carlos@unab.edu.co';
+    $abstractUser->avatar = 'https://example.com/a.png';
+    $abstractUser->user = ['hd' => 'unab.edu.co'];
+    $socialite->shouldReceive('user')->andReturn($abstractUser);
+    Socialite::shouldReceive('driver')->with('google')->andReturn($socialite);
+
+    $this->get('/auth/callback')
+        ->assertRedirect('/auth/complete');
+
+    $this->assertAuthenticatedAs($user);
 });

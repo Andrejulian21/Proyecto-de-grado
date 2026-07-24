@@ -81,7 +81,18 @@ class UserController extends Controller
             $user->codigo_estudiante = $payload['codigo_estudiante'];
         }
 
+        // If the new role is no longer EvaluadorExterno, clear the external flag
+        // and mark password as changed so the middleware doesn't block them.
+        if ($user->role->value !== UserRole::EvaluadorExterno->value) {
+            $user->es_externo = false;
+            $user->password_changed_at = now();
+        }
+
         $user->save();
+
+        // Sync whitelist role if an entry exists
+        AuthorizedEmail::where('email', $user->email)
+            ->update(['role' => $user->role->value]);
 
         AuditEvent::dispatch(
             $request->user(),

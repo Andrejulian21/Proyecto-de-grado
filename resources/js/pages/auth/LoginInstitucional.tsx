@@ -60,7 +60,7 @@ export function LoginInstitucional({ error = null }: LoginInstitucionalProps) {
                             href="/login/externo"
                             className="inline-flex min-h-[40px] items-center justify-center gap-2 text-[12px] font-bold uppercase tracking-[0.03em] text-[#57534e] no-underline transition-colors hover:text-[#1c1917]"
                         >
-                            <span>Login para evaluadores externos</span>
+                            <span>Login para usuarios externos</span>
                             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M5 12h14" />
                                 <path d="m12 5 7 7-7 7" />

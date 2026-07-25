@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Enums\EstadoInvitacionEvaluador;
 use App\Enums\EstadoProyecto;
 use App\Enums\FaseProyecto;
 use App\Enums\UserRole;
 use App\Models\AuthorizedEmail;
+use App\Models\EvaluadorProyecto;
 use App\Models\Proyecto;
 use App\Models\Semestre;
 use App\Models\User;
@@ -49,6 +51,8 @@ class TestUsersSeeder extends Seeder
             ['name' => 'Miguel Afanador', 'role' => UserRole::Coordinador],
         );
 
+
+    
         // ── 2. Estudiantes (login externo con credenciales) ─────────────
 
         $estudianteJulian = User::updateOrCreate(
@@ -85,6 +89,25 @@ class TestUsersSeeder extends Seeder
             ],
         );
 
+        // ──  Evaluador Externo (login externo con credenciales) ────────────────
+
+        $evaluadorExternoAngel = User::updateOrCreate(
+            ['email' => 'miguelafanquin10.evaluador@gmail.com'],
+            [
+                'name'                => 'Angel Afanador',
+                'password'            => 'Pruebas123!',
+                'role'                => UserRole::EvaluadorExterno,
+                'es_externo'          => true,
+                // Avoid forced password-change gate on first login (dev seed).
+                'password_changed_at' => now(),
+                // Clear lockout leftover from failed login attempts.
+                'failed_attempts'     => 0,
+                'last_failed_at'      => null,
+                'locked_until'        => null,
+            ],
+        );
+
+
         // ── 4. Semestre activo ──────────────────────────────────────────
 
         $semestre = Semestre::firstOrCreate(
@@ -116,8 +139,24 @@ class TestUsersSeeder extends Seeder
             'updated_at'  => now(),
         ]);
 
+        // Asignar evaluador externo Angel al proyecto demo
+        EvaluadorProyecto::updateOrCreate(
+            [
+                'proyecto_id'  => $proyecto->id,
+                'evaluador_id' => $evaluadorExternoAngel->id,
+            ],
+            [
+                'invitation_status' => EstadoInvitacionEvaluador::Aceptada,
+                'assigned_at'       => now(),
+                'fecha'             => now()->toDateString(),
+                'hora_inicio'       => '09:00',
+                'hora_fin'          => '10:00',
+                'fase'              => 'Anteproyecto',
+            ],
+        );
+
         $this->command->info(sprintf(
-            'Test users seeded: 2 coordinadores, 2 estudiantes, 1 director, 1 proyecto (%s)',
+            'Test users seeded: 2 coordinadores, 2 estudiantes, 1 director, 1 evaluador externo, 1 proyecto (%s)',
             $proyecto->code,
         ));
     }

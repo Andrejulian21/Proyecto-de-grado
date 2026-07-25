@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\ProyectoController;
 use App\Http\Controllers\Admin\SemestreController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Api\DirectorController;
+use App\Http\Controllers\Api\EvaluadorController;
 use App\Http\Controllers\Auth\AuthController;
 use Illuminate\Support\Facades\Route;
 
@@ -150,6 +151,14 @@ Route::middleware([
         Route::get('/evaluaciones', [DirectorController::class, 'evaluaciones']);
         Route::get('/proyectos/{proyecto}/entrega-fase', [DirectorController::class, 'entregaFase'])
             ->whereNumber('proyecto');
+    });
+
+    // Evaluador externo dashboard endpoints
+    Route::prefix('evaluador')->name('evaluador.')->group(function () {
+        Route::get('/evaluaciones', [EvaluadorController::class, 'evaluaciones']);
+        Route::get('/kpis', [EvaluadorController::class, 'kpis']);
+        Route::get('/proyectos/{id}/entrega-fase', [EvaluadorController::class, 'entregaFase'])
+            ->whereNumber('id');
     });
 });
 

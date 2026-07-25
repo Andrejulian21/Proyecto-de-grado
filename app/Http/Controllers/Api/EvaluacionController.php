@@ -89,14 +89,49 @@ class EvaluacionController extends Controller
 
         $data = $validator->validated();
 
-        $entrega = Entrega::findOrFail($data['entrega_id']);
+        $entrega = Entrega::with('proyectos:id')->findOrFail($data['entrega_id']);
 
-        $esAsignado = EvaluadorProyecto::where('proyecto_id', $entrega->proyecto_id)
+        // Entregas may link via direct FK and/or entrega_proyecto pivot
+        // (same resolution pattern as EvaluadorController@entregaFase).
+        $proyectoIds = collect([$entrega->proyecto_id])
+            ->merge($entrega->proyectos->pluck('id'))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($proyectoIds->isEmpty()) {
+            return response()->json([
+                'error' => 'La entrega no está vinculada a ningún proyecto.',
+            ], 422);
+        }
+
+        $asignacionUsuario = EvaluadorProyecto::whereIn('proyecto_id', $proyectoIds)
             ->where('evaluador_id', $user->id)
             ->exists();
 
-        if (! $esAsignado) {
-            return response()->json(['error' => 'No estás asignado a este proyecto.'], 403);
+        if (! $asignacionUsuario) {
+            $proyectoTieneEvaluadores = EvaluadorProyecto::whereIn('proyecto_id', $proyectoIds)->exists();
+
+            if (! $proyectoTieneEvaluadores) {
+                return response()->json([
+                    'error' => 'El proyecto no tiene un evaluador asignado.',
+                ], 403);
+            }
+
+            return response()->json([
+                'error' => 'El usuario autenticado no corresponde al evaluador asignado.',
+            ], 403);
+        }
+
+        $yaExisteCriterio = Evaluacion::where('entrega_id', $data['entrega_id'])
+            ->where('evaluador_id', $user->id)
+            ->where('criterio', $data['criterio'])
+            ->exists();
+
+        if ($yaExisteCriterio) {
+            return response()->json([
+                'error' => 'La evaluación para este criterio ya fue enviada.',
+            ], 422);
         }
 
         $existingSum = Evaluacion::where('entrega_id', $data['entrega_id'])

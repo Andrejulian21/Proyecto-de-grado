@@ -244,6 +244,14 @@ describe('T-016: CRUD evaluaciones', function () {
         $otroProyecto = Proyecto::create(['title' => 'Otro', 'semester_id' => $this->semestre->id]);
         $otraEntrega = Entrega::create(['proyecto_id' => $otroProyecto->id, 'phase' => 'anteproyecto', 'title' => 'Otra entrega', 'due_date' => '2026-03-01']);
 
+        // Another evaluator is assigned — authenticated user is not.
+        EvaluadorProyecto::create([
+            'proyecto_id' => $otroProyecto->id,
+            'evaluador_id' => User::factory()->external()->create()->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Aceptada,
+            'assigned_at' => now(),
+        ]);
+
         $response = $this->actingAs($this->evaluador)
             ->postJson('/api/evaluaciones', [
                 'entrega_id' => $otraEntrega->id,
@@ -252,7 +260,97 @@ describe('T-016: CRUD evaluaciones', function () {
                 'grade' => 4.50,
             ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(403)
+            ->assertJson([
+                'error' => 'El usuario autenticado no corresponde al evaluador asignado.',
+            ]);
+    });
+
+    it('evaluador puede calificar entrega vinculada solo por pivot entrega_proyecto', function () {
+        EvaluadorProyecto::create([
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Aceptada,
+            'assigned_at' => now(),
+        ]);
+
+        $entregaPivot = Entrega::create([
+            'proyecto_id' => null,
+            'phase' => 'anteproyecto',
+            'title' => 'Entrega grupal',
+            'due_date' => '2026-03-01',
+            'status' => 'aprobada',
+        ]);
+        $entregaPivot->proyectos()->attach($this->proyecto->id);
+
+        $response = $this->actingAs($this->evaluador)
+            ->postJson('/api/evaluaciones', [
+                'entrega_id' => $entregaPivot->id,
+                'criterio' => 'Estructura',
+                'percentage' => 100.00,
+                'grade' => 4.50,
+            ]);
+
+        $response->assertCreated();
+        expect(Evaluacion::where('entrega_id', $entregaPivot->id)->count())->toBe(1);
+    });
+
+    it('rechaza con mensaje específico cuando el proyecto no tiene evaluadores', function () {
+        $proyectoSinEval = Proyecto::create([
+            'title' => 'Sin evaluadores',
+            'semester_id' => $this->semestre->id,
+            'director_id' => $this->director->id,
+        ]);
+        $entrega = Entrega::create([
+            'proyecto_id' => $proyectoSinEval->id,
+            'phase' => 'anteproyecto',
+            'title' => 'Entrega',
+            'due_date' => '2026-03-01',
+        ]);
+
+        $response = $this->actingAs($this->evaluador)
+            ->postJson('/api/evaluaciones', [
+                'entrega_id' => $entrega->id,
+                'criterio' => 'Estructura',
+                'percentage' => 100.00,
+                'grade' => 4.50,
+            ]);
+
+        $response->assertStatus(403)
+            ->assertJson([
+                'error' => 'El proyecto no tiene un evaluador asignado.',
+            ]);
+    });
+
+    it('rechaza criterio duplicado con mensaje específico', function () {
+        EvaluadorProyecto::create([
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Aceptada,
+            'assigned_at' => now(),
+        ]);
+
+        Evaluacion::create([
+            'entrega_id' => $this->entrega->id,
+            'evaluador_id' => $this->evaluador->id,
+            'criterio' => 'Estructura',
+            'percentage' => 50.00,
+            'grade' => 4.0,
+            'evaluated_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->evaluador)
+            ->postJson('/api/evaluaciones', [
+                'entrega_id' => $this->entrega->id,
+                'criterio' => 'Estructura',
+                'percentage' => 50.00,
+                'grade' => 4.5,
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJson([
+                'error' => 'La evaluación para este criterio ya fue enviada.',
+            ]);
     });
 });
 

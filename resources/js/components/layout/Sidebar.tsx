@@ -51,8 +51,8 @@ const navConfig: Record<string, { to: string; icon: typeof LayoutDashboard; labe
         { to: '/asistente', label: 'Asistente', icon: UserCheck },
     ],
     EvaluadorExterno: [
-        { to: '/', label: 'Panel de Control', icon: LayoutDashboard },
-        { to: '/evaluaciones', label: 'Evaluaciones', icon: ClipboardCheck },
+        { to: '/dashboard/evaluador-externo', label: 'Panel de Control', icon: LayoutDashboard },
+        { to: '/dashboard/evaluador-externo', label: 'Evaluaciones', icon: ClipboardCheck },
         { to: '/anuncios', label: 'Anuncios', icon: Megaphone },
         { to: '/recursos', label: 'Recursos', icon: FolderKanban },
     ],
@@ -105,10 +105,10 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                         {items.map((item) => {
                             const isSupervisionActive = item.to === '/supervision' && location.pathname.startsWith('/bitacoras');
                             return (
-                                <li key={item.to}>
+                                <li key={`${item.to}-${item.label}`}>
                                     <NavLink
                                         to={item.to}
-                                        end={['/', '/dashboard/director', '/dashboard/estudiante', '/dashboard/coordinador', '/anuncios', '/anuncios/admin', '/evaluaciones'].includes(item.to)}
+                                        end={['/', '/dashboard/director', '/dashboard/estudiante', '/dashboard/coordinador', '/dashboard/evaluador-externo', '/anuncios', '/anuncios/admin', '/evaluaciones'].includes(item.to)}
                                         onClick={onClose}
                                         className={({ isActive }) =>
                                             cn(

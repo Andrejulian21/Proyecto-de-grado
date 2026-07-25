@@ -32,6 +32,7 @@ class Entrega extends Model
         'evaluation_complete',
         'acceptance_criteria',
         'hora_maxima',
+        'archivos_requeridos',
     ];
 
     protected $appends = ['grupo_id'];
@@ -44,6 +45,7 @@ class Entrega extends Model
             'start_date' => 'date',
             'consolidated_grade' => 'decimal:2',
             'evaluation_complete' => 'boolean',
+            'archivos_requeridos' => 'json',
         ];
     }
 
@@ -108,6 +110,26 @@ class Entrega extends Model
     public function scopePorEstado(Builder $query, string $status): Builder
     {
         return $query->where('status', $status);
+    }
+
+    /**
+     * Find a specific archivo requerido by its slug.
+     */
+    public function getArchivoRequerido(string $slug): ?array
+    {
+        $archivos = $this->archivos_requeridos ?? [];
+
+        if (! is_array($archivos)) {
+            return null;
+        }
+
+        foreach ($archivos as $archivo) {
+            if (($archivo['slug'] ?? null) === $slug) {
+                return $archivo;
+            }
+        }
+
+        return null;
     }
 
     /**

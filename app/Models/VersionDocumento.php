@@ -20,11 +20,26 @@ class VersionDocumento extends Model
         'original_name',
         'director_notes',
         'uploaded_at',
+        'entrega_proyecto_id',
+        'archivo_requerido_id',
+        'descontinuado',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'descontinuado' => 'boolean',
+        ];
+    }
 
     public function entrega(): BelongsTo
     {
         return $this->belongsTo(Entrega::class, 'entrega_id');
+    }
+
+    public function entregaProyecto(): BelongsTo
+    {
+        return $this->belongsTo(EntregaProyecto::class, 'entrega_proyecto_id');
     }
 
     public function scopeUltima(Builder $query): Builder

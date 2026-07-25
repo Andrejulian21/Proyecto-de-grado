@@ -52,7 +52,7 @@ const navConfig: Record<string, { to: string; icon: typeof LayoutDashboard; labe
     ],
     EvaluadorExterno: [
         { to: '/dashboard/evaluador-externo', label: 'Panel de Control', icon: LayoutDashboard },
-        { to: '/dashboard/evaluador-externo', label: 'Evaluaciones', icon: ClipboardCheck },
+        { to: '/evaluador/evaluaciones', label: 'Evaluaciones', icon: ClipboardCheck },
         { to: '/anuncios', label: 'Anuncios', icon: Megaphone },
         { to: '/recursos', label: 'Recursos', icon: FolderKanban },
     ],
@@ -108,7 +108,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                                 <li key={`${item.to}-${item.label}`}>
                                     <NavLink
                                         to={item.to}
-                                        end={['/', '/dashboard/director', '/dashboard/estudiante', '/dashboard/coordinador', '/dashboard/evaluador-externo', '/anuncios', '/anuncios/admin', '/evaluaciones'].includes(item.to)}
+                                        end={['/', '/dashboard/director', '/dashboard/estudiante', '/dashboard/coordinador', '/dashboard/evaluador-externo', '/evaluador/evaluaciones', '/anuncios', '/anuncios/admin', '/evaluaciones'].includes(item.to)}
                                         onClick={onClose}
                                         className={({ isActive }) =>
                                             cn(

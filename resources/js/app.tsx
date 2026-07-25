@@ -44,6 +44,7 @@ const VerBitacorasCoordinador = lazy(() => import('@/pages/coordinador/VerBitaco
 const RevisionBitacoraCoordinador = lazy(() => import('@/pages/coordinador/RevisionBitacoraCoordinador'));
 const EvaluarProyecto = lazy(() => import('@/pages/evaluador/EvaluarProyecto'));
 const EvaluadorCalificar = lazy(() => import('@/pages/evaluador/EvaluadorCalificar'));
+const EvaluacionesEvaluador = lazy(() => import('@/pages/evaluador/EvaluacionesEvaluador'));
 const AnalisisAutomaticoEntregas = lazy(() => import('@/pages/estudiante/AnalisisAutomaticoEntregas'));
 const AsistenteOrientacion = lazy(() => import('@/pages/estudiante/AsistenteOrientacion'));
 const EvaluacionesDirector = lazy(() => import('@/pages/director/EvaluacionesDirector'));
@@ -151,6 +152,7 @@ function App() {
                                 {/* PR12: Coordinador reports (removed) */}
                                 <Route path="/recursos/admin" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><RecursosAdmin /></SuspenseWrapper></ProtectedRoute>} />
                                 {/* PR13: Evaluador */}
+                                <Route path="/evaluador/evaluaciones" element={<ProtectedRoute allowedRoles={['EvaluadorExterno']}><SuspenseWrapper><EvaluacionesEvaluador /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/evaluaciones/:id" element={<ProtectedRoute allowedRoles={['Director', 'EvaluadorExterno']}><SuspenseWrapper><EvaluarProyecto /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/evaluaciones/:id/calificar" element={<ProtectedRoute allowedRoles={['EvaluadorExterno']}><SuspenseWrapper><EvaluadorCalificar /></SuspenseWrapper></ProtectedRoute>} />
                                 {/* Estudiante detalle entrega */}

@@ -419,6 +419,7 @@ class AuthController extends Controller
             'role' => $user->role->value,
             'es_externo' => $user->es_externo,
             'avatar' => $user->avatar,
+            'created_at' => $user->created_at?->toIso8601String(),
             'must_change_password' => $user->mustChangePassword(),
         ]);
     }

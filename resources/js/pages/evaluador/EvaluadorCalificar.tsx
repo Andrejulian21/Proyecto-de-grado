@@ -4,16 +4,16 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { apiFetch } from '@/lib/utils';
 import { datoNoEncontrado } from '@/lib/datoNoEncontrado';
+import {
+    DEFAULT_EVALUADOR_RUBRIC,
+    extractComment,
+    hasStoredGrades,
+    hydrateCriteriaFromSaved,
+    type EvaluacionCriterion,
+    type SavedEvaluacionRow,
+} from '@/lib/evaluacionCriteria';
 import type { EvaluacionAsignadaEvaluador } from '@/hooks/useEvaluadorEvaluaciones';
 import { ArrowLeft, Eye, Download, FileText, Send, Loader2, Star, AlertCircle } from 'lucide-react';
-
-interface GradeCriterion {
-    id: string;
-    name: string;
-    maxScore: number;
-    percentage: number;
-    score: number;
-}
 
 interface EntregaInfo {
     id: number;
@@ -29,19 +29,6 @@ interface EntregaInfo {
     }>;
 }
 
-interface SavedGrade {
-    criterio: string;
-    grade: number | null;
-    percentage: number;
-    comment: string | null;
-}
-
-const CRITERIA: GradeCriterion[] = [
-    { id: 'g1', name: 'Contenido y Estructura', maxScore: 5, percentage: 40, score: 0 },
-    { id: 'g2', name: 'Sustentación y Dominio', maxScore: 5, percentage: 35, score: 0 },
-    { id: 'g3', name: 'Resultados y Aportes', maxScore: 5, percentage: 25, score: 0 },
-];
-
 function buildSubtitle(proyecto: EvaluacionAsignadaEvaluador | null): string {
     if (!proyecto) return datoNoEncontrado('El proyecto');
     const code = proyecto.code || datoNoEncontrado('El código del proyecto');
@@ -56,7 +43,7 @@ export default function EvaluadorCalificar() {
     const [entrega, setEntrega] = useState<EntregaInfo | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [criteria, setCriteria] = useState(CRITERIA);
+    const [criteria, setCriteria] = useState<EvaluacionCriterion[]>(DEFAULT_EVALUADOR_RUBRIC);
     const [comment, setComment] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
@@ -129,17 +116,12 @@ export default function EvaluadorCalificar() {
                 const resGrades = await apiFetch(`/api/evaluaciones?entrega_id=${entregaData.id}`);
                 if (resGrades.ok) {
                     const jsonGrades = await resGrades.json();
-                    const saved: SavedGrade[] = jsonGrades.data ?? [];
+                    const saved: SavedEvaluacionRow[] = jsonGrades.data ?? [];
                     if (saved.length > 0 && !cancelled) {
-                        setCriteria((prev) =>
-                            prev.map((c) => {
-                                const match = saved.find((s) => s.criterio === c.name);
-                                return match?.grade != null ? { ...c, score: Number(match.grade) } : c;
-                            }),
-                        );
-                        const withComment = saved.find((s) => s.comment);
-                        if (withComment?.comment) setComment(withComment.comment);
-                        setReadOnly(true);
+                        // Rebuild criteria from persisted rows (source of truth).
+                        setCriteria(hydrateCriteriaFromSaved(saved, DEFAULT_EVALUADOR_RUBRIC));
+                        setComment(extractComment(saved));
+                        if (hasStoredGrades(saved)) setReadOnly(true);
                     }
                 }
 

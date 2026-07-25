@@ -4,17 +4,16 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { apiFetch } from '@/lib/utils';
 import { datoNoEncontrado } from '@/lib/datoNoEncontrado';
+import {
+    DEFAULT_EVALUADOR_RUBRIC,
+    extractComment,
+    hasStoredGrades,
+    hydrateCriteriaFromSaved,
+    type EvaluacionCriterion,
+    type SavedEvaluacionRow,
+} from '@/lib/evaluacionCriteria';
 import type { EvaluacionAsignadaEvaluador } from '@/hooks/useEvaluadorEvaluaciones';
 import { ArrowLeft, Eye, Download, FileText, Send, Loader2, AlertCircle } from 'lucide-react';
-
-interface RubricItem {
-    id: string;
-    name: string;
-    description: string;
-    maxScore: number;
-    percentage: number;
-    score: number;
-}
 
 interface EntregaInfo {
     id: number;
@@ -29,13 +28,6 @@ interface EntregaInfo {
         uploaded_at: string;
     }>;
 }
-
-const RUBRIC: RubricItem[] = [
-    { id: 'c1', name: 'Cumplimiento de Objetivos', description: 'Grado en que el proyecto cumple con los objetivos planteados en la propuesta inicial.', maxScore: 5, percentage: 30, score: 0 },
-    { id: 'c2', name: 'Calidad Técnica y Metodológica', description: 'Aplicación correcta de metodologías, herramientas y estándares de ingeniería.', maxScore: 5, percentage: 25, score: 0 },
-    { id: 'c3', name: 'Presentación y Sustentación', description: 'Claridad en la exposición, dominio del tema y capacidad de respuesta a preguntas.', maxScore: 5, percentage: 25, score: 0 },
-    { id: 'c4', name: 'Aportes y Resultados', description: 'Valor de los resultados obtenidos y su contribución al área de conocimiento.', maxScore: 5, percentage: 20, score: 0 },
-];
 
 function buildSubtitle(proyecto: EvaluacionAsignadaEvaluador | null): string {
     if (!proyecto) return datoNoEncontrado('El proyecto');
@@ -62,11 +54,12 @@ export default function EvaluarProyecto() {
     const [entrega, setEntrega] = useState<EntregaInfo | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [rubric, setRubric] = useState(RUBRIC);
+    const [rubric, setRubric] = useState<EvaluacionCriterion[]>(DEFAULT_EVALUADOR_RUBRIC);
     const [globalComment, setGlobalComment] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
+    const [readOnly, setReadOnly] = useState(false);
 
     const totalScore = rubric.reduce((s, r) => s + r.score, 0);
     const totalMax = rubric.reduce((s, r) => s + r.maxScore, 0);
@@ -103,7 +96,10 @@ export default function EvaluarProyecto() {
                     return;
                 }
 
-                if (!cancelled) setProyecto(found);
+                if (!cancelled) {
+                    setProyecto(found);
+                    setReadOnly(found.evaluation_status === 'evaluated');
+                }
 
                 const fase = found.fase_asignada || found.current_phase || 'Anteproyecto';
                 const resEntrega = await apiFetch(
@@ -124,10 +120,21 @@ export default function EvaluarProyecto() {
                 }
 
                 const jsonEntrega = await resEntrega.json();
-                if (!cancelled) {
-                    setEntrega(jsonEntrega.data ?? jsonEntrega);
-                    setLoading(false);
+                const entregaData: EntregaInfo = jsonEntrega.data ?? jsonEntrega;
+                if (!cancelled) setEntrega(entregaData);
+
+                const resGrades = await apiFetch(`/api/evaluaciones?entrega_id=${entregaData.id}`);
+                if (resGrades.ok) {
+                    const jsonGrades = await resGrades.json();
+                    const saved: SavedEvaluacionRow[] = jsonGrades.data ?? [];
+                    if (saved.length > 0 && !cancelled) {
+                        setRubric(hydrateCriteriaFromSaved(saved, DEFAULT_EVALUADOR_RUBRIC));
+                        setGlobalComment(extractComment(saved));
+                        if (hasStoredGrades(saved)) setReadOnly(true);
+                    }
                 }
+
+                if (!cancelled) setLoading(false);
             } catch (err) {
                 if (!cancelled) {
                     setError(err instanceof Error ? err.message : 'Error al cargar la evaluación');
@@ -143,6 +150,7 @@ export default function EvaluarProyecto() {
     }, [id]);
 
     function handleScoreChange(itemId: string, value: number) {
+        if (readOnly) return;
         setRubric((prev) =>
             prev.map((r) =>
                 r.id === itemId ? { ...r, score: Math.min(Math.max(0, value), r.maxScore) } : r,
@@ -151,7 +159,7 @@ export default function EvaluarProyecto() {
     }
 
     async function handleSubmit() {
-        if (totalScore === 0 || !entrega) return;
+        if (totalScore === 0 || !entrega || readOnly) return;
         setSubmitting(true);
         setSubmitError(null);
 
@@ -286,7 +294,9 @@ export default function EvaluarProyecto() {
                             <div className="flex items-center gap-2">
                                 <FileText className="h-5 w-5 text-[#c2410c]" />
                                 <h3 className="text-base font-bold text-[#1c1917]">Documento del Proyecto</h3>
-                                <StatusBadge variant="warning">Por evaluar</StatusBadge>
+                                <StatusBadge variant={readOnly ? 'success' : 'warning'}>
+                                    {readOnly ? 'Evaluado' : 'Por evaluar'}
+                                </StatusBadge>
                             </div>
                             {latestVersion?.file_path ? (
                                 <a
@@ -363,8 +373,9 @@ export default function EvaluarProyecto() {
                                             max={item.maxScore}
                                             step={0.1}
                                             value={item.score}
+                                            disabled={readOnly}
                                             onChange={(e) => handleScoreChange(item.id, Number(e.target.value))}
-                                            className="w-full accent-[#c2410c]"
+                                            className="w-full accent-[#c2410c] disabled:opacity-60"
                                             aria-label={`Puntaje para ${item.name}`}
                                         />
                                         <div className="flex items-center gap-2 mt-1">
@@ -374,8 +385,9 @@ export default function EvaluarProyecto() {
                                                 max={item.maxScore}
                                                 step={0.1}
                                                 value={item.score}
+                                                disabled={readOnly}
                                                 onChange={(e) => handleScoreChange(item.id, Number(e.target.value))}
-                                                className="w-16 min-h-[32px] rounded-lg border border-[#e5e5e5] bg-white px-2 py-1 text-xs font-semibold text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] tabular-nums"
+                                                className="w-16 min-h-[32px] rounded-lg border border-[#e5e5e5] bg-white px-2 py-1 text-xs font-semibold text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] tabular-nums disabled:opacity-60"
                                             />
                                             <span className="text-xs text-[#78716c]">/ {item.maxScore}</span>
                                         </div>
@@ -389,9 +401,10 @@ export default function EvaluarProyecto() {
                             <textarea
                                 rows={4}
                                 value={globalComment}
+                                disabled={readOnly}
                                 onChange={(e) => setGlobalComment(e.target.value)}
                                 placeholder="Escriba sus observaciones sobre el proyecto..."
-                                className="w-full min-h-[80px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y"
+                                className="w-full min-h-[80px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y disabled:opacity-60"
                             />
                         </div>
 
@@ -399,19 +412,21 @@ export default function EvaluarProyecto() {
                             <p className="text-sm text-[#dc2626]" role="alert">{submitError}</p>
                         )}
 
-                        <button
-                            type="button"
-                            onClick={handleSubmit}
-                            disabled={totalScore === 0 || submitting || !entrega}
-                            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#c2410c] px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            {submitting ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                                <Send className="h-4 w-4" />
-                            )}
-                            Enviar Evaluación
-                        </button>
+                        {!readOnly && (
+                            <button
+                                type="button"
+                                onClick={handleSubmit}
+                                disabled={totalScore === 0 || submitting || !entrega}
+                                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#c2410c] px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                {submitting ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Send className="h-4 w-4" />
+                                )}
+                                Enviar Evaluación
+                            </button>
+                        )}
                         {!entrega && (
                             <p className="text-xs text-center text-[#57534e]">
                                 {datoNoEncontrado('El documento')} No es posible enviar sin entrega aprobada.

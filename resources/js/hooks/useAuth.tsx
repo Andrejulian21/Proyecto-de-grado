@@ -7,6 +7,7 @@ interface User {
     name: string;
     email: string;
     role: 'Coordinador' | 'Director' | 'Estudiante' | 'EvaluadorExterno';
+    created_at?: string | null;
 }
 
 interface AuthContextValue {

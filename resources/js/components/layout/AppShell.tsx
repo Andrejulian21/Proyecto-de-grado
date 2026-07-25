@@ -13,6 +13,7 @@ const ROUTE_TITLES: Record<string, string> = {
     '/dashboard/director': 'Panel del Director',
     '/dashboard/coordinador': 'Panel del Coordinador',
     '/dashboard/evaluador-externo': 'Panel del Evaluador',
+    '/evaluador/evaluaciones': 'Evaluaciones',
     '/coordinador/usuarios': 'Gestión de Usuarios y Accesos',
     '/coordinador/audit-log': 'Auditoría',
     '/proyectos': 'Proyectos',

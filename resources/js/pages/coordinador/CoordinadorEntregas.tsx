@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { GroupSelector } from '@/components/forms/GroupSelector';
+import { MetricasEvaluacionField } from '@/components/forms/MetricasEvaluacionField';
 import { useEntregas, FASE_SEQUENCE, type Fase, type Entrega, type UpdateEntregaPayload } from '@/hooks/useEntregas';
 import {
     Search,
@@ -74,6 +75,7 @@ export default function CoordinadorEntregas() {
     const [formHoraInicio, setFormHoraInicio] = useState('');
     const [formHora, setFormHora] = useState('');
     const [formCriterios, setFormCriterios] = useState('');
+    const [formMetricas, setFormMetricas] = useState('');
     const [createError, setCreateError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -97,6 +99,7 @@ export default function CoordinadorEntregas() {
                     fecha_inicio: formFechaInicio || undefined,
                     hora_inicio: formHoraInicio || undefined,
                     criterios: formCriterios.trim() || undefined,
+                    metricas_evaluacion: formMetricas.trim() || undefined,
                     hora_maxima: formHora || undefined,
                 });
                 setFormTitulo('');
@@ -106,6 +109,7 @@ export default function CoordinadorEntregas() {
                 setFormHoraInicio('');
                 setFormHora('');
                 setFormCriterios('');
+                setFormMetricas('');
                 setShowCreateForm(false);
             } catch (err) {
                 setCreateError(err instanceof Error ? err.message : 'Error al crear entrega');
@@ -113,7 +117,7 @@ export default function CoordinadorEntregas() {
                 creatingRef.current = false;
             }
         },
-        [selectedGroup, formFase, formTitulo, formDesc, formFecha, crear],
+        [selectedGroup, formFase, formTitulo, formDesc, formFecha, formFechaInicio, formHoraInicio, formHora, formCriterios, formMetricas, crear],
     );
 
     // ── Edit modal state ─────────────────────────────────────────
@@ -125,6 +129,7 @@ export default function CoordinadorEntregas() {
     const [editDesc, setEditDesc] = useState('');
     const [editHora, setEditHora] = useState('');
     const [editCriterios, setEditCriterios] = useState('');
+    const [editMetricas, setEditMetricas] = useState('');
     const [editFase, setEditFase] = useState<string>('');
     const [editGrupoId, setEditGrupoId] = useState<number | null>(null);
     const [editError, setEditError] = useState<string | null>(null);
@@ -146,6 +151,7 @@ export default function CoordinadorEntregas() {
         setEditDesc(entrega.description || '');
         setEditHora(entrega.hora_maxima ?? '');
         setEditCriterios(entrega.acceptance_criteria ?? '');
+        setEditMetricas(entrega.evaluation_metrics ?? '');
         setEditFase(entrega.phase);
         setEditGrupoId(entrega.grupo_id);
         setEditError(null);
@@ -169,6 +175,7 @@ export default function CoordinadorEntregas() {
                 titulo: editTitulo.trim(),
                 description: editDesc.trim(),
                 acceptance_criteria: editCriterios.trim() || null,
+                evaluation_metrics: editMetricas.trim() || null,
                 hora_maxima: editHora || null,
                 start_date: editFechaInicio || null,
                 start_time: editHoraInicio || null,
@@ -179,7 +186,7 @@ export default function CoordinadorEntregas() {
         } catch (err) {
             setEditError(err instanceof Error ? err.message : 'Error al actualizar');
         }
-    }, [editingEntrega, editFecha, editTitulo, editDesc, editHora, editCriterios, editFase, actualizar, closeEditModal]);
+    }, [editingEntrega, editFecha, editTitulo, editDesc, editHora, editCriterios, editMetricas, editFechaInicio, editHoraInicio, editFase, actualizar, closeEditModal]);
 
     // ── Delete confirmation state ────────────────────────────────
     const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -347,6 +354,12 @@ export default function CoordinadorEntregas() {
                                 className="w-full min-h-[60px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y"
                             />
                         </div>
+
+                        <MetricasEvaluacionField
+                            id="create-metricas-evaluacion"
+                            value={formMetricas}
+                            onChange={setFormMetricas}
+                        />
 
                         <div className="flex flex-col gap-1.5">
                             <label className="text-sm font-semibold text-[#1c1917]">
@@ -698,6 +711,12 @@ export default function CoordinadorEntregas() {
                                     className="w-full min-h-[60px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y"
                                 />
                             </div>
+
+                            <MetricasEvaluacionField
+                                id="edit-metricas-evaluacion"
+                                value={editMetricas}
+                                onChange={setEditMetricas}
+                            />
 
                             {/* Fecha límite */}
                             <div className="flex flex-col gap-1.5">

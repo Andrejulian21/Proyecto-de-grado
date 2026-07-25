@@ -117,6 +117,61 @@ it('estudiante NO puede crear entrega (403)', function () {
     $response->assertStatus(403);
 });
 
+it('coordinador puede crear entrega con metricas de evaluacion', function () {
+    $metricas = 'Claridad de objetivos y calidad del marco teórico.';
+
+    $response = $this->actingAs($this->coordinador)
+        ->postJson('/api/admin/entregas', [
+            'grupo_id' => $this->semestre->id,
+            'fase' => 'anteproyecto',
+            'titulo' => 'Entrega con métricas',
+            'descripcion' => 'Descripción de la entrega',
+            'fecha_limite' => '2026-03-15',
+            'metricas_evaluacion' => $metricas,
+        ]);
+
+    $response->assertCreated();
+    $entrega = Entrega::query()->first();
+    expect($entrega)->not->toBeNull();
+    expect($entrega->evaluation_metrics)->toBe($metricas);
+    expect($entrega->acceptance_criteria)->toBeNull();
+});
+
+it('crear entrega sin metricas deja evaluation_metrics en null', function () {
+    $this->actingAs($this->coordinador)
+        ->postJson('/api/admin/entregas', [
+            'grupo_id' => $this->semestre->id,
+            'fase' => 'anteproyecto',
+            'titulo' => 'Sin métricas',
+            'descripcion' => 'Descripción de la entrega',
+            'fecha_limite' => '2026-03-15',
+        ])
+        ->assertCreated();
+
+    expect(Entrega::query()->first()->evaluation_metrics)->toBeNull();
+});
+
+it('coordinador puede actualizar metricas de evaluacion', function () {
+    $entrega = Entrega::create([
+        'proyecto_id' => $this->proyecto->id,
+        'semester_id' => $this->semestre->id,
+        'phase' => 'anteproyecto',
+        'title' => 'Entrega editable',
+        'description' => 'Descripción',
+        'due_date' => '2026-03-15',
+        'evaluation_metrics' => 'Métricas iniciales',
+    ]);
+
+    $response = $this->actingAs($this->coordinador)
+        ->putJson("/api/admin/entregas/{$entrega->id}", [
+            'evaluation_metrics' => 'Métricas actualizadas para IA',
+        ]);
+
+    $response->assertOk()
+        ->assertJsonPath('data.evaluation_metrics', 'Métricas actualizadas para IA');
+    expect($entrega->fresh()->evaluation_metrics)->toBe('Métricas actualizadas para IA');
+});
+
 // -- Subir versiones --------------------------------------------------------
 
 it('estudiante puede subir version a entrega', function () {

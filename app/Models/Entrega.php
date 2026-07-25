@@ -31,6 +31,7 @@ class Entrega extends Model
         'consolidated_grade',
         'evaluation_complete',
         'acceptance_criteria',
+        'evaluation_metrics',
         'hora_maxima',
     ];
 

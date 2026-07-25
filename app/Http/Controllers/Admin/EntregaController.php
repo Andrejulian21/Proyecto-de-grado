@@ -107,6 +107,7 @@ class EntregaController extends Controller
             'description' => 'sometimes|required|string|max:500',
             'titulo' => 'sometimes|required|string|max:255',
             'acceptance_criteria' => 'sometimes|nullable|string',
+            'evaluation_metrics' => 'sometimes|nullable|string',
             'hora_maxima' => 'sometimes|nullable|string|max:10',
             'start_date' => 'sometimes|nullable|date|before_or_equal:due_date',
             'start_time' => 'sometimes|nullable|string|max:10',
@@ -132,6 +133,9 @@ class EntregaController extends Controller
         }
         if (array_key_exists('acceptance_criteria', $data)) {
             $entrega->acceptance_criteria = $data['acceptance_criteria'];
+        }
+        if (array_key_exists('evaluation_metrics', $data)) {
+            $entrega->evaluation_metrics = $data['evaluation_metrics'];
         }
         if (array_key_exists('hora_maxima', $data)) {
             $entrega->hora_maxima = $data['hora_maxima'];
@@ -198,6 +202,7 @@ class EntregaController extends Controller
             'fecha_inicio' => 'nullable|date|before_or_equal:fecha_limite',
             'hora_inicio' => 'nullable|string|max:10',
             'criterios' => 'nullable|string',
+            'metricas_evaluacion' => 'nullable|string',
             'hora_maxima' => 'nullable|string|max:10',
         ]);
 
@@ -225,6 +230,7 @@ class EntregaController extends Controller
                 'start_time' => $data['hora_inicio'] ?? null,
                 'hora_maxima' => $data['hora_maxima'] ?? null,
                 'acceptance_criteria' => $data['criterios'] ?? null,
+                'evaluation_metrics' => $data['metricas_evaluacion'] ?? null,
                 'status' => EstadoEntrega::Pendiente->value,
             ]);
 

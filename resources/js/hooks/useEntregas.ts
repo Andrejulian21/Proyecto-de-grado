@@ -29,6 +29,7 @@ export interface Entrega {
     start_date?: string | null;
     start_time?: string | null;
     acceptance_criteria?: string;
+    evaluation_metrics?: string | null;
     hora_maxima?: string;
     status?: string;
     created_at?: string;
@@ -48,6 +49,7 @@ export interface CreateEntregaPayload {
     fecha_inicio?: string;
     hora_inicio?: string;
     criterios?: string;
+    metricas_evaluacion?: string;
     hora_maxima?: string;
 }
 
@@ -56,6 +58,7 @@ export interface UpdateEntregaPayload {
     description?: string;
     titulo?: string;
     acceptance_criteria?: string | null;
+    evaluation_metrics?: string | null;
     hora_maxima?: string | null;
     start_date?: string | null;
     start_time?: string | null;

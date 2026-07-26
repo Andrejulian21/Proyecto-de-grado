@@ -88,6 +88,13 @@ Route::middleware([
         ->name('estudiante.proyecto');
     Route::get('/estudiante/entregas', [\App\Http\Controllers\Api\EstudianteController::class, 'entregas'])
         ->name('estudiante.entregas');
+    Route::post('/estudiante/entregas/{entrega}/evaluacion-inteligente', [\App\Http\Controllers\Api\EvaluacionInteligenteController::class, 'store'])
+        ->whereNumber('entrega')
+        ->name('estudiante.entregas.evaluacion_inteligente');
+    Route::get('/estudiante/asistente/conversacion', [\App\Http\Controllers\Api\AsistenteAcademicoController::class, 'show'])
+        ->name('estudiante.asistente.conversacion');
+    Route::post('/estudiante/asistente/mensajes', [\App\Http\Controllers\Api\AsistenteAcademicoController::class, 'store'])
+        ->name('estudiante.asistente.mensajes');
 
     // Entregas — versiones (accessible by authenticated students and directors)
     Route::get('/entregas/{id}/versiones', [EntregaController::class, 'versiones'])
@@ -151,6 +158,12 @@ Route::middleware([
         Route::get('/evaluaciones', [DirectorController::class, 'evaluaciones']);
         Route::get('/proyectos/{proyecto}/entrega-fase', [DirectorController::class, 'entregaFase'])
             ->whereNumber('proyecto');
+        Route::get('/entregas/{entrega}/evaluacion-abet', [\App\Http\Controllers\Api\EvaluacionAbetController::class, 'show'])
+            ->whereNumber('entrega')
+            ->name('entregas.evaluacion_abet.show');
+        Route::post('/entregas/{entrega}/evaluacion-abet', [\App\Http\Controllers\Api\EvaluacionAbetController::class, 'store'])
+            ->whereNumber('entrega')
+            ->name('entregas.evaluacion_abet');
     });
 
     // Evaluador externo dashboard endpoints
@@ -246,6 +259,12 @@ Route::middleware(['auth:sanctum', 'single_session', 'activity', 'role:Coordinad
         Route::put('/directores/{director}/cupo', [DirectorCupoController::class, 'update'])
             ->whereNumber('director')
             ->name('directores.cupo.update');
+        Route::get('/directores/{director}/perfil-academico', [\App\Http\Controllers\Admin\DirectorAcademicProfileController::class, 'show'])
+            ->whereNumber('director')
+            ->name('directores.perfil_academico.show');
+        Route::put('/directores/{director}/perfil-academico', [\App\Http\Controllers\Admin\DirectorAcademicProfileController::class, 'update'])
+            ->whereNumber('director')
+            ->name('directores.perfil_academico.update');
 
         // Directores list + sus proyectos (para la página /directores).
         Route::get('/directores', [DirectorCupoController::class, 'directores'])

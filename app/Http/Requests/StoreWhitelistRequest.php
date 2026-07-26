@@ -49,13 +49,25 @@ class StoreWhitelistRequest extends FormRequest
                 Rule::unique('authorized_emails', 'email')->whereNull('deleted_at'),
             ],
             'name' => ['nullable', 'string', 'max:255'],
-            'areas' => ['nullable', 'string', 'max:1000'],
+            'areas' => ['nullable', 'string', 'max:2000'],
             'codigo_estudiante' => ['nullable', 'string', 'max:20'],
             'role' => [
                 'required',
                 'string',
                 Rule::in(array_map(fn (UserRole $r) => $r->value, self::WHITELIST_ROLES)),
             ],
+            // Optional academic profile (Director). Accepted as arrays or *_text strings.
+            'research_lines' => ['nullable'],
+            'research_lines.*' => ['string', 'max:255'],
+            'technologies' => ['nullable'],
+            'technologies.*' => ['string', 'max:255'],
+            'methodologies' => ['nullable'],
+            'methodologies.*' => ['string', 'max:255'],
+            'research_lines_text' => ['nullable', 'string', 'max:4000'],
+            'technologies_text' => ['nullable', 'string', 'max:4000'],
+            'methodologies_text' => ['nullable', 'string', 'max:4000'],
+            'academic_experience' => ['nullable', 'string', 'max:5000'],
+            'years_of_experience' => ['nullable', 'integer', 'min:0', 'max:80'],
         ];
     }
 }

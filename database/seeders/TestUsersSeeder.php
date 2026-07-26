@@ -9,6 +9,7 @@ use App\Enums\EstadoProyecto;
 use App\Enums\FaseProyecto;
 use App\Enums\UserRole;
 use App\Models\AuthorizedEmail;
+use App\Models\DirectorAcademicProfile;
 use App\Models\EvaluadorProyecto;
 use App\Models\Proyecto;
 use App\Models\Semestre;
@@ -82,10 +83,27 @@ class TestUsersSeeder extends Seeder
         $directorJulian = User::updateOrCreate(
             ['email' => 'julian21arteaga@gmail.com'],
             [
-                'name'       => 'Julian Director',
-                'password'   => 'Pruebas123!',
-                'role'       => UserRole::Director,
-                'es_externo' => true,
+                'name'         => 'Julian Director',
+                'password'     => 'Pruebas123!',
+                'role'         => UserRole::Director,
+                'es_externo'   => true,
+                'max_capacity' => 3,
+                'areas'        => "Inteligencia Artificial\nIngeniería de Software",
+            ],
+        );
+
+        DirectorAcademicProfile::updateOrCreate(
+            ['user_id' => $directorJulian->id],
+            [
+                'research_lines' => [
+                    'Inteligencia Artificial aplicada',
+                    'Ingeniería de Software',
+                    'Sistemas de información académicos',
+                ],
+                'technologies' => ['Laravel', 'React', 'PostgreSQL', 'Python'],
+                'methodologies' => ['SCRUM', 'Design Science Research'],
+                'academic_experience' => 'Dirección de proyectos de grado en desarrollo de software e IA aplicada a educación.',
+                'years_of_experience' => 8,
             ],
         );
 

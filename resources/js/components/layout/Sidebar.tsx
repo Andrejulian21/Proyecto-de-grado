@@ -47,7 +47,7 @@ const navConfig: Record<string, { to: string; icon: typeof LayoutDashboard; labe
         { to: '/bitacora', label: 'Bitácora', icon: ScrollText },
         { to: '/anuncios', label: 'Anuncios', icon: Megaphone },
         { to: '/recursos', label: 'Recursos', icon: FolderKanban },
-        { to: '/analisis-entregas', label: 'Análisis de Entregas', icon: BarChart3 },
+        { to: '/analisis-entregas', label: 'Evaluador IA', icon: BarChart3 },
         { to: '/asistente', label: 'Asistente', icon: UserCheck },
     ],
     EvaluadorExterno: [

@@ -13,6 +13,12 @@ import {
     Search,
     Users,
 } from 'lucide-react';
+import {
+    DirectorAcademicFields,
+    emptyDirectorAcademicForm,
+    listToTextarea,
+    type DirectorAcademicFormValues,
+} from '@/components/coordinador/DirectorAcademicFields';
 
 interface User {
     id: number;
@@ -86,7 +92,9 @@ export default function GestionUsuarios() {
     const [estCodigo, setEstCodigo] = useState('');
     const [dirCorreo, setDirCorreo] = useState('');
     const [dirNombre, setDirNombre] = useState('');
-    const [dirAreas, setDirAreas] = useState('');
+    const [dirAcademic, setDirAcademic] = useState<DirectorAcademicFormValues>(emptyDirectorAcademicForm());
+    const [editAcademic, setEditAcademic] = useState<DirectorAcademicFormValues>(emptyDirectorAcademicForm());
+    const [loadingProfile, setLoadingProfile] = useState(false);
 
     // ── Sección 4: Roles ──
     const [roleChanges, setRoleChanges] = useState<Record<string, string>>({});
@@ -190,6 +198,8 @@ export default function GestionUsuarios() {
         setFormEmail('');
         setFormRole('Estudiante');
         setFormCodigoEstudiante('');
+        setEditAcademic(emptyDirectorAcademicForm());
+        setLoadingProfile(false);
     }
 
     function showMsg(type: 'success' | 'error', text: string) {
@@ -221,15 +231,38 @@ export default function GestionUsuarios() {
                 throw new Error(err?.message || 'Error al guardar');
             }
 
+            // Persist academic profile when editing an existing Director user (not whitelist-only rows).
+            if (
+                editingUser &&
+                !editingIsWhitelist &&
+                formRole === 'Director' &&
+                typeof editingUser.id === 'number'
+            ) {
+                const profileRes = await apiFetch(`/api/admin/directores/${editingUser.id}/perfil-academico`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        areas: editAcademic.areas.trim() || null,
+                        research_lines_text: editAcademic.researchLines,
+                        technologies_text: editAcademic.technologies,
+                        methodologies_text: editAcademic.methodologies,
+                        academic_experience: editAcademic.academicExperience.trim() || null,
+                        years_of_experience: editAcademic.yearsOfExperience
+                            ? Number(editAcademic.yearsOfExperience)
+                            : null,
+                    }),
+                });
+                if (!profileRes.ok) {
+                    const err = await profileRes.json().catch(() => null);
+                    throw new Error(err?.error || 'Rol actualizado, pero falló el perfil académico');
+                }
+            }
+
+            const wasWhitelist = editingIsWhitelist;
             showMsg('success', editingUser ? 'Usuario actualizado' : 'Usuario creado');
-            setModalOpen(false);
-            setEditingUser(null);
-            setEditingIsWhitelist(false);
-            setFormName('');
-            setFormEmail('');
-            setFormRole('Estudiante');
+            resetForm();
             fetchUsers();
-            if (editingIsWhitelist) fetchWhitelist();
+            if (wasWhitelist) fetchWhitelist();
         } catch (err: any) {
             showMsg('error', err.message);
         } finally {
@@ -277,14 +310,41 @@ export default function GestionUsuarios() {
         }
     }
 
-    function openEdit(u: any, isWhitelist: boolean) {
+    async function openEdit(u: any, isWhitelist: boolean) {
         setEditingUser(u);
         setEditingIsWhitelist(isWhitelist);
         setFormName(u.name || '');
         setFormEmail(u.email);
         setFormRole(u.role);
         setFormCodigoEstudiante(u.codigo_estudiante || '');
+        setEditAcademic(emptyDirectorAcademicForm());
         setModalOpen(true);
+
+        if (!isWhitelist && u.role === 'Director' && typeof u.id === 'number') {
+            setLoadingProfile(true);
+            try {
+                const res = await apiFetch(`/api/admin/directores/${u.id}/perfil-academico`);
+                if (res.ok) {
+                    const json = await res.json();
+                    const data = json.data ?? {};
+                    setEditAcademic({
+                        areas: data.areas ?? '',
+                        researchLines: listToTextarea(data.research_lines),
+                        technologies: listToTextarea(data.technologies),
+                        methodologies: listToTextarea(data.methodologies),
+                        academicExperience: data.academic_experience ?? '',
+                        yearsOfExperience:
+                            data.years_of_experience === null || data.years_of_experience === undefined
+                                ? ''
+                                : String(data.years_of_experience),
+                    });
+                }
+            } catch {
+                // Keep empty form; user can still edit role.
+            } finally {
+                setLoadingProfile(false);
+            }
+        }
     }
 
     async     function toggleBlock(_u: User) {
@@ -380,16 +440,28 @@ export default function GestionUsuarios() {
             const res = await apiFetch('/api/admin/whitelist', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: dirCorreo.trim(), name: dirNombre.trim() || null, role: 'Director', areas: dirAreas.trim() || null }),
+                body: JSON.stringify({
+                    email: dirCorreo.trim(),
+                    name: dirNombre.trim() || null,
+                    role: 'Director',
+                    areas: dirAcademic.areas.trim() || null,
+                    research_lines_text: dirAcademic.researchLines,
+                    technologies_text: dirAcademic.technologies,
+                    methodologies_text: dirAcademic.methodologies,
+                    academic_experience: dirAcademic.academicExperience.trim() || null,
+                    years_of_experience: dirAcademic.yearsOfExperience
+                        ? Number(dirAcademic.yearsOfExperience)
+                        : null,
+                }),
             });
             if (!res.ok) {
                 const err = await res.json().catch(() => null);
-                throw new Error(err?.message || 'Error al agregar director');
+                throw new Error(err?.message || err?.error || 'Error al agregar director');
             }
-            showMsg('success', 'Director agregado');
+            showMsg('success', 'Director agregado con perfil académico');
             setDirCorreo('');
             setDirNombre('');
-            setDirAreas('');
+            setDirAcademic(emptyDirectorAcademicForm());
             fetchWhitelist();
             fetchUsers();
         } catch (err: any) {
@@ -836,7 +908,7 @@ export default function GestionUsuarios() {
                                 />
                                 <span className="text-xs text-[#57534e]">Docentes y directores de proyecto</span>
                             </div>
-                            <div className="flex flex-col gap-1.5 mb-4">
+                            <div className="mb-4 flex flex-col gap-1.5">
                                 <label htmlFor="nombre-dir" className="text-sm font-semibold text-text">Nombre completo</label>
                                 <input
                                     id="nombre-dir"
@@ -847,15 +919,17 @@ export default function GestionUsuarios() {
                                     placeholder="Ej: Dr. Ricardo Gómez"
                                 />
                             </div>
-                            <div className="flex flex-col gap-1.5 mb-4">
-                                <label htmlFor="areas-dir" className="text-sm font-semibold text-text">Áreas de especialización</label>
-                                <textarea
-                                    id="areas-dir"
-                                    rows={3}
-                                    value={dirAreas}
-                                    onChange={(e) => setDirAreas(e.target.value)}
-                                    className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-text outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y"
-                                    placeholder="Ej: Inteligencia Artificial, Desarrollo Web, Seguridad..."
+                            <div className="mb-4 rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-3">
+                                <p className="mb-3 text-xs font-bold uppercase tracking-[0.05em] text-[#57534e]">
+                                    Perfil académico
+                                </p>
+                                <p className="mb-3 text-xs text-[#78716c]">
+                                    Esta información alimentará recomendaciones del Asistente Académico.
+                                </p>
+                                <DirectorAcademicFields
+                                    idPrefix="dir-create"
+                                    values={dirAcademic}
+                                    onChange={(patch) => setDirAcademic((prev) => ({ ...prev, ...patch }))}
                                 />
                             </div>
                             <button
@@ -873,10 +947,14 @@ export default function GestionUsuarios() {
             {/* ═══ MODAL: Nuevo / Editar usuario ═══ */}
             {modalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-                    <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-[0_20px_60px_rgba(28,25,23,0.15)]">
+                    <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-[0_20px_60px_rgba(28,25,23,0.15)]">
                         <div className="mb-5 flex items-center justify-between">
                             <h2 className="text-lg font-bold text-text">
-                                {editingUser ? 'Cambiar rol' : 'Nuevo usuario'}
+                                {editingUser
+                                    ? formRole === 'Director' && !editingIsWhitelist
+                                        ? 'Editar Director'
+                                        : 'Cambiar rol'
+                                    : 'Nuevo usuario'}
                             </h2>
                             <button
                                 onClick={resetForm}
@@ -929,6 +1007,26 @@ export default function GestionUsuarios() {
                                         placeholder="Ej: U00167215"
                                         className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3.5 py-2.5 text-sm text-text outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
                                     />
+                                </div>
+                            )}
+                            {formRole === 'Director' && editingUser && !editingIsWhitelist && (
+                                <div className="rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-3">
+                                    <p className="mb-2 text-xs font-bold uppercase tracking-[0.05em] text-[#57534e]">
+                                        Perfil académico
+                                    </p>
+                                    {loadingProfile ? (
+                                        <div className="flex items-center gap-2 py-4 text-xs text-[#78716c]">
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                            Cargando perfil…
+                                        </div>
+                                    ) : (
+                                        <DirectorAcademicFields
+                                            idPrefix="dir-edit"
+                                            values={editAcademic}
+                                            onChange={(patch) => setEditAcademic((prev) => ({ ...prev, ...patch }))}
+                                            compact
+                                        />
+                                    )}
                                 </div>
                             )}
                             <div className="flex justify-end gap-3 pt-2">

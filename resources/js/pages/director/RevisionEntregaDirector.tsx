@@ -8,6 +8,7 @@ import {
     CheckCircle2, XCircle, Send,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
+import { EvaluacionAbetPanel } from '@/components/director/EvaluacionAbetPanel';
 
 /* ── Types ── */
 
@@ -511,7 +512,19 @@ export default function RevisionEntregaDirector() {
                     </div>
                 )}
 
-                {/* ── E. Panel de Revisión (DEBAJO de la card de Documento) ── */}
+                {/* ── E. Evaluación Inteligente ABET ── */}
+                {selectedVersion && (
+                    <EvaluacionAbetPanel
+                        entregaId={entrega.id}
+                        versionId={selectedVersion.id}
+                        versionLabel={`Versión ${selectedVersion.version_number}`}
+                        isDocx={(selectedVersion.original_name || selectedVersion.file_path || '')
+                            .toLowerCase()
+                            .endsWith('.docx')}
+                    />
+                )}
+
+                {/* ── F. Panel de Revisión (DEBAJO de la card de Documento) ── */}
                 <div className="rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                     <div className="mb-6 flex items-center gap-2">
                         <MessageSquareText className="h-5 w-5 text-[#c2410c]" />
@@ -617,7 +630,7 @@ export default function RevisionEntregaDirector() {
                     </div>
                 </div>
 
-                {/* ── F. Nota consolidada (si existe) ── */}
+                {/* ── G. Nota consolidada (si existe) ── */}
                 {entrega.consolidated_grade !== null && entrega.consolidated_grade !== undefined && (
                     <div className="rounded-xl border border-[#e5e5e5] bg-white p-5 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                         <div className="flex items-center gap-2">

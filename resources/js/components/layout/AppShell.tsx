@@ -28,7 +28,7 @@ const ROUTE_TITLES: Record<string, string> = {
     '/bitacoras/proyectos': 'Seleccionar Proyecto',
     '/recursos': 'Recursos',
     '/recursos/admin': 'Gestión de Recursos',
-    '/analisis-entregas': 'Análisis de Entregas',
+    '/analisis-entregas': 'Evaluador Inteligente',
     '/asistente': 'Asistente',
     '/alertas': 'Alertas',
     '/semestre': 'Semestre',

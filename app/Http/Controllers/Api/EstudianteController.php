@@ -87,6 +87,7 @@ class EstudianteController extends Controller
                     $uploadedAt = $version->uploaded_at ?? $version->created_at;
 
                     return [
+                        'id'              => $version->id,
                         'numero_version'  => $version->version_number,
                         'nombre_archivo'  => $version->original_name,
                         'ruta_archivo'    => $version->file_path,
@@ -99,17 +100,18 @@ class EstudianteController extends Controller
                 })->values();
 
                 return [
-                    'id'               => $entrega->id,
-                    'fase'             => $entrega->phase?->value ?? $entrega->phase,
-                    'titulo'           => $entrega->title,
-                    'descripcion'      => $entrega->description,
-                    'fecha_limite'     => $entrega->due_date?->toDateString(),
-                    'estado'           => $statusValue,
-                    'nota'             => $entrega->consolidated_grade,
-                    'criterios'        => $entrega->acceptance_criteria,
-                    'total_versiones'  => $versiones->count(),
-                    'ultima_version'   => $versiones->last()['numero_version'] ?? null,
-                    'versiones'        => $versiones,
+                    'id'                   => $entrega->id,
+                    'fase'                 => $entrega->phase?->value ?? $entrega->phase,
+                    'titulo'               => $entrega->title,
+                    'descripcion'          => $entrega->description,
+                    'fecha_limite'         => $entrega->due_date?->toDateString(),
+                    'estado'               => $statusValue,
+                    'nota'                 => $entrega->consolidated_grade,
+                    'criterios'            => $entrega->acceptance_criteria,
+                    'metricas_evaluacion'  => $entrega->evaluation_metrics,
+                    'total_versiones'      => $versiones->count(),
+                    'ultima_version'       => $versiones->last()['numero_version'] ?? null,
+                    'versiones'            => $versiones,
                 ];
             });
 

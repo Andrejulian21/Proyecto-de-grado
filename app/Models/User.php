@@ -8,6 +8,7 @@ use App\Auth\LoginAttemptPolicy;
 use App\Enums\UserRole;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
@@ -122,6 +123,14 @@ class User extends Authenticatable
     public function proyectosDirigidos(): HasMany
     {
         return $this->hasMany(Proyecto::class, 'director_id');
+    }
+
+    /**
+     * Structured academic profile for directors (research lines, technologies, …).
+     */
+    public function academicProfile(): HasOne
+    {
+        return $this->hasOne(DirectorAcademicProfile::class, 'user_id');
     }
 
     // -- external-evaluator helpers (T-016, T-017) -----------------------

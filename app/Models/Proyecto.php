@@ -99,5 +99,24 @@ class Proyecto extends Model
             $count = static::where('semester_id', $proyecto->semester_id)->count() + 1;
             $proyecto->code = 'PG-' . $semestreCode . str_pad((string) $count, 3, '0', STR_PAD_LEFT);
         });
+
+        // Auto-vincular proyecto a todas las entregas existentes del semestre
+        // cuando se crea un nuevo proyecto.
+        static::created(function ($proyecto) {
+            $entregas = \App\Models\Entrega::where('semester_id', $proyecto->semester_id)
+                ->whereIn('status', [
+                    \App\Enums\EstadoEntrega::Pendiente->value,
+                    \App\Enums\EstadoEntrega::Enviada->value,
+                    \App\Enums\EstadoEntrega::Creada->value,
+                    \App\Enums\EstadoEntrega::Solicitada->value,
+                    \App\Enums\EstadoEntrega::Revisada->value,
+                    \App\Enums\EstadoEntrega::Aprobada->value,
+                ])
+                ->pluck('id');
+
+            if ($entregas->isNotEmpty()) {
+                $proyecto->entregasPivot()->attach($entregas);
+            }
+        });
     }
 }

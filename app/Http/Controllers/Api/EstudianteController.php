@@ -9,6 +9,7 @@ use App\Models\Entrega;
 use App\Models\Proyecto;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 
 class EstudianteController extends Controller
 {
@@ -48,6 +49,40 @@ class EstudianteController extends Controller
         $proyecto->setRelation('entregas', $entregas);
 
         return response()->json(['data' => $proyecto]);
+    }
+
+    /**
+     * PUT /api/estudiante/proyecto
+     *
+     * Update the title of the student's own project.
+     */
+    public function actualizarProyecto(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $proyecto = Proyecto::whereHas('estudiantes', function ($q) use ($user) {
+            $q->where('user_id', $user->id);
+        })->first();
+
+        if (! $proyecto) {
+            return response()->json(['error' => 'No tienes un proyecto asignado.'], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'title' => 'required|string|max:500',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $proyecto->title = $request->input('title');
+        $proyecto->save();
+
+        return response()->json(['data' => [
+            'id' => $proyecto->id,
+            'title' => $proyecto->title,
+        ]]);
     }
 
     /**

@@ -86,6 +86,8 @@ Route::middleware([
     // Estudiante — proyecto y entregas propias
     Route::get('/estudiante/proyecto', [\App\Http\Controllers\Api\EstudianteController::class, 'proyecto'])
         ->name('estudiante.proyecto');
+    Route::put('/estudiante/proyecto', [\App\Http\Controllers\Api\EstudianteController::class, 'actualizarProyecto'])
+        ->name('estudiante.proyecto.update');
     Route::get('/estudiante/entregas', [\App\Http\Controllers\Api\EstudianteController::class, 'entregas'])
         ->name('estudiante.entregas');
 

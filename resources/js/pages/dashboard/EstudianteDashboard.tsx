@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GraduationCap, User, AlertTriangle, Loader2, FileText, Eye } from 'lucide-react';
+import { GraduationCap, User, AlertTriangle, Loader2, FileText, Eye, Pencil, Check, X } from 'lucide-react';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { PageHeader } from '@/components/ui/PageHeader';
 import DeliveryAccordion from '@/components/DeliveryAccordion';
@@ -47,6 +47,9 @@ export default function EstudianteDashboard() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null);
+    const [editingTitle, setEditingTitle] = useState(false);
+    const [editTitleValue, setEditTitleValue] = useState('');
+    const [savingTitle, setSavingTitle] = useState(false);
 
     useEffect(() => {
         let cancel = false;
@@ -102,6 +105,62 @@ export default function EstudianteDashboard() {
                                 <StatusBadge variant="en-curso">En Curso</StatusBadge>
                             </div>
                             <h3 className="text-lg font-bold text-[#1c1917]">{proyecto.title}</h3>
+                            <div className="flex items-center gap-2">
+                                {editingTitle ? (
+                                    <div className="flex items-center gap-2 flex-1">
+                                        <input
+                                            type="text"
+                                            value={editTitleValue}
+                                            onChange={(e) => setEditTitleValue(e.target.value)}
+                                            className="flex-1 min-h-[36px] rounded-lg border border-[#c2410c] bg-white px-3 py-1.5 text-sm font-bold text-[#1c1917] outline-none focus:shadow-[0_0_0_3px_#fed7aa]"
+                                            autoFocus
+                                            disabled={savingTitle}
+                                        />
+                                        <button
+                                            onClick={async () => {
+                                                if (!editTitleValue.trim() || savingTitle) return;
+                                                setSavingTitle(true);
+                                                try {
+                                                    const res = await apiFetch(`/api/estudiante/proyecto`, {
+                                                        method: 'PUT',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({ title: editTitleValue.trim() }),
+                                                    });
+                                                    if (!res.ok) throw new Error('Error al guardar');
+                                                    setProyecto((prev: any) => ({ ...prev, title: editTitleValue.trim() }));
+                                                    setEditingTitle(false);
+                                                } catch {
+                                                    setError('Error al actualizar el título');
+                                                } finally {
+                                                    setSavingTitle(false);
+                                                }
+                                            }}
+                                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#c2410c] text-white hover:bg-[#9a330a]"
+                                            title="Guardar"
+                                        >
+                                            {savingTitle ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                                        </button>
+                                        <button
+                                            onClick={() => setEditingTitle(false)}
+                                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#e5e5e5] text-[#57534e] hover:bg-[#f5f5f4]"
+                                            title="Cancelar"
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => {
+                                            setEditTitleValue(proyecto.title);
+                                            setEditingTitle(true);
+                                        }}
+                                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#78716c] transition-colors hover:bg-[#f5f5f4] hover:text-[#c2410c]"
+                                        title="Editar título del proyecto"
+                                    >
+                                        <Pencil className="h-4 w-4" />
+                                    </button>
+                                )}
+                            </div>
                             <span className="flex items-center gap-1.5 text-sm text-[#57534e]"><User className="h-3.5 w-3.5" /> Director: {proyecto.director?.name}</span>
                         </div>
                     </div>

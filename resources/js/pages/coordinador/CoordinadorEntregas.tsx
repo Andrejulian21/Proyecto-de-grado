@@ -3,6 +3,8 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { GroupSelector } from '@/components/forms/GroupSelector';
 import { useEntregas, FASE_SEQUENCE, type Fase, type Entrega, type UpdateEntregaPayload } from '@/hooks/useEntregas';
+import ArchivosRequeridosBuilder from '@/components/entregas/ArchivosRequeridosBuilder';
+import type { ArchivoRequeridoConfig } from '@/types/entregas';
 import {
     Search,
     FileText,
@@ -74,6 +76,10 @@ export default function CoordinadorEntregas() {
     const [formHoraInicio, setFormHoraInicio] = useState('');
     const [formHora, setFormHora] = useState('');
     const [formCriterios, setFormCriterios] = useState('');
+    const [formArchivos, setFormArchivos] = useState<ArchivoRequeridoConfig[]>([
+        { id: 'documento', nombre: 'Documento', versionamiento: true },
+    ]);
+    const [formArchivosError, setFormArchivosError] = useState<string | null>(null);
     const [createError, setCreateError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -85,6 +91,15 @@ export default function CoordinadorEntregas() {
             e.preventDefault();
             if (creatingRef.current) return; // ← guard contra doble click
             if (!selectedGroup || !formTitulo.trim() || !formDesc.trim() || !formFecha) return;
+
+            // Validate archivos_requeridos
+            const validArchivos = formArchivos.filter((a) => a.nombre.trim().length > 0);
+            if (validArchivos.length === 0) {
+                setFormArchivosError('Debe agregar al menos un archivo requerido con nombre.');
+                return;
+            }
+            setFormArchivosError(null);
+
             creatingRef.current = true;
             setCreateError(null);
             try {
@@ -98,6 +113,7 @@ export default function CoordinadorEntregas() {
                     hora_inicio: formHoraInicio || undefined,
                     criterios: formCriterios.trim() || undefined,
                     hora_maxima: formHora || undefined,
+                    archivos_requeridos: validArchivos,
                 });
                 setFormTitulo('');
                 setFormDesc('');
@@ -106,6 +122,10 @@ export default function CoordinadorEntregas() {
                 setFormHoraInicio('');
                 setFormHora('');
                 setFormCriterios('');
+                setFormArchivos([
+                    { id: 'documento', nombre: 'Documento', versionamiento: true },
+                ]);
+                setFormArchivosError(null);
                 setShowCreateForm(false);
             } catch (err) {
                 setCreateError(err instanceof Error ? err.message : 'Error al crear entrega');
@@ -113,7 +133,7 @@ export default function CoordinadorEntregas() {
                 creatingRef.current = false;
             }
         },
-        [selectedGroup, formFase, formTitulo, formDesc, formFecha, crear],
+        [selectedGroup, formFase, formTitulo, formDesc, formFecha, formArchivos, crear],
     );
 
     // ── Edit modal state ─────────────────────────────────────────
@@ -127,6 +147,8 @@ export default function CoordinadorEntregas() {
     const [editCriterios, setEditCriterios] = useState('');
     const [editFase, setEditFase] = useState<string>('');
     const [editGrupoId, setEditGrupoId] = useState<number | null>(null);
+    const [editArchivos, setEditArchivos] = useState<ArchivoRequeridoConfig[]>([]);
+    const [editArchivosError, setEditArchivosError] = useState<string | null>(null);
     const [editError, setEditError] = useState<string | null>(null);
 
     const openEditModal = useCallback((entrega: Entrega) => {
@@ -148,6 +170,10 @@ export default function CoordinadorEntregas() {
         setEditCriterios(entrega.acceptance_criteria ?? '');
         setEditFase(entrega.phase);
         setEditGrupoId(entrega.grupo_id);
+        setEditArchivos(entrega.archivos_requeridos ?? [
+            { id: 'documento', nombre: 'Documento', versionamiento: true },
+        ]);
+        setEditArchivosError(null);
         setEditError(null);
     }, []);
 
@@ -162,6 +188,13 @@ export default function CoordinadorEntregas() {
             setEditError('La fecha límite es obligatoria.');
             return;
         }
+        // Validate archivos_requeridos
+        const validArchivos = editArchivos.filter((a) => a.nombre.trim().length > 0);
+        if (validArchivos.length === 0) {
+            setEditArchivosError('Debe haber al menos un archivo requerido con nombre.');
+            return;
+        }
+        setEditArchivosError(null);
         setEditError(null);
         try {
             const payload: UpdateEntregaPayload = {
@@ -173,13 +206,14 @@ export default function CoordinadorEntregas() {
                 start_date: editFechaInicio || null,
                 start_time: editHoraInicio || null,
                 phase: editFase,
+                archivos_requeridos: validArchivos,
             };
             await actualizar(editingEntrega.id, payload);
             closeEditModal();
         } catch (err) {
             setEditError(err instanceof Error ? err.message : 'Error al actualizar');
         }
-    }, [editingEntrega, editFecha, editTitulo, editDesc, editHora, editCriterios, editFase, actualizar, closeEditModal]);
+    }, [editingEntrega, editFecha, editTitulo, editDesc, editHora, editCriterios, editFase, editArchivos, actualizar, closeEditModal]);
 
     // ── Delete confirmation state ────────────────────────────────
     const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -345,6 +379,17 @@ export default function CoordinadorEntregas() {
                                 rows={3}
                                 placeholder="Criterios que debe cumplir la entrega para ser aprobada"
                                 className="w-full min-h-[60px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y"
+                            />
+                        </div>
+
+                        <div className="sm:col-span-2">
+                            <ArchivosRequeridosBuilder
+                                value={formArchivos}
+                                onChange={(archivos) => {
+                                    setFormArchivos(archivos);
+                                    setFormArchivosError(null);
+                                }}
+                                error={formArchivosError ?? undefined}
                             />
                         </div>
 
@@ -698,6 +743,16 @@ export default function CoordinadorEntregas() {
                                     className="w-full min-h-[60px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y"
                                 />
                             </div>
+
+                            {/* Archivos requeridos */}
+                            <ArchivosRequeridosBuilder
+                                value={editArchivos}
+                                onChange={(archivos) => {
+                                    setEditArchivos(archivos);
+                                    setEditArchivosError(null);
+                                }}
+                                error={editArchivosError ?? undefined}
+                            />
 
                             {/* Fecha límite */}
                             <div className="flex flex-col gap-1.5">

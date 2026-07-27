@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useReducer } from 'react';
 import { apiFetch } from '@/lib/utils';
+import type { EntregaEstadoResponse, ArchivoRequeridoConfig } from '@/types/entregas';
 
 export const FASE_SEQUENCE = [
     'anteproyecto',
@@ -37,6 +38,7 @@ export interface Entrega {
     proyectos?: ProyectoResumen[];
     proyectos_count?: number;
     proyectos_list?: string[];
+    archivos_requeridos?: ArchivoRequeridoConfig[];
 }
 
 export interface CreateEntregaPayload {
@@ -49,6 +51,7 @@ export interface CreateEntregaPayload {
     hora_inicio?: string;
     criterios?: string;
     hora_maxima?: string;
+    archivos_requeridos?: ArchivoRequeridoConfig[];
 }
 
 export interface UpdateEntregaPayload {
@@ -61,6 +64,7 @@ export interface UpdateEntregaPayload {
     start_time?: string | null;
     phase?: string;
     proyecto_id?: number;
+    archivos_requeridos?: ArchivoRequeridoConfig[];
 }
 
 export interface EntregasFilters {
@@ -226,6 +230,33 @@ export function useEntregas(filters?: EntregasFilters) {
         }
     }, []);
 
+    const subirArchivoPorSlug = useCallback(async (entregaId: number, slug: string, file: File) => {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const res = await apiFetch(`/api/entregas/${entregaId}/archivos/${slug}`, {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!res.ok) {
+            const body = await res.json().catch(() => null);
+            throw new Error(body?.message ?? body?.error ?? `Error ${res.status}`);
+        }
+
+        return res.json();
+    }, []);
+
+    const fetchEstadoCompletitud = useCallback(async (entregaId: number): Promise<EntregaEstadoResponse> => {
+        const res = await apiFetch(`/api/entregas/${entregaId}/estado`);
+        if (!res.ok) {
+            const body = await res.json().catch(() => null);
+            throw new Error(body?.message ?? `Error ${res.status}`);
+        }
+        const json = await res.json();
+        return (json.data ?? json) as EntregaEstadoResponse;
+    }, []);
+
     const getNextFase = useCallback(
         (grupoId: number): Fase => {
             const groupEntregas = state.data.filter((e) => e.grupo_id === grupoId);
@@ -258,5 +289,7 @@ export function useEntregas(filters?: EntregasFilters) {
         actualizar,
         eliminar,
         getNextFase,
+        subirArchivoPorSlug,
+        fetchEstadoCompletitud,
     };
 }

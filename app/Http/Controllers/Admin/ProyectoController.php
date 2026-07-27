@@ -12,6 +12,7 @@ use App\Models\Evaluacion;
 use App\Models\Proyecto;
 use App\Models\Semestre;
 use App\Models\User;
+use App\Models\VersionDocumento;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -149,33 +150,38 @@ class ProyectoController extends Controller
 
     public function destroy(Request $request, Proyecto $proyecto): JsonResponse
     {
-        // 1. Verificar si tiene entregas con versiones
-        $tieneEntregas = Entrega::paraProyecto($proyecto->id)
-            ->whereHas('versiones')
+        // 1. Verificar si el proyecto tiene entregas con versiones subidas por el estudiante.
+        //    Con el nuevo sistema, las entregas son compartidas entre proyectos del mismo
+        //    semestre via pivot. Solo verificamos si ESTE proyecto tiene versiones asociadas.
+        $tieneVersiones = \DB::table('entrega_proyecto')
+            ->where('proyecto_id', $proyecto->id)
+            ->whereExists(function ($q) {
+                $q->select(\DB::raw(1))
+                  ->from('versiones_documento')
+                  ->whereColumn('versiones_documento.entrega_proyecto_id', 'entrega_proyecto.id');
+            })
             ->exists();
 
-        if ($tieneEntregas) {
+        // Fallback: verificar versiones directas (legacy, antes del nuevo esquema)
+        if (! $tieneVersiones) {
+            $tieneVersiones = VersionDocumento::whereHas('entrega', function ($q) use ($proyecto) {
+                $q->where('proyecto_id', $proyecto->id);
+            })->exists();
+        }
+
+        if ($tieneVersiones) {
             return response()->json([
                 'error' => 'No se puede eliminar el proyecto porque ya tiene entregas con versiones subidas.',
             ], 422);
         }
 
-        // 2. Hard delete en orden
+        // 2. Eliminar solo el proyecto y sus relaciones directas
+        //    Las entregas NO se eliminan porque son compartidas entre proyectos del semestre.
         $proyecto->bitacoras()->forceDelete();
-
-        $entregas = Entrega::paraProyecto($proyecto->id)->get();
-        foreach ($entregas as $e) {
-            $e->versiones()->forceDelete();
-            $e->forceDelete();
-        }
-
         $proyecto->estudiantes()->detach();
-
-        // Clean evaluador_proyecto pivot (no relationship method on Proyecto)
+        \DB::table('entrega_proyecto')->where('proyecto_id', $proyecto->id)->delete();
         \DB::table('evaluador_proyecto')->where('proyecto_id', $proyecto->id)->delete();
-
         Evaluacion::where('proyecto_id', $proyecto->id)->forceDelete();
-
         $proyecto->forceDelete();
 
         // 3. AuditEvent

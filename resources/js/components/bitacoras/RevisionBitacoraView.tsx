@@ -261,12 +261,6 @@ export function RevisionBitacoraView({
                             )}
                         </div>
 
-                        {directorSigned && mode === 'student' && (
-                            <p className="mb-3 text-xs text-[#78716c]">
-                                El contenido está bloqueado porque el director ya firmó esta bitácora.
-                            </p>
-                        )}
-
                         {editing ? (
                             <div className="flex flex-col gap-4">
                                 <div>

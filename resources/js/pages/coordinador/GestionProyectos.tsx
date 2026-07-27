@@ -519,6 +519,7 @@ export default function GestionProyectos() {
                             value={formStudents}
                             onChange={setFormStudents}
                             error={formErrors.students}
+                            sinProyecto={true}
                         />
                     </div>
                 </div>
@@ -761,6 +762,7 @@ export default function GestionProyectos() {
                             <StudentAutocomplete
                                 value={editStudents}
                                 onChange={setEditStudents}
+                                sinProyecto={true}
                             />
                         </div>
 

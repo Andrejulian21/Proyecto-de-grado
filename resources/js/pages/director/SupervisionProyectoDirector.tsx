@@ -198,7 +198,9 @@ function ProjectCard({ project }: { project: DirectorProyecto }) {
         ? project.current_phase.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
         : 'Sin fase';
 
-    const statusCfg = projectStatusConfig[project.status] ?? projectStatusConfig.active;
+    const statusCfg = project.semestre && !project.semestre.is_active
+        ? { label: 'Inactivo', variant: 'inactivo' as const }
+        : (projectStatusConfig[project.status] ?? projectStatusConfig.active);
 
     return (
         <div className="group flex flex-col gap-4 rounded-xl border border-[#e5e5e5] bg-white p-5 shadow-[0_1px_2px_rgba(28,25,23,0.05)] transition-all hover:border-[#c2410c] hover:shadow-[0_4px_12px_rgba(194,65,12,0.1)]">

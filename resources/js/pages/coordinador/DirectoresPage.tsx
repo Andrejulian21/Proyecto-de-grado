@@ -132,8 +132,8 @@ function ProjectCard({ proyecto, mode, onSelect, onViewBitacora }: ProjectCardPr
                         <span className="inline-flex items-center rounded-full bg-[#e7e5e4] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.03em] text-[#57534e]">
                             {proyecto.code}
                         </span>
-                        <StatusBadge variant={proyecto.status === 'en_curso' ? 'success' : proyecto.status === 'en_riesgo' ? 'riesgo' : 'inactivo'}>
-                            {proyecto.status === 'en_curso' ? 'En Curso' : proyecto.status === 'en_riesgo' ? 'En Riesgo' : proyecto.status === 'completado' ? 'Completado' : 'Incumplimiento'}
+                        <StatusBadge variant={proyecto.semestre && !proyecto.semestre.is_active ? 'inactivo' : proyecto.status === 'en_curso' ? 'success' : proyecto.status === 'en_riesgo' ? 'riesgo' : 'inactivo'}>
+                            {proyecto.semestre && !proyecto.semestre.is_active ? 'Semestre Inactivo' : proyecto.status === 'en_curso' ? 'En Curso' : proyecto.status === 'en_riesgo' ? 'En Riesgo' : proyecto.status === 'completado' ? 'Completado' : 'Incumplimiento'}
                         </StatusBadge>
                     </div>
                     <h3 className="mt-2 text-sm font-bold text-[#1c1917]">{proyecto.title}</h3>
@@ -258,6 +258,7 @@ export default function DirectoresPage() {
 
     const [nivel, setNivel] = useState<NivelView>(1);
     const [drillMode, setDrillMode] = useState<DrillMode>(null);
+    const [todasProyectos, setTodasProyectos] = useState(false);
     const volverRef = useRef(false);
 
     useEffect(() => {
@@ -296,7 +297,7 @@ export default function DirectoresPage() {
 
     function handleViewProyectos(director: Director) {
         setDrillMode('proyectos');
-        selectDirector(director);
+        selectDirector(director, todasProyectos);
         setNivel(2);
     }
 
@@ -407,12 +408,34 @@ export default function DirectoresPage() {
             {/* Level 2: Projects */}
             {nivel === 2 && (
                 <>
+                    {/* Toggle inactivos */}
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => {
+                                setTodasProyectos(!todasProyectos);
+                                if (selectedDirector) selectDirector(selectedDirector, !todasProyectos);
+                            }}
+                            className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${
+                                todasProyectos
+                                    ? 'border-[#c2410c] bg-[#fed7aa] text-[#c2410c]'
+                                    : 'border-[#e5e5e5] bg-white text-[#57534e] hover:border-[#c2410c] hover:text-[#c2410c]'
+                            }`}
+                        >
+                            {todasProyectos ? '✓ Mostrando todos' : 'Mostrar inactivos'}
+                        </button>
+                        {todasProyectos && (
+                            <span className="text-xs text-[#78716c]">
+                                Se muestran proyectos de todos los semestres
+                            </span>
+                        )}
+                    </div>
+
                     {loadingProyectos ? (
                         <div className="flex items-center justify-center py-16" role="status" aria-label="Cargando proyectos">
                             <Loader2 className="h-6 w-6 animate-spin text-[#c2410c]" />
                         </div>
                     ) : errorProyectos ? (
-                        <ErrorBanner message={errorProyectos} onRetry={() => selectedDirector && selectDirector(selectedDirector)} />
+                        <ErrorBanner message={errorProyectos} onRetry={() => selectedDirector && selectDirector(selectedDirector, todasProyectos)} />
                     ) : proyectos.length === 0 ? (
                         <EmptyState icon={FolderKanban} message="Este director no tiene proyectos asignados" />
                     ) : (

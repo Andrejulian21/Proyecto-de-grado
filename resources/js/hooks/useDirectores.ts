@@ -17,6 +17,7 @@ export interface DirectorProyecto {
     estudiantes: { id: number; name: string }[];
     current_phase: string;
     status: string;
+    semestre?: { id: number; name: string; is_active: boolean } | null;
 }
 
 export interface Bitacora {
@@ -63,7 +64,7 @@ export function useDirectores() {
         }
     }, []);
 
-    const selectDirector = useCallback(async (director: Director) => {
+    const selectDirector = useCallback(async (director: Director, todas?: boolean) => {
         setSelectedDirector(director);
         setSelectedProyecto(null);
         setBitacoras([]);
@@ -71,7 +72,8 @@ export function useDirectores() {
         setLoadingProyectos(true);
         setErrorProyectos(null);
         try {
-            const res = await apiFetch(`/api/admin/directores/${director.id}/proyectos`);
+            const params = todas ? '?todas=1' : '';
+            const res = await apiFetch(`/api/admin/directores/${director.id}/proyectos${params}`);
             if (!res.ok) {
                 const body = await res.json().catch(() => null);
                 throw new Error(body?.message ?? `Error ${res.status}`);

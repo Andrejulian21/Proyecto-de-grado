@@ -111,11 +111,16 @@ class DirectorCupoController extends Controller
      *
      * Returns projects for a given director, with their students.
      */
-    public function directorProyectos(int $id): JsonResponse
+    public function directorProyectos(Request $request, int $id): JsonResponse
     {
-        $proyectos = Proyecto::where('director_id', $id)
-            ->with('estudiantes:id,name')
-            ->get();
+        $query = Proyecto::where('director_id', $id)
+            ->with('estudiantes:id,name', 'semestre:id,name,is_active');
+
+        if (! $request->boolean('todas')) {
+            $query->enSemestresActivos();
+        }
+
+        $proyectos = $query->get();
 
         $result = $proyectos->map(fn (Proyecto $p) => [
             'id' => $p->id,
@@ -127,6 +132,11 @@ class DirectorCupoController extends Controller
             ]),
             'current_phase' => $p->current_phase?->value,
             'status' => $p->status?->value,
+            'semestre' => $p->semestre ? [
+                'id' => $p->semestre->id,
+                'name' => $p->semestre->name,
+                'is_active' => $p->semestre->is_active,
+            ] : null,
         ]);
 
         return response()->json(['data' => $result]);

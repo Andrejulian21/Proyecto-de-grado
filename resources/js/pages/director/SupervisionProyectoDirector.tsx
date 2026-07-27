@@ -72,7 +72,8 @@ function ProjectCardSkeleton() {
 
 function ProjectListView() {
     const navigate = useNavigate();
-    const { data: proyectos, loading, error, refetch } = useDirectorProyectos();
+    const [todas, setTodas] = useState(false);
+    const { data: proyectos, loading, error, refetch } = useDirectorProyectos(todas);
     const [search, setSearch] = useState('');
 
     const filtered = proyectos.filter((p) => {
@@ -125,6 +126,25 @@ function ProjectListView() {
                 title="Proyectos"
                 subtitle="Seleccione un proyecto para ver su detalle y entregas"
             />
+
+            {/* Toggle inactivos */}
+            <div className="flex items-center gap-3">
+                <button
+                    onClick={() => setTodas(!todas)}
+                    className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${
+                        todas
+                            ? 'border-[#c2410c] bg-[#fed7aa] text-[#c2410c]'
+                            : 'border-[#e5e5e5] bg-white text-[#57534e] hover:border-[#c2410c] hover:text-[#c2410c]'
+                    }`}
+                >
+                    {todas ? '✓ Mostrando todos' : 'Mostrar inactivos'}
+                </button>
+                {todas && (
+                    <span className="text-xs text-[#78716c]">
+                        Se muestran proyectos de todos los semestres
+                    </span>
+                )}
+            </div>
 
             {/* Search */}
             <div className="relative">
@@ -198,6 +218,11 @@ function ProjectCard({ project }: { project: DirectorProyecto }) {
                 <h3 className="text-sm font-bold text-[#1c1917] leading-snug line-clamp-2">
                     {project.title}
                 </h3>
+                {project.semestre && !project.semestre.is_active && (
+                    <span className="mt-0.5 inline-flex items-center gap-1 self-start rounded-full bg-[#e7e5e4] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.03em] text-[#57534e]">
+                        Semestre inactivo
+                    </span>
+                )}
             </div>
 
             <div className="flex items-center gap-2 text-xs text-[#57534e]">

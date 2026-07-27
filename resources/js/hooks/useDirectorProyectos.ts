@@ -35,7 +35,7 @@ function reducer(state: State, action: Action): State {
     }
 }
 
-export function useDirectorProyectos() {
+export function useDirectorProyectos(todas?: boolean) {
     const [state, dispatch] = useReducer(reducer, {
         data: [],
         loading: true,
@@ -50,7 +50,8 @@ export function useDirectorProyectos() {
             dispatch({ type: 'FETCH_START' });
 
             try {
-                const res = await apiFetch('/api/director/proyectos');
+                const params = todas ? '?todas=1' : '';
+                const res = await apiFetch(`/api/director/proyectos${params}`);
 
                 if (!res.ok) {
                     const body = await res.json().catch(() => null);
@@ -74,7 +75,7 @@ export function useDirectorProyectos() {
         return () => {
             cancelled = true;
         };
-    }, [fetchId]);
+    }, [fetchId, todas]);
 
     const refetch = useCallback(() => {
         setFetchId((id) => id + 1);

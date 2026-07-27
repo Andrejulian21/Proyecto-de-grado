@@ -24,10 +24,14 @@ class DirectorController extends Controller
     {
         $userId = $request->user()->id;
 
-        $proyectos = Proyecto::where('director_id', $userId)
-            ->enSemestresActivos()
-            ->with(['estudiantes:id,name', 'semestre:id,name,is_active'])
-            ->get();
+        $query = Proyecto::where('director_id', $userId)
+            ->with(['estudiantes:id,name', 'semestre:id,name,is_active']);
+
+        if (! $request->boolean('todas')) {
+            $query->enSemestresActivos();
+        }
+
+        $proyectos = $query->get();
 
         return response()->json(['data' => $proyectos]);
     }

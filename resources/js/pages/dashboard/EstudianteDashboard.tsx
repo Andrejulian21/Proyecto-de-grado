@@ -104,15 +104,14 @@ export default function EstudianteDashboard() {
                                 <span className="text-xs font-bold uppercase tracking-[0.05em] text-[#c2410c]">{proyecto.code}</span>
                                 <StatusBadge variant="en-curso">En Curso</StatusBadge>
                             </div>
-                            <h3 className="text-lg font-bold text-[#1c1917]">{proyecto.title}</h3>
                             <div className="flex items-center gap-2">
                                 {editingTitle ? (
-                                    <div className="flex items-center gap-2 flex-1">
+                                    <>
                                         <input
                                             type="text"
                                             value={editTitleValue}
                                             onChange={(e) => setEditTitleValue(e.target.value)}
-                                            className="flex-1 min-h-[36px] rounded-lg border border-[#c2410c] bg-white px-3 py-1.5 text-sm font-bold text-[#1c1917] outline-none focus:shadow-[0_0_0_3px_#fed7aa]"
+                                            className="flex-1 min-h-[36px] rounded-lg border border-[#c2410c] bg-white px-3 py-1.5 text-base font-bold text-[#1c1917] outline-none focus:shadow-[0_0_0_3px_#fed7aa]"
                                             autoFocus
                                             disabled={savingTitle}
                                         />
@@ -121,7 +120,7 @@ export default function EstudianteDashboard() {
                                                 if (!editTitleValue.trim() || savingTitle) return;
                                                 setSavingTitle(true);
                                                 try {
-                                                    const res = await apiFetch(`/api/estudiante/proyecto`, {
+                                                    const res = await apiFetch('/api/estudiante/proyecto', {
                                                         method: 'PUT',
                                                         headers: { 'Content-Type': 'application/json' },
                                                         body: JSON.stringify({ title: editTitleValue.trim() }),
@@ -147,18 +146,21 @@ export default function EstudianteDashboard() {
                                         >
                                             <X className="h-4 w-4" />
                                         </button>
-                                    </div>
+                                    </>
                                 ) : (
-                                    <button
-                                        onClick={() => {
-                                            setEditTitleValue(proyecto.title);
-                                            setEditingTitle(true);
-                                        }}
-                                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#78716c] transition-colors hover:bg-[#f5f5f4] hover:text-[#c2410c]"
-                                        title="Editar título del proyecto"
-                                    >
-                                        <Pencil className="h-4 w-4" />
-                                    </button>
+                                    <>
+                                        <h3 className="text-lg font-bold text-[#1c1917]">{proyecto.title}</h3>
+                                        <button
+                                            onClick={() => {
+                                                setEditTitleValue(proyecto.title);
+                                                setEditingTitle(true);
+                                            }}
+                                            className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[#78716c] transition-colors hover:bg-[#f5f5f4] hover:text-[#c2410c]"
+                                            title="Editar título del proyecto"
+                                        >
+                                            <Pencil className="h-3.5 w-3.5" />
+                                        </button>
+                                    </>
                                 )}
                             </div>
                             <span className="flex items-center gap-1.5 text-sm text-[#57534e]"><User className="h-3.5 w-3.5" /> Director: {proyecto.director?.name}</span>

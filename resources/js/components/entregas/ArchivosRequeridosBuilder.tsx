@@ -87,7 +87,7 @@ export default function ArchivosRequeridosBuilder({ value, onChange, error, disa
                             <FileText className="h-4 w-4 text-[#c2410c]" />
                         </div>
 
-                        <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
+                        <div className="flex flex-1 flex-row items-center gap-3">
                             <div className="flex-1">
                                 <input
                                     type="text"
@@ -102,7 +102,7 @@ export default function ArchivosRequeridosBuilder({ value, onChange, error, disa
                                 </span>
                             </div>
 
-                            <label className="flex shrink-0 items-center gap-2 text-sm text-[#57534e]">
+                            <label className="flex shrink-0 items-center gap-2 text-sm text-[#57534e] whitespace-nowrap">
                                 <input
                                     type="checkbox"
                                     checked={archivo.versionamiento}
@@ -110,7 +110,7 @@ export default function ArchivosRequeridosBuilder({ value, onChange, error, disa
                                     className="h-4 w-4 rounded border-[#d6d3d1] text-[#c2410c] focus:ring-[#c2410c] focus:ring-offset-0 disabled:opacity-50"
                                     disabled={disabled}
                                 />
-                                Versionamiento
+                                Versiones
                             </label>
                         </div>
 

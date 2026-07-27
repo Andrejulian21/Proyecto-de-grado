@@ -56,7 +56,7 @@ export function Header({ onMenuClick, title }: HeaderProps) {
                     >
                         {initials}
                     </div>
-                    <div className="hidden text-right sm:block">
+                    <div className="text-right">
                         <p className="text-sm font-medium leading-tight text-text">{user.name || 'Usuario'}</p>
                         <p className="text-xs leading-tight text-text-muted">
                             {roleLabels[user.role] ?? user.role}

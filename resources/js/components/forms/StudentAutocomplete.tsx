@@ -7,6 +7,7 @@ export interface StudentAutocompleteProps {
     onChange: (selected: StudentUser[]) => void;
     error?: string;
     max?: number;
+    sinProyecto?: boolean;
 }
 
 export function StudentAutocomplete({
@@ -14,10 +15,11 @@ export function StudentAutocomplete({
     onChange,
     error,
     max = 3,
+    sinProyecto,
 }: StudentAutocompleteProps) {
     const [inputValue, setInputValue] = useState('');
     const [open, setOpen] = useState(false);
-    const { results, loading, search } = useStudentSearch();
+    const { results, loading, search } = useStudentSearch(sinProyecto);
     const wrapperRef = useRef<HTMLDivElement>(null);
 
     // Filter already-selected students from results

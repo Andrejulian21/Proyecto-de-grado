@@ -63,6 +63,11 @@ class UserController extends Controller
             }
         }
 
+        // Filtrar estudiantes que NO tienen proyecto asignado
+        if ($request->boolean('sin_proyecto')) {
+            $query->whereDoesntHave('proyectosComoEstudiante');
+        }
+
         return response()->json($query->paginate($perPage));
     }
 

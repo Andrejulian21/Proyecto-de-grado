@@ -33,7 +33,7 @@ function writeCache(entries: CacheEntry) {
     }
 }
 
-export function useStudentSearch() {
+export function useStudentSearch(sinProyecto?: boolean) {
     const [results, setResults] = useState<StudentUser[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -68,7 +68,7 @@ export function useStudentSearch() {
 
             try {
                 const res = await apiFetch(
-                    `/api/admin/usuarios?role=estudiante&search=${encodeURIComponent(query.trim())}`,
+                    `/api/admin/usuarios?role=estudiante&search=${encodeURIComponent(query.trim())}${sinProyecto ? '&sin_proyecto=1' : ''}`,
                     { signal: controller.signal },
                 );
                 if (!res.ok) throw new Error(`Error ${res.status}`);
@@ -90,7 +90,7 @@ export function useStudentSearch() {
                 setLoading(false);
             }
         }, DEBOUNCE_MS);
-    }, []);
+    }, [sinProyecto]);
 
     useEffect(() => {
         return () => {

@@ -9,7 +9,7 @@ import { CalendarGrid, type CalendarAssignment } from '@/components/calendar/Cal
 import { ResultsTable } from '@/components/tables/ResultsTable';
 import { useEvaluadorProyecto, useEvaluadorUsers, type EvaluadorProyecto, type CreateEvaluadorPayload, type UpdateEvaluadorPayload } from '@/hooks/useEvaluadorProyecto';
 import { useEvaluaciones } from '@/hooks/useEvaluaciones';
-import { useProyectos } from '@/hooks/useProyectos';
+import { ProjectAutocomplete, type ProjectOption } from '@/components/forms/ProjectAutocomplete';
 import { cn } from '@/lib/utils';
 
 /* ── Edit Modal ── */
@@ -222,14 +222,6 @@ export default function AsignacionEvaluadores() {
         loading: loadingEvalUsers,
     } = useEvaluadorUsers();
 
-    /* ── Proyectos de semestres activos ── */
-    const {
-        data: proyectos,
-        loading: loadingProyectos,
-    } = useProyectos(null, {
-        semestre_activo: true,
-    });
-
     /* ── Local state ── */
     const [showRegisterForm, setShowRegisterForm] = useState(false);
     const [search, setSearch] = useState('');
@@ -241,19 +233,13 @@ export default function AsignacionEvaluadores() {
     const [deleteTarget, setDeleteTarget] = useState<EvaluadorProyecto | null>(null);
 
     // Registration form
-    const [formProyectoId, setFormProyectoId] = useState('');
+    const [selectedProyecto, setSelectedProyecto] = useState<ProjectOption | null>(null);
     const [formFase, setFormFase] = useState<'Anteproyecto' | 'Final'>('Anteproyecto');
     const [formEvalIds, setFormEvalIds] = useState<number[]>([]);
     const [formFecha, setFormFecha] = useState('');
     const [formHoraInicio, setFormHoraInicio] = useState('');
     const [formHoraFin, setFormHoraFin] = useState('');
     const [formError, setFormError] = useState<string | null>(null);
-
-    /* ── Derive selected project director ── */
-    const selectedProyecto = useMemo(() => {
-        if (!formProyectoId) return null;
-        return proyectos.find((p) => p.id === Number(formProyectoId)) ?? null;
-    }, [formProyectoId, proyectos]);
 
     /* ── Filters ── */
     const filtered = useMemo(() => {
@@ -315,7 +301,7 @@ export default function AsignacionEvaluadores() {
         e.preventDefault();
         setFormError(null);
 
-        if (!formProyectoId || formEvalIds.length < 2 || !formFecha || !formHoraInicio || !formHoraFin) {
+        if (!selectedProyecto || formEvalIds.length < 2 || !formFecha || !formHoraInicio || !formHoraFin) {
             setFormError('Complete todos los campos obligatorios (proyecto, mínimo 2 evaluadores, fecha, hora inicio y hora fin).');
             return;
         }
@@ -346,7 +332,7 @@ export default function AsignacionEvaluadores() {
         }
 
         const payload: CreateEvaluadorPayload = {
-            proyecto_id: Number(formProyectoId),
+            proyecto_id: selectedProyecto.id,
             evaluador_ids: formEvalIds,
             fecha: formFecha,
             hora_inicio: formHoraInicio,
@@ -356,7 +342,7 @@ export default function AsignacionEvaluadores() {
 
         try {
             await crear(payload);
-            setFormProyectoId('');
+            setSelectedProyecto(null);
             setFormFase('Anteproyecto');
             setFormEvalIds([]);
             setFormFecha('');
@@ -366,7 +352,7 @@ export default function AsignacionEvaluadores() {
         } catch {
             // error is handled by mutationError in the hook
         }
-    }, [formProyectoId, formEvalIds, formFecha, formHoraInicio, formHoraFin, formFase, selectedProyecto, crear]);
+    }, [selectedProyecto, formEvalIds, formFecha, formHoraInicio, formHoraFin, formFase, crear]);
 
     const handleEdit = useCallback(async (id: number, payload: UpdateEvaluadorPayload) => {
         try {
@@ -516,31 +502,14 @@ export default function AsignacionEvaluadores() {
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                         {/* Project selector */}
                         <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-1">
-                            <label htmlFor="reg-proyecto" className="text-sm font-semibold text-[#1c1917]">
-                                Proyecto <span className="text-[#dc2626]">*</span>
-                            </label>
-                            <select
-                                id="reg-proyecto"
-                                value={formProyectoId}
-                                onChange={(e) => { setFormProyectoId(e.target.value); setFormError(null); }}
-                                className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
-                                required
-                            >
-                                <option value="">Seleccione un proyecto</option>
-                                {loadingProyectos ? (
-                                    <option value="" disabled>Cargando proyectos...</option>
-                                ) : (
-                                    proyectos.map((p) => (
-                                        <option key={p.id} value={p.id}>
-                                            {p.code} — {p.title}
-                                            {p.director ? ` (Dir: ${p.director.name})` : ''}
-                                            {p.estudiantes.length > 0
-                                                ? ` | ${p.estudiantes.map((e) => e.name).join(', ')}`
-                                                : ''}
-                                        </option>
-                                    ))
-                                )}
-                            </select>
+                            <ProjectAutocomplete
+                                value={selectedProyecto}
+                                onChange={(p) => {
+                                    setSelectedProyecto(p);
+                                    setFormError(null);
+                                }}
+                                error={formError && !selectedProyecto ? 'Seleccione un proyecto' : undefined}
+                            />
                         </div>
 
                         {/* Phase */}

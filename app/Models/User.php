@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Auth\LoginAttemptPolicy;
 use App\Enums\UserRole;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -123,6 +124,14 @@ class User extends Authenticatable
     public function proyectosDirigidos(): HasMany
     {
         return $this->hasMany(Proyecto::class, 'director_id');
+    }
+
+    /**
+     * Projects where this user participates as a student (pivot).
+     */
+    public function proyectosComoEstudiante(): BelongsToMany
+    {
+        return $this->belongsToMany(Proyecto::class, 'proyecto_estudiante', 'user_id', 'proyecto_id');
     }
 
     // -- external-evaluator helpers (T-016, T-017) -----------------------

@@ -8,6 +8,7 @@ import {
     CheckCircle2, XCircle, Send,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
+import type { ArchivoRequeridoConfig } from '@/types/entregas';
 
 /* ── Types ── */
 
@@ -20,6 +21,12 @@ interface Version {
     director_notes: string | null;
     uploaded_at: string;
     created_at: string;
+    archivo_requerido_id: string | null;
+}
+
+interface ArchivoConVersiones {
+    config: ArchivoRequeridoConfig;
+    versiones: Version[];
 }
 
 interface EntregaDetail {
@@ -33,6 +40,7 @@ interface EntregaDetail {
     start_time: string | null;
     hora_maxima: string | null;
     acceptance_criteria: string | null;
+    archivos_requeridos?: ArchivoRequeridoConfig[];
     consolidated_grade: string | number | null;
     evaluation_complete: boolean;
     proyecto?: { id: number; code: string; title: string };
@@ -129,6 +137,7 @@ export default function RevisionEntregaDirector() {
     const [entrega, setEntrega] = useState<EntregaDetail | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [selectedArchivoIdx, setSelectedArchivoIdx] = useState(0);
     const [selectedVersionIdx, setSelectedVersionIdx] = useState(0);
 
     /* ── Review form state ── */
@@ -188,6 +197,7 @@ export default function RevisionEntregaDirector() {
                     consolidated_grade: null,
                     director_notes: directorNotes || null,
                     version_id: selectedVersion?.id,
+                    archivo_requerido_id: activeArchivo?.config.id ?? null,
                 }),
             });
 
@@ -212,9 +222,23 @@ export default function RevisionEntregaDirector() {
     const projectTitle = mainProyecto?.title ?? '';
     const backPath = proyectoId ? `/supervision/${proyectoId}` : '/supervision';
 
-    const sortedVersions = [...(entrega?.versiones ?? [])].sort(
-        (a, b) => b.version_number - a.version_number,
-    );
+    /* ── Group versions by archivo_requerido_id ── */
+    const allVersions = entrega?.versiones ?? [];
+    const hasArchivoIds = allVersions.some((v) => v.archivo_requerido_id);
+    const archivosConVersiones: ArchivoConVersiones[] = (entrega?.archivos_requeridos ?? []).map((config, idx) => ({
+        config,
+        versiones: allVersions
+            .filter((v) => {
+                if (hasArchivoIds) return v.archivo_requerido_id === config.id;
+                // Fallback: first config gets all versions (legacy data)
+                return idx === 0;
+            })
+            .sort((a, b) => b.version_number - a.version_number),
+    }));
+    const safeArchivoIdx = Math.min(selectedArchivoIdx, Math.max(0, archivosConVersiones.length - 1));
+    const activeArchivo = archivosConVersiones[safeArchivoIdx] ?? null;
+
+    const sortedVersions = activeArchivo?.versiones ?? [];
     const safeVersionIdx = Math.min(selectedVersionIdx, Math.max(0, sortedVersions.length - 1));
     const selectedVersion: Version | null = sortedVersions[safeVersionIdx] ?? null;
 
@@ -392,117 +416,138 @@ export default function RevisionEntregaDirector() {
                     </div>
                 )}
 
-                {/* ── D. Documento / Versiones ── */}
-                {sortedVersions.length > 0 && selectedVersion ? (
-                    <div className="rounded-xl border border-[#e5e5e5] bg-white shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
-                        {/* Header + version selector */}
-                        <div className="flex items-center justify-between border-b border-[#e5e5e5] px-6 py-4">
-                            <div className="flex items-center gap-2">
-                                <FileText className="h-5 w-5 text-[#c2410c]" />
-                                <h3 className="text-base font-bold text-[#1c1917]">Documento</h3>
-                            </div>
-
-                            {sortedVersions.length <= 4 ? (
-                                <div className="flex items-center gap-1">
-                                    {sortedVersions.map((v, idx) => (
-                                        <button
-                                            key={v.id}
-                                            onClick={() => setSelectedVersionIdx(idx)}
-                                            className={`inline-flex min-h-[32px] items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-                                                safeVersionIdx === idx
-                                                    ? 'bg-[#c2410c] text-white shadow-sm'
-                                                    : 'bg-[#f5f5f4] text-[#57534e] hover:bg-[#e7e5e4]'
-                                            }`}
-                                        >
-                                            v{v.version_number}
-                                        </button>
-                                    ))}
-                                </div>
-                            ) : (
-                                <select
-                                    value={safeVersionIdx}
-                                    onChange={(e) => setSelectedVersionIdx(Number(e.target.value))}
-                                    className="rounded-lg border border-[#e5e5e5] bg-white px-3 py-1.5 text-xs font-semibold text-[#1c1917] focus:border-[#c2410c] focus:outline-none focus:ring-1 focus:ring-[#c2410c]"
-                                >
-                                    {sortedVersions.map((v, idx) => (
-                                        <option key={v.id} value={idx}>
-                                            Versión {v.version_number}
-                                        </option>
-                                    ))}
-                                </select>
-                            )}
-                        </div>
-
-                        {/* Body: left (file info) + right (observations) */}
-                        <div className="p-6">
-                            <div className="grid grid-cols-1 gap-6 xl:grid-cols-[280px_1fr]">
-                                {/* Izquierda: info del archivo */}
-                                <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-[#e5e5e5] bg-[#fafaf9] py-16">
-                                    <FileText className="h-16 w-16 text-[#d6d3d1]" />
-                                    <div className="text-center">
-                                        <p className="text-sm font-semibold text-[#1c1917]">
-                                            {selectedVersion.original_name || `documento_v${selectedVersion.version_number}.pdf`}
-                                        </p>
-                                        <p className="mt-1 flex items-center justify-center gap-1 text-xs text-[#78716c]">
-                                            <Calendar className="h-3 w-3" />
-                                            {formatDate(selectedVersion.uploaded_at || selectedVersion.created_at)}
-                                        </p>
-                                    </div>
-                                    <a
-                                        href={getDownloadUrl(selectedVersion.file_path)}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a]"
-                                    >
-                                        <Download className="h-4 w-4" />
-                                        Abrir documento
-                                    </a>
-                                </div>
-
-                                {/* Derecha: observaciones de la versión seleccionada */}
-                                <div className="rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-4">
-                                    <div className="mb-3 flex items-center justify-between gap-2">
-                                        <span className="text-sm font-bold text-[#1c1917]">
-                                            Versión {selectedVersion.version_number}
-                                        </span>
-                                        <StatusBadge variant={getReviewStatus(selectedVersion, entrega.status).variant}>
-                                            {getReviewStatus(selectedVersion, entrega.status).label}
-                                        </StatusBadge>
-                                    </div>
-                                    <div className="mb-3 space-y-1">
-                                        <p className="flex items-center gap-1 text-xs text-[#78716c]">
-                                            <Calendar className="h-3 w-3" />
-                                            {formatDate(selectedVersion.uploaded_at || selectedVersion.created_at)}
-                                        </p>
-                                    </div>
-                                    {selectedVersion.director_notes ? (
-                                        <div className="rounded-md bg-white p-3">
-                                            <p className="whitespace-pre-wrap text-xs leading-relaxed text-[#1c1917]">
-                                                {selectedVersion.director_notes}
-                                            </p>
-                                        </div>
-                                    ) : (
-                                        <p className="text-xs text-[#a8a29e] italic">
-                                            Sin observaciones del director.
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                ) : (
-                    /* Sin versiones */
+                {/* ── D. Archivos Requeridos ── */}
+                {archivosConVersiones.length === 0 ? (
                     <div className="rounded-xl border border-[#e5e5e5] bg-white shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                         <div className="border-b border-[#e5e5e5] px-6 py-4">
                             <div className="flex items-center gap-2">
                                 <FileText className="h-5 w-5 text-[#c2410c]" />
-                                <h3 className="text-base font-bold text-[#1c1917]">Documento</h3>
+                                <h3 className="text-base font-bold text-[#1c1917]">Archivos Requeridos</h3>
                             </div>
                         </div>
                         <div className="flex flex-col items-center gap-3 py-12 text-center text-sm text-[#a8a29e]">
                             <FileText className="h-10 w-10 text-[#d6d3d1]" />
-                            <p>El estudiante aún no ha subido versiones para esta entrega.</p>
+                            <p>No se han configurado archivos requeridos para esta entrega.</p>
                         </div>
+                    </div>
+                ) : (
+                    /* ── Per-file version tab selector ── */
+                    <div className="rounded-xl border border-[#e5e5e5] bg-white shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
+                        <div className="flex items-center border-b border-[#e5e5e5] px-4 py-3">
+                            {archivosConVersiones.map((av, idx) => {
+                                const isActive = safeArchivoIdx === idx;
+                                const isCompleto = av.versiones.length > 0;
+                                return (
+                                    <button
+                                        key={av.config.id}
+                                        onClick={() => {
+                                            setSelectedArchivoIdx(idx);
+                                            setSelectedVersionIdx(0);
+                                            setDirectorNotes('');
+                                            setDecision(null);
+                                            setSubmitError(null);
+                                        }}
+                                        className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                            isActive
+                                                ? 'bg-[#c2410c] text-white shadow-sm'
+                                                : 'text-[#57534e] hover:bg-[#f5f5f4]'
+                                        } ${!isCompleto ? 'opacity-60' : ''}`}
+                                    >
+                                        <FileText className="h-3.5 w-3.5" />
+                                        {av.config.nombre}
+                                        {isCompleto && (
+                                            <span className="ml-0.5 rounded-full bg-white/20 px-1.5 text-[10px]">
+                                                {av.versiones.length}
+                                            </span>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {/* Versiones del archivo activo */}
+                        {activeArchivo && activeArchivo.versiones.length > 0 && selectedVersion ? (
+                            <div className="p-6">
+                                <div className="grid grid-cols-1 gap-6 xl:grid-cols-[280px_1fr]">
+                                    {/* File info */}
+                                    <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-[#e5e5e5] bg-[#fafaf9] py-16">
+                                        <FileText className="h-16 w-16 text-[#d6d3d1]" />
+                                        <div className="text-center">
+                                            <p className="text-sm font-semibold text-[#1c1917]">
+                                                {selectedVersion.original_name || `documento_v${selectedVersion.version_number}.pdf`}
+                                            </p>
+                                            <p className="mt-1 flex items-center justify-center gap-1 text-xs text-[#78716c]">
+                                                <Calendar className="h-3 w-3" />
+                                                {formatDate(selectedVersion.uploaded_at || selectedVersion.created_at)}
+                                            </p>
+                                        </div>
+                                        <a
+                                            href={getDownloadUrl(selectedVersion.file_path)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a]"
+                                        >
+                                            <Download className="h-4 w-4" />
+                                            Abrir documento
+                                        </a>
+
+                                        {/* Version selector dentro del mismo archivo */}
+                                        {activeArchivo.config.versionamiento && activeArchivo.versiones.length > 1 && (
+                                            <div className="flex items-center gap-1">
+                                                {activeArchivo.versiones.slice(0, 4).map((v, vidx) => (
+                                                    <button
+                                                        key={v.id}
+                                                        onClick={() => setSelectedVersionIdx(vidx)}
+                                                        className={`inline-flex min-h-[28px] items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${
+                                                            safeVersionIdx === vidx
+                                                                ? 'bg-[#c2410c] text-white'
+                                                                : 'bg-[#f5f5f4] text-[#57534e] hover:bg-[#e7e5e4]'
+                                                        }`}
+                                                    >
+                                                        v{v.version_number}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Observaciones existentes de esta versión */}
+                                    <div className="rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-4">
+                                        <div className="mb-3 flex items-center justify-between gap-2">
+                                            <span className="text-sm font-bold text-[#1c1917]">
+                                                {activeArchivo.config.nombre} · Versión {selectedVersion.version_number}
+                                            </span>
+                                            <StatusBadge variant={getReviewStatus(selectedVersion, entrega.status).variant}>
+                                                {getReviewStatus(selectedVersion, entrega.status).label}
+                                            </StatusBadge>
+                                        </div>
+                                        <div className="mb-3 space-y-1">
+                                            <p className="flex items-center gap-1 text-xs text-[#78716c]">
+                                                <Calendar className="h-3 w-3" />
+                                                {formatDate(selectedVersion.uploaded_at || selectedVersion.created_at)}
+                                            </p>
+                                        </div>
+                                        {selectedVersion.director_notes ? (
+                                            <div className="rounded-md bg-white p-3">
+                                                <p className="whitespace-pre-wrap text-xs leading-relaxed text-[#1c1917]">
+                                                    {selectedVersion.director_notes}
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <p className="text-xs text-[#a8a29e] italic">
+                                                Sin observaciones previas del director.
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            /* Sin versiones para este archivo */
+                            <div className="flex flex-col items-center gap-3 py-12 text-center text-sm text-[#a8a29e]">
+                                <FileText className="h-10 w-10 text-[#d6d3d1]" />
+                                <p>El estudiante aún no ha subido el archivo "{activeArchivo?.config.nombre}".</p>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -510,7 +555,9 @@ export default function RevisionEntregaDirector() {
                 <div className="rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                     <div className="mb-6 flex items-center gap-2">
                         <MessageSquareText className="h-5 w-5 text-[#c2410c]" />
-                        <h3 className="text-base font-bold text-[#1c1917]">Panel de Revisión</h3>
+                        <h3 className="text-base font-bold text-[#1c1917]">
+                            Revisar: {activeArchivo?.config.nombre ?? 'Selecciona un archivo'}
+                        </h3>
                     </div>
 
                     <div className="flex flex-col gap-6">

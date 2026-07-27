@@ -54,12 +54,12 @@ Chained PRs recommended: Yes
 
 **Skills:** `react-patterns`, `typescript-pro`, `shadcn-ui`, `tailwind-patterns`
 
-- [ ] 3.1 Crear `ArchivosRequeridosBuilder.tsx` — lista dinámica, inputs nombre + toggle versionamiento, botones agregar/eliminar, max 6
-- [ ] 3.2 Integrar builder en `CoordinadorEntregas.tsx` — formulario crear y modal editar con archivos_requeridos en payload
-- [ ] 3.3 Modificar `DetalleEntregaEstudiante.tsx` — tarjetas por archivo requerido, subida individual con reemplazo si sin versionamiento
-- [ ] 3.4 Modificar `RevisionEntregaDirector.tsx` — archivos agrupados, selector versión, textarea observaciones por archivo
-- [ ] 3.5 Actualizar `types/entregas.ts` (ArchivoRequeridoConfig, ArchivoRequeridoEstado, EntregaEstadoResponse)
-- [ ] 3.6 Actualizar `hooks/useEntregas.ts` — subirArchivoPorSlug() y fetchEstadoCompletitud()
+- [x] 3.1 Crear `ArchivosRequeridosBuilder.tsx` — lista dinámica, inputs nombre + toggle versionamiento, botones agregar/eliminar, max 6
+- [x] 3.2 Integrar builder en `CoordinadorEntregas.tsx` — formulario crear y modal editar con archivos_requeridos en payload
+- [x] 3.3 Modificar `DetalleEntregaEstudiante.tsx` — tarjetas por archivo requerido, subida individual con reemplazo si sin versionamiento
+- [x] 3.4 Modificar `RevisionEntregaDirector.tsx` — archivos agrupados, selector versión, textarea observaciones por archivo
+- [x] 3.5 Actualizar `types/entregas.ts` (ArchivoRequeridoConfig, ArchivoRequeridoEstado, EntregaEstadoResponse)
+- [x] 3.6 Actualizar `hooks/useEntregas.ts` — subirArchivoPorSlug() y fetchEstadoCompletitud()
 
 ## Phase 4: Tests + Migración de Datos
 

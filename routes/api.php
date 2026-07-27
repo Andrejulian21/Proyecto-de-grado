@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\ProyectoController;
 use App\Http\Controllers\Admin\SemestreController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Api\DirectorController;
+use App\Http\Controllers\Api\EntregaEstudianteController;
 use App\Http\Controllers\Auth\AuthController;
 use Illuminate\Support\Facades\Route;
 
@@ -88,13 +89,21 @@ Route::middleware([
     Route::get('/estudiante/entregas', [\App\Http\Controllers\Api\EstudianteController::class, 'entregas'])
         ->name('estudiante.entregas');
 
+    // Estudiante — subir archivos por slug y consultar estado de completitud (PR 2)
+    Route::post('/entregas/{entrega}/archivos/{slug}', [EntregaEstudianteController::class, 'subirArchivoPorSlug'])
+        ->whereNumber('entrega')
+        ->name('entregas.archivos.subir');
+    Route::get('/entregas/{entrega}/estado', [EntregaEstudianteController::class, 'estadoCompletitud'])
+        ->whereNumber('entrega')
+        ->name('entregas.estado');
+
     // Entregas — versiones (accessible by authenticated students and directors)
     Route::get('/entregas/{id}/versiones', [EntregaController::class, 'versiones'])
         ->whereNumber('id')
         ->name('entregas.versiones');
-    Route::post('/entregas/{id}/versiones', [EntregaController::class, 'subirVersion'])
-        ->whereNumber('id')
-        ->name('entregas.subir_version');
+    // ELIMINADO (PR 2): Route::post('/entregas/{id}/versiones', [EntregaController::class, 'subirVersion'])
+    //     ->whereNumber('id')
+    //     ->name('entregas.subir_version');
     Route::delete('/entregas/{entregaId}/versiones/{versionId}', [EntregaController::class, 'eliminarVersion'])
         ->whereNumber('entregaId')
         ->whereNumber('versionId')

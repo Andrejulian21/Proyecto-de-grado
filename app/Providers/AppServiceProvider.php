@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Models\Proyecto;
+use App\Observers\ProyectoObserver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -32,6 +34,9 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinute(60)->by((string) $key);
         });
+
+        // Register model observers
+        Proyecto::observe(ProyectoObserver::class);
 
         // Dedicated rate limiter for the external login endpoint (H-003).
         // 5 attempts per minute per (IP + email) combination to mitigate

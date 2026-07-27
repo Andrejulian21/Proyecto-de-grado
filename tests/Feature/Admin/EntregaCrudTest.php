@@ -85,7 +85,11 @@ it('coordinador puede crear entrega', function () {
         'fase' => 'anteproyecto',
         'titulo' => 'Entrega Anteproyecto',
         'descripcion' => 'Descripción detallada del anteproyecto',
-        'fecha_limite' => '2026-03-15',
+        'fecha_limite' => '2026-09-15',
+        'archivos_requeridos' => [
+            ['id' => 'documento_principal', 'nombre' => 'Documento Principal', 'versionamiento' => true],
+            ['id' => 'anexos', 'nombre' => 'Anexos', 'versionamiento' => false],
+        ],
     ];
 
     $response = $this->actingAs($this->coordinador)
@@ -96,6 +100,7 @@ it('coordinador puede crear entrega', function () {
     expect(Entrega::count())->toBe(1);
     expect($response->json('data.title'))->toBe('Entrega Anteproyecto');
     expect($response->json('data.semester_id'))->toBe($this->semestre->id);
+    expect($response->json('data.archivos_requeridos'))->toHaveCount(2);
 });
 
 it('crear entrega valida campos requeridos', function () {

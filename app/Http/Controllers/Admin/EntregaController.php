@@ -8,6 +8,7 @@ use App\Enums\EstadoEntrega;
 use App\Enums\EstadoProyecto;
 use App\Enums\FaseProyecto;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreEntregaRequest;
 use App\Models\AuditLog;
 use App\Models\Entrega;
 use App\Models\Notificacion;
@@ -112,6 +113,10 @@ class EntregaController extends Controller
             'start_time' => 'sometimes|nullable|string|max:10',
             'phase' => 'sometimes|required|string|max:50',
             'proyecto_id' => 'sometimes|required|exists:proyectos,id',
+            'archivos_requeridos' => 'sometimes|required|array|min:1|max:6',
+            'archivos_requeridos.*.id' => 'required_with:archivos_requeridos|string|max:50|regex:/^[a-z0-9_]+$/',
+            'archivos_requeridos.*.nombre' => 'required_with:archivos_requeridos|string|max:255',
+            'archivos_requeridos.*.versionamiento' => 'required_with:archivos_requeridos|boolean',
         ]);
 
         if ($validator->fails()) {
@@ -148,6 +153,47 @@ class EntregaController extends Controller
         if (isset($data['proyecto_id'])) {
             $entrega->proyecto_id = $data['proyecto_id'];
         }
+
+        // Handle archivos_requeridos update with versioning validation
+        if (isset($data['archivos_requeridos'])) {
+            $nuevosArchivos = collect($data['archivos_requeridos'])->map(function (array $item) {
+                return [
+                    'slug' => $item['id'],
+                    'nombre' => $item['nombre'],
+                    'versionamiento' => (bool) $item['versionamiento'],
+                ];
+            });
+
+            // Validate: if a file had versionamiento=true and has existing versions,
+            // don't allow changing versionamiento to false
+            $actuales = $entrega->archivos_requeridos ?? [];
+            foreach ($actuales as $actual) {
+                $nuevo = $nuevosArchivos->firstWhere('slug', $actual['slug'] ?? $actual['id'] ?? null);
+                if ($nuevo && ($actual['versionamiento'] ?? false) === true && $nuevo['versionamiento'] === false) {
+                    // Check if there are existing versions for this archivo_requerido
+                    $tieneVersiones = $entrega->versiones()
+                        ->where('archivo_requerido_id', $actual['slug'] ?? $actual['id'] ?? null)
+                        ->exists();
+
+                    if ($tieneVersiones) {
+                        return response()->json([
+                            'error' => "No se puede deshabilitar el versionamiento para '{$actual['nombre']}' porque ya tiene versiones subidas.",
+                        ], 422);
+                    }
+                }
+            }
+
+            // Check unique IDs
+            $ids = $nuevosArchivos->pluck('slug')->toArray();
+            if (count($ids) !== count(array_unique($ids))) {
+                return response()->json([
+                    'error' => 'Los IDs de los archivos requeridos deben ser únicos.',
+                ], 422);
+            }
+
+            $entrega->archivos_requeridos = $nuevosArchivos->toArray();
+        }
+
         $entrega->save();
 
         $entrega->load('proyecto:id,code,title,semester_id', 'proyecto.semestre:id,name', 'proyectos:id,code,title');
@@ -182,57 +228,43 @@ class EntregaController extends Controller
      *
      * Crear una nueva entrega (coordinador).
      */
-    public function store(Request $request): JsonResponse
+    public function store(StoreEntregaRequest $request): JsonResponse
     {
-        // Only coordinators can create entregas
-        if ($request->user()->role->value !== 'Coordinador') {
-            return response()->json(['error' => 'No autorizado.'], 403);
-        }
+        $data = $request->validated();
 
-        $validator = Validator::make($request->all(), [
-            'grupo_id' => 'required|exists:semestres,id',
-            'fase' => 'required|string|max:50',
-            'titulo' => 'required|string|max:255',
-            'descripcion' => 'required|string|max:500',
-            'fecha_limite' => 'required|date',
-            'fecha_inicio' => 'nullable|date|before_or_equal:fecha_limite',
-            'hora_inicio' => 'nullable|string|max:10',
-            'criterios' => 'nullable|string',
-            'hora_maxima' => 'nullable|string|max:10',
+        $archivos = collect($data['archivos_requeridos'])->map(function (array $item) {
+            return [
+                'slug' => $item['id'],
+                'nombre' => $item['nombre'],
+                'versionamiento' => (bool) $item['versionamiento'],
+            ];
+        })->toArray();
+
+        unset($data['archivos_requeridos']);
+
+        $entrega = Entrega::create([
+            'semester_id' => $data['grupo_id'],
+            'phase' => $data['fase'],
+            'title' => $data['titulo'],
+            'description' => $data['descripcion'],
+            'due_date' => $data['fecha_limite'],
+            'start_date' => $data['fecha_inicio'] ?? null,
+            'start_time' => $data['hora_inicio'] ?? null,
+            'hora_maxima' => $data['hora_maxima'] ?? null,
+            'acceptance_criteria' => $data['criterios'] ?? null,
+            'status' => 'pendiente',
+            'archivos_requeridos' => $archivos,
         ]);
 
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
-        }
-
-        $data = $validator->validated();
-
-        // Create one entrega per active project in the semester
+        // Vincular a todos los proyectos activos del semestre
         $proyectos = Proyecto::where('semester_id', $data['grupo_id'])
             ->whereIn('status', [EstadoProyecto::EnCurso->value, EstadoProyecto::EnRiesgo->value, EstadoProyecto::Completado->value])
-            ->get(['id', 'code', 'title']);
+            ->pluck('id');
 
-        $entregas = collect();
-        foreach ($proyectos as $proyecto) {
-            $entrega = Entrega::create([
-                'proyecto_id' => $proyecto->id,
-                'semester_id' => $data['grupo_id'],
-                'phase' => $data['fase'],
-                'title' => $data['titulo'],
-                'description' => $data['descripcion'],
-                'due_date' => $data['fecha_limite'],
-                'start_date' => $data['fecha_inicio'] ?? null,
-                'start_time' => $data['hora_inicio'] ?? null,
-                'hora_maxima' => $data['hora_maxima'] ?? null,
-                'acceptance_criteria' => $data['criterios'] ?? null,
-                'status' => EstadoEntrega::Pendiente->value,
-            ]);
+        $entrega->proyectos()->attach($proyectos);
+        $entrega->load('semestre:id,name');
 
-            $entrega->load('semestre:id,name');
-            $entregas->push($entrega);
-        }
-
-        return response()->json(['data' => $entregas], 201);
+        return response()->json(['data' => $entrega], 201);
     }
 
     /**
@@ -469,7 +501,11 @@ class EntregaController extends Controller
             return response()->json(['error' => 'No eres estudiante de este proyecto.'], 403);
         }
 
-        return response()->json(['data' => $entrega]);
+        $data = $entrega->toArray();
+        $data['proyectos_count'] = $entrega->proyectos->count();
+        $data['versiones_count'] = $entrega->versiones->count();
+
+        return response()->json(['data' => $data]);
     }
 
     /**

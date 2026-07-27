@@ -46,7 +46,6 @@ export default function RevisionBitacoraEstudiante() {
                 const mapped: BitacoraDetail = {
                     id: b.id,
                     content: b.notes ?? '',
-                    weeklySummary: '',
                     topic: b.topic ?? '',
                     projectCode: project.code ?? '',
                     date: b.meeting_date ?? '',
@@ -117,17 +116,14 @@ export default function RevisionBitacoraEstudiante() {
                 // El estudiante no firma directamente; solo el director
                 throw new Error('Solo el director puede firmar la bitácora.');
             }}
-            onSaveContent={(content: string, _weeklySummary: string) => {
+            onSaveContent={(content: string) => {
                 apiFetch(`/api/bitacoras/${id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         notes: content,
-                        topic: _weeklySummary || undefined,
                     }),
-                }).catch(() => {
-                    // Error silencioso — la UI actualiza localmente igual
-                });
+                }).catch(() => {});
             }}
         />
     );

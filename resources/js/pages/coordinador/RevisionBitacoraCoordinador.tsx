@@ -44,7 +44,6 @@ export default function RevisionBitacoraCoordinador() {
                 const mapped: BitacoraDetail = {
                     id: b.id,
                     content: b.notes ?? '',
-                    weeklySummary: '',
                     topic: b.topic ?? '',
                     projectCode: project.code ?? '',
                     date: b.meeting_date ?? '',

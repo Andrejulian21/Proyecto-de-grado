@@ -28,7 +28,6 @@ export interface BitacoraSignature {
 export interface BitacoraDetail {
     id: number;
     content: string;
-    weeklySummary: string;
     topic: string;
     projectCode: string;
     date: string;
@@ -77,7 +76,7 @@ export interface RevisionBitacoraViewProps {
     onBack: () => void;
     onSign: (totpCode: string) => Promise<void>;
     onRemoveSignature?: () => void;
-    onSaveContent?: (content: string, weeklySummary: string) => void;
+    onSaveContent?: (content: string) => void;
     currentStudentName?: string;
     disableSigning?: boolean;
 }
@@ -94,7 +93,6 @@ export function RevisionBitacoraView({
 }: RevisionBitacoraViewProps) {
     const [bitacora, setBitacora] = useState(initialBitacora);
     const [content, setContent] = useState(bitacora.content);
-    const [weeklySummary, setWeeklySummary] = useState(bitacora.weeklySummary);
     const [editing, setEditing] = useState(false);
     const [totpCode, setTotpCode] = useState('');
     const [totpError, setTotpError] = useState('');
@@ -186,8 +184,8 @@ export function RevisionBitacoraView({
     }
 
     function handleSaveContent() {
-        onSaveContent?.(content, weeklySummary);
-        setBitacora((prev) => ({ ...prev, content, weeklySummary }));
+        onSaveContent?.(content);
+        setBitacora((prev) => ({ ...prev, content }));
         setEditing(false);
     }
 
@@ -283,18 +281,6 @@ export function RevisionBitacoraView({
                                         className="w-full rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
                                     />
                                 </div>
-                                <div>
-                                    <label htmlFor="bitacora-summary" className="mb-1.5 block text-xs font-bold uppercase tracking-[0.05em] text-[#57534e]">
-                                        Resumen semanal
-                                    </label>
-                                    <textarea
-                                        id="bitacora-summary"
-                                        rows={2}
-                                        value={weeklySummary}
-                                        onChange={(e) => setWeeklySummary(e.target.value)}
-                                        className="w-full rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
-                                    />
-                                </div>
                                 <div className="flex gap-2">
                                     <button
                                         type="button"
@@ -308,7 +294,6 @@ export function RevisionBitacoraView({
                                         type="button"
                                         onClick={() => {
                                             setContent(bitacora.content);
-                                            setWeeklySummary(bitacora.weeklySummary);
                                             setEditing(false);
                                         }}
                                         className="inline-flex min-h-[36px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-white px-3 py-1.5 text-xs font-semibold text-[#57534e] hover:bg-[#f5f5f4]"
@@ -320,10 +305,6 @@ export function RevisionBitacoraView({
                         ) : (
                             <div className="flex flex-col gap-4">
                                 <p className="text-sm leading-relaxed text-[#57534e]">{content}</p>
-                                <div>
-                                    <p className="text-xs font-bold uppercase tracking-[0.05em] text-[#57534e]">Resumen semanal</p>
-                                    <p className="mt-1 text-sm text-[#57534e]">{weeklySummary}</p>
-                                </div>
                             </div>
                         )}
                     </div>

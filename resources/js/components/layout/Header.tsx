@@ -14,6 +14,13 @@ const roleBadgeStyles: Record<string, string> = {
     EvaluadorExterno: 'bg-warning/10 text-warning',
 };
 
+const roleLabels: Record<string, string> = {
+    Coordinador: 'Coordinador',
+    Director: 'Director',
+    Estudiante: 'Estudiante',
+    EvaluadorExterno: 'Evaluador Externo',
+};
+
 export function Header({ onMenuClick, title }: HeaderProps) {
     const { user, logout } = useAuth();
 
@@ -50,9 +57,9 @@ export function Header({ onMenuClick, title }: HeaderProps) {
                         {initials}
                     </div>
                     <div className="hidden text-right sm:block">
-                        <p className="text-sm font-medium leading-tight text-text">{user.name}</p>
+                        <p className="text-sm font-medium leading-tight text-text">{user.name || 'Usuario'}</p>
                         <p className="text-xs leading-tight text-text-muted">
-                            {user.role === 'EvaluadorExterno' ? 'Evaluador Externo' : user.role}
+                            {roleLabels[user.role] ?? user.role}
                         </p>
                     </div>
                 </div>

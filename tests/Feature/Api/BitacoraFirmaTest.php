@@ -83,6 +83,25 @@ it('store genera un codigo hasheado y devuelve el plain text en la respuesta', f
         ->and($bitacora->signature_code_expires_at->isFuture())->toBeTrue();
 });
 
+it('el codigo persistido en BD esta hasheado, no en texto plano', function () {
+    $response = $this->actingAs($this->estudiante)
+        ->postJson('/api/bitacoras', [
+            'proyecto_id' => $this->proyecto->id,
+            'topic' => 'Hash check',
+            'meeting_date' => '2026-04-10',
+        ]);
+    $response->assertCreated();
+
+    $plain = $response->json('data.signature_code_plain');
+    $bitacora = Bitacora::find($response->json('data.id'));
+
+    // The DB column must never store the plain digits.
+    expect($bitacora->signature_code)->not->toBe($plain)
+        ->and($bitacora->signature_code)->not->toContain($plain)
+        ->and(strlen((string) $bitacora->signature_code))->toBeGreaterThan(20) // bcrypt hash length
+        ->and(Hash::check($plain, $bitacora->signature_code))->toBeTrue();
+});
+
 // -- FIRMAR: exito -----------------------------------------------------
 
 it('firmar con codigo correcto transiciona a FirmadaDirector y registra director_signed_at', function () {

@@ -11,8 +11,9 @@ test('bitacoras table exists', function () {
 test('bitacoras has the columns defined in spec', function () {
     $expected = [
         'id', 'proyecto_id', 'topic', 'notes', 'evidence_file',
-        'meeting_date', 'signature_status', 'student_signed_at',
-        'director_signed_at', 'duration_hours',
+        'meeting_date', 'signature_status', 'signature_code',
+        'signature_code_expires_at', 'signature_retries',
+        'student_signed_at', 'director_signed_at', 'duration_hours',
         'created_at', 'updated_at',
     ];
 
@@ -32,7 +33,7 @@ test('bitacoras.signature_status defaults to Pendiente', function () {
 });
 
 test('bitacoras nullable columns are nullable', function () {
-    $nullable = ['notes', 'evidence_file', 'student_signed_at', 'director_signed_at', 'duration_hours'];
+    $nullable = ['notes', 'evidence_file', 'signature_code', 'signature_code_expires_at', 'student_signed_at', 'director_signed_at', 'duration_hours'];
 
     $columns = Schema::getColumns('bitacoras');
 

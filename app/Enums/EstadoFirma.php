@@ -11,6 +11,7 @@ enum EstadoFirma: string
     case FirmadaDirector = 'FirmadaDirector';
     case Completada = 'Completada';
     case Sospechosa = 'Sospechosa';
+    case NoFirmada = 'NoFirmada';
 
     public static function values(): array
     {
@@ -25,6 +26,7 @@ enum EstadoFirma: string
             self::FirmadaDirector => 'Firmada por Director',
             self::Completada => 'Completada',
             self::Sospechosa => 'Sospechosa',
+            self::NoFirmada => 'No Firmada',
         };
     }
 }

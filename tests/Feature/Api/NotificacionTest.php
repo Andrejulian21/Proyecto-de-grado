@@ -165,27 +165,28 @@ it('al revisar entrega se genera notificacion para el estudiante', function () {
 });
 
 // -- Notificaciones automáticas al firmar bitácora ------------------------
+//
+// PR 1 replaced the old multi-step sign flow with a TOTP-based one:
+// the student creates the bitacora (which generates a code), and the
+// director signs by entering that code. We only need to assert that
+// the director's successful sign notifies the project students, which
+// mirrors the original intent of this test.
 
-it('al firmar bitacora se genera notificacion', function () {
+it('al firmar bitacora con codigo correcto se notifica a los estudiantes del proyecto', function () {
     $bitacora = Bitacora::create([
         'proyecto_id' => $this->proyecto->id,
-        'topic' => 'Reunión test',
+        'topic' => 'Reunion test',
         'meeting_date' => '2026-04-01',
-        'signature_status' => 'Pendiente',
     ]);
+    $plain = $bitacora->generateSignatureCode();
 
-    // Estudiante firma primero
-    $this->actingAs($this->estudiante)
-        ->postJson("/api/bitacoras/{$bitacora->id}/firmar");
+    $this->actingAs($this->director)
+        ->postJson("/api/bitacoras/{$bitacora->id}/firmar", [
+            'code' => $plain,
+        ])
+        ->assertOk();
 
     $notifEstudiante = Notificacion::where('user_id', $this->estudiante->id)->get();
-    expect($notifEstudiante)->toHaveCount(0); // only the other party gets notified
-
-    // Director firma para completar
-    $this->actingAs($this->director)
-        ->postJson("/api/bitacoras/{$bitacora->id}/firmar");
-
-    $notifDirector = Notificacion::where('user_id', $this->director->id)->get();
-    expect($notifDirector)->toHaveCount(1);
-    expect($notifDirector[0]->type)->toContain('bitacora');
+    expect($notifEstudiante)->toHaveCount(1);
+    expect($notifEstudiante[0]->type)->toContain('bitacora');
 });

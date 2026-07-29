@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Enums\EstadoFirma;
 use App\Http\Controllers\Controller;
 use App\Models\Bitacora;
+use App\Models\Notificacion;
 use App\Models\Proyecto;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -202,6 +203,25 @@ class BitacoraController extends Controller
                 'director_signed_at' => now(),
             ]);
             RateLimiter::clear($throttleKey);
+
+            // Notify the project's students that their bitacora is now
+            // signed by the director. Kept from the previous multi-step
+            // flow so the existing NotificacionTest behavior is
+            // preserved under the new TOTP design.
+            $proyecto = Proyecto::find($bitacora->proyecto_id);
+            if ($proyecto) {
+                $estudiantes = $proyecto->estudiantes()->pluck('user_id');
+                foreach ($estudiantes as $estudianteId) {
+                    Notificacion::create([
+                        'user_id' => $estudianteId,
+                        'sender_id' => $request->user()->id,
+                        'type' => 'bitacora.firmada_director',
+                        'title' => 'Bitacora firmada por director',
+                        'content' => "El director ha firmado la bitacora '{$bitacora->topic}'.",
+                        'sent_at' => now(),
+                    ]);
+                }
+            }
 
             return response()->json(['data' => $bitacora->fresh()]);
         }

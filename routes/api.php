@@ -63,7 +63,7 @@ Route::middleware([
     Route::post('/auth/logout', [AuthController::class, 'logout'])
         ->name('auth.logout');
 
-    // Bitácoras CRUD + firma (T-012)
+    // Bitácoras CRUD + firma (T-012, PR 1 firma por clave dinámica).
     Route::get('/bitacoras', [\App\Http\Controllers\Api\BitacoraController::class, 'index'])
         ->name('bitacoras.index');
     Route::post('/bitacoras', [\App\Http\Controllers\Api\BitacoraController::class, 'store'])
@@ -77,6 +77,9 @@ Route::middleware([
     Route::post('/bitacoras/{id}/firmar', [\App\Http\Controllers\Api\BitacoraController::class, 'firmar'])
         ->whereNumber('id')
         ->name('bitacoras.firmar');
+    Route::post('/bitacoras/{id}/re-solicitar-codigo', [\App\Http\Controllers\Api\BitacoraController::class, 'reSolicitarCodigo'])
+        ->whereNumber('id')
+        ->name('bitacoras.re_solicitar_codigo');
 
     // T-014: Total bitácora hours per project (director/coordinador)
     Route::get('/director/proyectos/{id}/horas', [\App\Http\Controllers\Api\BitacoraController::class, 'horas'])

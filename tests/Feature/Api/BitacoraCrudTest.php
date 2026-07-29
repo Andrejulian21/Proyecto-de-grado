@@ -189,86 +189,45 @@ it('NO puede actualizar bitácora ya firmada', function () {
     $response->assertStatus(422);
 });
 
-// -- FIRMAR ---------------------------------------------------------------
+// -- FIRMAR (TOTP) -------------------------------------------------------
+//
+// PR 1 — Seguimiento y Firma replaced the old multi-step sign flow with a
+// 6-digit code. The exhaustive TOTP behavior is tested in
+// `BitacoraFirmaTest`. This block keeps a small smoke test here so the
+// historical `BitacoraCrudTest` still exercises the endpoint.
 
-it('estudiante firma bitácora pendiente -> FirmadaEstudiante', function () {
+it('firmar con codigo correcto transiciona a FirmadaDirector (smoke test)', function () {
     $bitacora = Bitacora::create([
         'proyecto_id' => $this->proyecto->id,
         'topic' => 'Para firmar',
         'meeting_date' => '2026-04-01',
     ]);
-
-    $response = $this->actingAs($this->estudiante)
-        ->postJson("/api/bitacoras/{$bitacora->id}/firmar");
-
-    $response->assertOk();
-    $b = $bitacora->fresh();
-    expect($b->signature_status->value)->toBe('FirmadaEstudiante');
-    expect($b->student_signed_at)->not->toBeNull();
-});
-
-it('director firma bitácora FirmadaEstudiante -> Completada', function () {
-    $bitacora = Bitacora::create([
-        'proyecto_id' => $this->proyecto->id,
-        'topic' => 'Para completar',
-        'meeting_date' => '2026-04-01',
-        'signature_status' => 'FirmadaEstudiante',
-        'student_signed_at' => now(),
-    ]);
+    $plain = $bitacora->generateSignatureCode();
 
     $response = $this->actingAs($this->director)
-        ->postJson("/api/bitacoras/{$bitacora->id}/firmar");
+        ->postJson("/api/bitacoras/{$bitacora->id}/firmar", [
+            'code' => $plain,
+        ]);
 
     $response->assertOk();
     $b = $bitacora->fresh();
-    expect($b->signature_status->value)->toBe('Completada');
+    expect($b->signature_status->value)->toBe('FirmadaDirector');
     expect($b->director_signed_at)->not->toBeNull();
 });
 
-it('flujo completo: pendiente -> estudiante -> director -> completada', function () {
+it('firmar bitácora que ya esta FirmadaDirector da 422', function () {
     $bitacora = Bitacora::create([
         'proyecto_id' => $this->proyecto->id,
-        'topic' => 'Flujo completo',
+        'topic' => 'Firmada por director',
         'meeting_date' => '2026-04-01',
-    ]);
-
-    // Estudiante firma
-    $this->actingAs($this->estudiante)
-        ->postJson("/api/bitacoras/{$bitacora->id}/firmar");
-    expect($bitacora->fresh()->signature_status->value)->toBe('FirmadaEstudiante');
-
-    // Director firma
-    $this->actingAs($this->director)
-        ->postJson("/api/bitacoras/{$bitacora->id}/firmar");
-    expect($bitacora->fresh()->signature_status->value)->toBe('Completada');
-});
-
-it('firmar bitácora ya completada da 422', function () {
-    $bitacora = Bitacora::create([
-        'proyecto_id' => $this->proyecto->id,
-        'topic' => 'Completada',
-        'meeting_date' => '2026-04-01',
-        'signature_status' => 'Completada',
-        'student_signed_at' => now(),
+        'signature_status' => 'FirmadaDirector',
         'director_signed_at' => now(),
     ]);
 
-    $response = $this->actingAs($this->estudiante)
-        ->postJson("/api/bitacoras/{$bitacora->id}/firmar");
+    $response = $this->actingAs($this->director)
+        ->postJson("/api/bitacoras/{$bitacora->id}/firmar", [
+            'code' => '123456',
+        ]);
 
     $response->assertStatus(422);
-});
-
-it('persona sin relación al proyecto no puede firmar', function () {
-    $intruso = User::factory()->create(['role' => UserRole::Estudiante->value]);
-    $bitacora = Bitacora::create([
-        'proyecto_id' => $this->proyecto->id,
-        'topic' => 'Para intruso',
-        'meeting_date' => '2026-04-01',
-    ]);
-
-    $response = $this->actingAs($intruso)
-        ->postJson("/api/bitacoras/{$bitacora->id}/firmar");
-
-    $response->assertStatus(403);
 });

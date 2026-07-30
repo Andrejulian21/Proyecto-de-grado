@@ -13,6 +13,7 @@ export default function NuevaBitacora() {
     const [topic, setTopic] = useState('');
     const [description, setDescription] = useState('');
     const [duration, setDuration] = useState('1');
+    const [semana, setSemana] = useState('1');
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
     const [createdBitacora, setCreatedBitacora] = useState<{
@@ -52,6 +53,7 @@ export default function NuevaBitacora() {
                     notes: description.trim(),
                     meeting_date: `${date}T${time}:00`,
                     duration_hours: parseFloat(duration),
+                    semana: parseInt(semana, 10),
                 }),
             });
 
@@ -69,7 +71,17 @@ export default function NuevaBitacora() {
                 }
             } else {
                 const body = await res.json().catch(() => ({}));
-                setError(body.error || body.message || 'Error al crear la bitacora.');
+                // Laravel validation errors come back as { errors: { field: [msg] } };
+                // surface the first one so the user sees what went wrong.
+                const firstValidationError = body.errors
+                    ? Object.values(body.errors).flat().find((m) => typeof m === 'string')
+                    : null;
+                setError(
+                    body.error ||
+                        body.message ||
+                        firstValidationError ||
+                        'Error al crear la bitacora.',
+                );
             }
         } catch {
             setError('Error de conexion. Intente de nuevo.');
@@ -158,6 +170,25 @@ export default function NuevaBitacora() {
                                 className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] tabular-nums"
                                 required
                             />
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                            <label htmlFor="binnacle-semana" className="text-sm font-semibold text-[#1c1917]">
+                                Semana <span className="text-[#dc2626]">*</span>
+                            </label>
+                            <select
+                                id="binnacle-semana"
+                                value={semana}
+                                onChange={(e) => setSemana(e.target.value)}
+                                className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] tabular-nums"
+                                required
+                            >
+                                {Array.from({ length: 32 }, (_, i) => i + 1).map((n) => (
+                                    <option key={n} value={n}>
+                                        Semana {n}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
 
                         <div className="flex flex-col gap-1.5 sm:col-span-2">

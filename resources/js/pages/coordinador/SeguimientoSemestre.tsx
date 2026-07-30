@@ -234,7 +234,7 @@ function ObservationsPanel({
                     {proyecto.proyecto_codigo}
                 </span>
             </div>
-            <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 w-full">
                 {proyecto.fases.map((fase) => {
                     const draftVal =
                         drafts[fase.key] ??
@@ -246,7 +246,7 @@ function ObservationsPanel({
                     return (
                         <div
                             key={fase.key}
-                            className="flex flex-col gap-2 rounded-md border border-[#e5e5e5] bg-white p-2.5 shadow-[0_1px_2px_rgba(28,25,23,0.04)] transition-shadow hover:shadow-[0_2px_6px_rgba(28,25,23,0.08)]"
+                            className="flex flex-col gap-2 rounded-md border border-[#e5e5e5] bg-white p-3 shadow-[0_1px_2px_rgba(28,25,23,0.04)] transition-shadow hover:shadow-[0_2px_6px_rgba(28,25,23,0.08)] w-full"
                         >
                             <label
                                 htmlFor={fieldId}
@@ -254,7 +254,7 @@ function ObservationsPanel({
                             >
                                 {fase.fase}
                             </label>
-                            <div className="flex gap-1.5">
+                            <div className="flex gap-1.5 w-full">
                                 <textarea
                                     id={fieldId}
                                     ref={(el) => {

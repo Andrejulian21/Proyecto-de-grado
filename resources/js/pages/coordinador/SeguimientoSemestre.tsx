@@ -35,19 +35,22 @@ const estadoConfig = {
         label: 'Entregado',
         icon: CheckCircle2,
         color: 'text-[#16a34a]',
-        bg: 'bg-[#dcfce7]',
+        bg: 'bg-[#f0fdf4]',
+        border: 'border-[#bbf7d0]',
     } as const,
     pendiente: {
         label: 'Pendiente',
         icon: Clock,
         color: 'text-[#d97706]',
-        bg: 'bg-[#fef3c7]',
+        bg: 'bg-[#fffbeb]',
+        border: 'border-[#fde68a]',
     } as const,
     no_entrego: {
         label: 'No entregó',
         icon: XCircle,
         color: 'text-[#dc2626]',
-        bg: 'bg-[#fee2e2]',
+        bg: 'bg-[#fef2f2]',
+        border: 'border-[#fecaca]',
     } as const,
 } as const;
 
@@ -75,12 +78,13 @@ function EstadoCell({ estado }: { estado: string }) {
     return (
         <span
             className={cn(
-                'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.03em]',
+                'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.03em] shadow-sm',
                 cfg.bg,
                 cfg.color,
+                cfg.border,
             )}
         >
-            <Icon className="h-3 w-3 shrink-0" />
+            <Icon className="h-3.5 w-3.5 shrink-0" />
             {cfg.label}
         </span>
     );
@@ -143,19 +147,28 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             proyecto_id: proyId,
+                            semestre_id: selectedSemestre,
                             fase: faseKey,
-                            contenido,
+                            observacion: contenido,
                         }),
                     },
                 );
                 if (!res.ok) throw new Error('Error al guardar observación');
+
+                // Clear draft and refetch to get fresh data with saved observation
+                setObsDraft((prev) => {
+                    const next = { ...prev };
+                    delete next[key];
+                    return next;
+                });
+                refetch();
             } catch (err) {
                 console.error(err);
             } finally {
                 setSavingObs((prev) => ({ ...prev, [key]: false }));
             }
         },
-        [obsDraft],
+        [obsDraft, selectedSemestre, refetch],
     );
 
     // Derive canonical column layout from the first project (safe assumption)
@@ -245,7 +258,7 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                         description="No hay proyectos registrados para este semestre."
                     />
                 ) : (
-                    <div className="w-full overflow-x-auto rounded-xl border border-[#e5e5e5] bg-white shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
+                    <div className="w-full overflow-x-auto rounded-xl border border-[#e5e5e5] bg-white shadow-[0_1px_3px_rgba(28,25,23,0.08),0_1px_2px_rgba(28,25,23,0.06)]">
                         <table className="w-full text-left text-sm tabular-nums">
                             {/* ============= HEAD ============= */}
                             <thead className="bg-[#f5f5f4] text-[11px] font-bold uppercase tracking-[0.05em] text-[#57534e]">
@@ -267,15 +280,8 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                                         return (
                                             <th
                                                 key={fase.key}
-                                                colSpan={
-                                                    collapsed
-                                                        ? 0
-                                                        : fase.entregas.length
-                                                }
-                                                className={cn(
-                                                    'border-l border-[#e5e5e5] p-0 align-top',
-                                                    collapsed && 'hidden',
-                                                )}
+                                                colSpan={fase.entregas.length}
+                                                className="border-l border-[#e5e5e5] p-0 align-top"
                                             >
                                                 <button
                                                     onClick={() =>
@@ -308,7 +314,30 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                                     </th>
                                 </tr>
 
-
+                                {/* Sub-header: nombres de cada entrega */}
+                                {canonicalPhases.some(
+                                    (f) => !collapsedPhases.has(f.key),
+                                ) && (
+                                    <tr>
+                                        <th className="sticky left-0 z-10 bg-[#f5f5f4]" />
+                                        <th />
+                                        <th />
+                                        {canonicalPhases.map((fase) => {
+                                            if (collapsedPhases.has(fase.key))
+                                                return null;
+                                            return fase.entregas.map((ent) => (
+                                                <th
+                                                    key={`sub-${ent.id}`}
+                                                    className="border-l border-t border-[#e5e5e5] px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-[0.03em] text-[#78716c]"
+                                                >
+                                                    {ent.title}
+                                                </th>
+                                            ));
+                                        })}
+                                        <th className="border-l border-t border-[#e5e5e5] px-2 py-2" />
+                                        <th className="border-l border-t border-[#e5e5e5] px-2 py-2" />
+                                    </tr>
+                                )}
                             </thead>
 
                             {/* ============= BODY ============= */}
@@ -320,7 +349,7 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                                     return (
                                         <tr
                                             key={proy.id}
-                                            className="group border-b border-[#e5e5e5] last:border-b-0"
+                                            className="group border-b border-[#e5e5e5] transition-colors hover:bg-[#fafaf9] last:border-b-0"
                                         >
                                             {/* Estudiantes */}
                                             <td className="sticky left-0 z-10 border-r border-[#e5e5e5] bg-white px-4 py-3">
@@ -379,8 +408,17 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                                                     collapsedPhases.has(
                                                         fase.key,
                                                     )
-                                                )
-                                                    return null;
+                                                ) {
+                                                    // Empty cells to preserve column alignment when collapsed
+                                                    return fase.entregas.map(
+                                                        (ent) => (
+                                                            <td
+                                                                key={`${proy.id}-${ent.id}`}
+                                                                className="border-l border-[#e5e5e5] px-3 py-3"
+                                                            />
+                                                        ),
+                                                    );
+                                                }
                                                 const proyFase =
                                                     proy.fases.find(
                                                         (f) =>

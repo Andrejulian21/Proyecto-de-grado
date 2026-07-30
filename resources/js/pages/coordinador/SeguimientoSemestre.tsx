@@ -334,12 +334,7 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                                             );
                                         })}
 
-                                        <th className="border-l border-t border-[#e5e5e5] px-4 py-2 text-center text-[10px] font-semibold uppercase tracking-[0.03em] text-[#78716c]">
-                                            Grupo A
-                                        </th>
-                                        <th className="border-l border-t border-[#e5e5e5] px-4 py-2 text-center text-[10px] font-semibold uppercase tracking-[0.03em] text-[#78716c]">
-                                            Grupo B
-                                        </th>
+
                                     </tr>
                                 )}
                             </thead>

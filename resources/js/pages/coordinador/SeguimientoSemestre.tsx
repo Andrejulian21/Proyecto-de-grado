@@ -297,13 +297,13 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                                     <th className="border-l border-[#e5e5e5] px-4 py-3 text-center">
                                         <div className="flex items-center justify-center gap-1">
                                             <FileText className="h-3 w-3" />
-                                            Proyecto de Grado 1
+                                            Bitacoras Proyecto de Grado 1
                                         </div>
                                     </th>
                                     <th className="border-l border-[#e5e5e5] px-4 py-3 text-center">
                                         <div className="flex items-center justify-center gap-1">
                                             <FileText className="h-3 w-3" />
-                                            Proyecto de Grado 2
+                                            Bitacoras Proyecto de Grado 2
                                         </div>
                                     </th>
                                 </tr>

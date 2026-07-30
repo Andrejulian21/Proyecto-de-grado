@@ -238,7 +238,7 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                 !loading &&
                 !error &&
                 data &&
-                (data.proyectos.length === 0 ? (
+                (data.proyectos?.length === 0 ? (
                     <EmptyState
                         icon={FileText}
                         title="Sin proyectos"

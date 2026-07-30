@@ -329,26 +329,14 @@ export function RevisionBitacoraView({
 
                         {mode === 'director' && (
                             currentUserSigned ? (
-                                <div className="flex flex-col gap-3">
-                                    <div className="rounded-lg border border-[#dcfce7] bg-[#dcfce7]/40 p-4 text-sm text-[#14532d]">
-                                        Ya has firmado esta bitácora.
-                                    </div>
-                                    {onRemoveSignature && (
-                                        <button
-                                            type="button"
-                                            onClick={handleRemoveSignature}
-                                            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[#dc2626] bg-white px-4 py-3 text-sm font-semibold text-[#dc2626] transition-colors hover:bg-[#fee2e2]"
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                            Quitar firma
-                                        </button>
-                                    )}
+                                <div className="rounded-lg border border-[#dcfce7] bg-[#dcfce7]/40 p-4 text-sm text-[#14532d]">
+                                    Has firmado esta bitácora correctamente.
                                 </div>
                             ) : (
                                 <SignatureCodeInput
                                     bitacoraId={bitacora.id}
                                     onSuccess={() => {
-                                        // The parent onSign handles UI updates
+                                        // Refresca la vista apenas se firma correctamente
                                         onSign().then(() => {}).catch(() => {});
                                     }}
                                 />

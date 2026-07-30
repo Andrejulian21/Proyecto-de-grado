@@ -75,45 +75,10 @@ function EstadoCell({ estado }: { estado: EntregaItem['estado'] }) {
     );
 }
 
-interface PhaseHeaderProps {
-    fase: FaseEntregas;
-    collapsed: boolean;
-    onToggle: () => void;
-}
-
-function PhaseHeader({ fase, collapsed, onToggle }: PhaseHeaderProps) {
+function PhaseHeader({ fase }: { fase: FaseEntregas }) {
     return (
-        <th
-            className={cn(
-                'border-l border-[#e5e5e5] p-0 align-middle text-center',
-                collapsed ? 'w-8' : 'min-w-[140px]',
-            )}
-        >
-            <button
-                type="button"
-                onClick={onToggle}
-                aria-label={
-                    collapsed
-                        ? `Expandir ${fase.fase}`
-                        : `Contraer ${fase.fase}`
-                }
-                title={fase.fase}
-                className={cn(
-                    'flex w-full items-center justify-center gap-1 px-2 py-3 text-[10px] font-bold uppercase tracking-wider text-[#57534e] transition-colors',
-                    'hover:bg-[#fafaf9] hover:text-[#1c1917]',
-                )}
-            >
-                {collapsed ? (
-                    <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-                ) : (
-                    <>
-                        <ChevronDown className="h-3.5 w-3.5 shrink-0" />
-                        <span className="whitespace-nowrap">
-                            {fase.fase}
-                        </span>
-                    </>
-                )}
-            </button>
+        <th className="border-l border-[#e5e5e5] px-3 py-3 text-center text-[10px] font-bold uppercase tracking-wider text-[#57534e] min-w-[140px]">
+            {fase.fase}
         </th>
     );
 }
@@ -317,18 +282,6 @@ export default function SeguimientoSemestre({
     const [expandedProject, setExpandedProject] = useState<number | null>(
         null,
     );
-    const [collapsedPhases, setCollapsedPhases] = useState<Set<string>>(
-        new Set(),
-    );
-
-    const togglePhase = useCallback((faseKey: string) => {
-        setCollapsedPhases((prev) => {
-            const next = new Set(prev);
-            if (next.has(faseKey)) next.delete(faseKey);
-            else next.add(faseKey);
-            return next;
-        });
-    }, []);
 
     const proyectos = data?.proyectos ?? [];
 
@@ -462,12 +415,6 @@ export default function SeguimientoSemestre({
                                         <PhaseHeader
                                             key={fase.key}
                                             fase={fase}
-                                            collapsed={collapsedPhases.has(
-                                                fase.key,
-                                            )}
-                                            onToggle={() =>
-                                                togglePhase(fase.key)
-                                            }
                                         />
                                     ))}
                                     <th

@@ -401,7 +401,7 @@ export default function SeguimientoSemestre({
                                     </th>
                                     <th
                                         scope="col"
-                                        className="whitespace-nowrap px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider"
+                                        className="border-l border-[#e5e5e5] whitespace-nowrap px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider"
                                     >
                                         Proyecto
                                     </th>
@@ -478,7 +478,7 @@ export default function SeguimientoSemestre({
                                                     </span>
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-3 align-top">
+                                            <td className="border-l border-[#e5e5e5] px-4 py-3 align-top">
                                                 <div className="flex flex-col">
                                                     <span className="text-sm font-medium text-[#1c1917]">
                                                         {
@@ -496,18 +496,6 @@ export default function SeguimientoSemestre({
                                                 {proy.director}
                                             </td>
                                             {canonicalPhases.map((fase) => {
-                                                if (
-                                                    collapsedPhases.has(
-                                                        fase.key,
-                                                    )
-                                                ) {
-                                                    return (
-                                                        <td
-                                                            key={fase.key}
-                                                            className="w-0 p-0 overflow-hidden border-l border-[#e5e5e5]"
-                                                        />
-                                                    );
-                                                }
                                                 const proyFase =
                                                     proy.fases.find(
                                                         (f) =>

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { TOTPInput } from '@/components/ui/TOTPInput';
+import { SignatureCodeInput } from '@/components/bitacoras/SignatureCode';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import {
     ArrowLeft,
@@ -314,7 +314,7 @@ export function RevisionBitacoraView({
                     </div>
                 </div>
 
-                {/* TOTP panel — hidden for coordinator */}
+                {/* Signature panel — hidden for coordinator */}
                 <div className={cn("lg:col-span-2", disableSigning && "hidden")}>
                     <div className="sticky top-20 rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                         <div className="mb-5 flex items-center gap-3">
@@ -323,7 +323,7 @@ export function RevisionBitacoraView({
                             </div>
                             <div>
                                 <h3 className="text-sm font-bold text-[#1c1917]">Firma Digital</h3>
-                                <p className="text-xs text-[#57534e]">Verificación TOTP (mock)</p>
+                                <p className="text-xs text-[#57534e]">Código de firma</p>
                             </div>
                         </div>
 
@@ -345,29 +345,13 @@ export function RevisionBitacoraView({
                                     )}
                                 </div>
                             ) : (
-                                <>
-                                    <p className="mb-4 text-xs text-[#57534e]">
-                                        Ingrese el código de 6 dígitos para firmar esta bitácora.
-                                    </p>
-                                    <TOTPInput
-                                        onComplete={handleTOTPComplete}
-                                        error={totpError}
-                                        disabled={submitting}
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={handleSign}
-                                        disabled={submitting || totpCode.length !== 6}
-                                        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#c2410c] px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a] disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                        {submitting ? (
-                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                        ) : (
-                                            <PenSquare className="h-4 w-4" />
-                                        )}
-                                        Firmar Bitácora
-                                    </button>
-                                </>
+                                <SignatureCodeInput
+                                    bitacoraId={bitacora.id}
+                                    onSuccess={() => {
+                                        // The parent onSign handles UI updates
+                                        onSign().then(() => {}).catch(() => {});
+                                    }}
+                                />
                             )
                         )}
                     </div>

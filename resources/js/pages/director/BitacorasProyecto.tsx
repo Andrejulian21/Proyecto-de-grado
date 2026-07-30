@@ -4,10 +4,9 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { apiFetch } from '@/lib/utils';
-import { SignatureCodeInput } from '@/components/bitacoras/SignatureCode';
 import {
-    ArrowLeft, Eye, PenSquare, FileText, Loader2,
-    AlertCircle, RefreshCw, X,
+    ArrowLeft, Eye, FileText, Loader2,
+    RefreshCw,
 } from 'lucide-react';
 
 /* ── Types ── */
@@ -47,8 +46,7 @@ export default function BitacorasProyecto() {
     const [filterStatus, setFilterStatus] = useState<string>('all');
 
     // Confirm dialog state
-    const [confirmOpen, setConfirmOpen] = useState(false);
-    const [selectedBitacora, setSelectedBitacora] = useState<ProyectoBitacora | null>(null);
+
 
 
     useEffect(() => {
@@ -166,20 +164,7 @@ export default function BitacorasProyecto() {
                     >
                         <Eye className="h-4 w-4" />
                     </button>
-                    {row.signature_status === 'Pendiente' && (
-                        <button
-                            onClick={() => {
-                                setSelectedBitacora(row);
-                                setSignError(null);
-                                setConfirmOpen(true);
-                            }}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#57534e] transition-colors hover:bg-[#c2410c] hover:text-white active:scale-[0.98]"
-                            aria-label={`Firmar bitácora ${row.topic}`}
-                            title="Firmar"
-                        >
-                            <PenSquare className="h-4 w-4" />
-                        </button>
-                    )}
+
                 </div>
             ),
         },
@@ -297,39 +282,7 @@ export default function BitacorasProyecto() {
                 }
             />
 
-            {/* Sign code input modal */}
-            {confirmOpen && selectedBitacora && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-                    onClick={() => { setConfirmOpen(false); setSelectedBitacora(null); }}>
-                    <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-[0_20px_60px_rgba(28,25,23,0.15)]"
-                        onClick={(e) => e.stopPropagation()}>
-                        <div className="mb-4 flex items-center justify-between">
-                            <h2 className="text-lg font-bold text-[#1c1917]">Firmar Bitácora</h2>
-                            <button onClick={() => { setConfirmOpen(false); setSelectedBitacora(null); }}
-                                className="rounded-lg p-1.5 text-[#57534e] hover:bg-[#f5f5f4]">
-                                <X className="h-5 w-5" />
-                            </button>
-                        </div>
-                        <p className="mb-4 text-sm text-[#57534e]">
-                            Ingrese el código de 6 dígitos que el estudiante le compartió:
-                        </p>
-                        <SignatureCodeInput
-                            bitacoraId={selectedBitacora.id}
-                            onSuccess={() => {
-                                setConfirmOpen(false);
-                                setSelectedBitacora(null);
-                                const refreshRes = apiFetch(`/api/director/proyectos/${proyectoId}/bitacoras`);
-                                refreshRes.then(async (r) => {
-                                    if (r.ok) {
-                                        const json = await r.json();
-                                        setBitacoras(json.data ?? json);
-                                    }
-                                });
-                            }}
-                        />
-                    </div>
-                </div>
-            )}
+
         </div>
     );
 }

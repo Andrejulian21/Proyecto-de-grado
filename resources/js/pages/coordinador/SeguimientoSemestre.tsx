@@ -343,7 +343,7 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
 
                             {/* ============= BODY ============= */}
                             <tbody>
-                                {data.proyectos.map((proy) => {
+                                {data.proyectos?.map((proy) => {
                                     const isExpanded =
                                         expandedProject === proy.id;
 
@@ -463,7 +463,7 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
             {data &&
                 expandedProject !== null &&
                 (() => {
-                    const proy = data.proyectos.find(
+                    const proy = data.proyectos?.find(
                         (p) => p.id === expandedProject,
                     );
                     if (!proy) return null;

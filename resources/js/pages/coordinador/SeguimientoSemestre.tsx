@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { apiFetch, cn } from '@/lib/utils';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -170,6 +170,9 @@ function ObservationsPanel({
 }: ObservationsPanelProps) {
     const [drafts, setDrafts] = useState<Record<string, string>>({});
     const [saving, setSaving] = useState<Record<string, boolean>>({});
+    const textareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>(
+        {},
+    );
 
     const handleSave = useCallback(
         async (fase: string) => {
@@ -207,9 +210,19 @@ function ObservationsPanel({
         [drafts, proyecto.id, selectedSemestre, onSaved],
     );
 
+    // Auto-resize textareas to fit their content
+    useEffect(() => {
+        Object.values(textareaRefs.current).forEach((el) => {
+            if (!el) return;
+            el.style.height = 'auto';
+            const next = Math.max(el.scrollHeight, 36);
+            el.style.height = `${next}px`;
+        });
+    });
+
     return (
-        <div className="rounded-lg border border-[#e5e5e5] bg-white shadow-sm">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-[#e5e5e5] bg-[#f5f5f4] px-4 py-2">
+        <div className="animate-in fade-in slide-in-from-top-2 rounded-lg border border-[#e5e5e5] bg-white shadow-sm duration-200">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-t-lg border-b border-[#e5e5e5] bg-[#fff7ed] px-4 py-2.5">
                 <span className="text-sm font-semibold text-[#1c1917]">
                     Observaciones
                 </span>
@@ -233,17 +246,20 @@ function ObservationsPanel({
                     return (
                         <div
                             key={fase.key}
-                            className="flex flex-col gap-1.5"
+                            className="flex flex-col gap-2 rounded-md border border-[#e5e5e5] bg-white p-2.5 shadow-[0_1px_2px_rgba(28,25,23,0.04)] transition-shadow hover:shadow-[0_2px_6px_rgba(28,25,23,0.08)]"
                         >
                             <label
                                 htmlFor={fieldId}
-                                className="text-[10px] font-bold uppercase tracking-wider text-[#57534e]"
+                                className="text-[10px] font-bold uppercase tracking-wider text-[#c2410c]"
                             >
                                 {fase.fase}
                             </label>
                             <div className="flex gap-1.5">
                                 <textarea
                                     id={fieldId}
+                                    ref={(el) => {
+                                        textareaRefs.current[fase.key] = el;
+                                    }}
                                     value={draftVal}
                                     onChange={(e) =>
                                         setDrafts((prev) => ({
@@ -251,9 +267,9 @@ function ObservationsPanel({
                                             [fase.key]: e.target.value,
                                         }))
                                     }
-                                    rows={2}
+                                    rows={1}
                                     placeholder="Sin observaciones..."
-                                    className="min-h-[36px] flex-1 resize-y rounded-md border border-[#e5e5e5] bg-white px-2.5 py-1.5 text-xs leading-snug text-[#1c1917] placeholder:text-[#a8a29e] transition-colors hover:border-[#c2410c] focus:border-[#c2410c] focus:outline-none focus:ring-2 focus:ring-[#c2410c]/20"
+                                    className="min-h-[36px] flex-1 resize-none overflow-hidden rounded-md border border-[#e5e5e5] bg-white px-2.5 py-1.5 text-xs leading-snug text-[#1c1917] placeholder:text-[#a8a29e] transition-colors hover:border-[#c2410c] focus:border-[#c2410c] focus:outline-none focus:ring-2 focus:ring-[#c2410c]/20"
                                 />
                                 <button
                                     type="button"

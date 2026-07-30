@@ -264,9 +264,6 @@ export default function BitacorasDirector() {
                 </div>
             )}
 
-            {/* Sign error dialog - replaced by SignatureCodeInput's internal error handling */}
-                </div>
-            )}
         </div>
     );
 }

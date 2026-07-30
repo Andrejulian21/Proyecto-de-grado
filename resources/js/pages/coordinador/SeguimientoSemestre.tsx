@@ -1,23 +1,20 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { apiFetch, cn } from '@/lib/utils';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SemestreSelector } from '@/components/seguimiento/SemestreSelector';
-
-export interface SeguimientoSemestreProps {
-    showHeader?: boolean;
-}
 import {
     useSeguimientoSemestre,
     type ProyectoSeguimiento,
     type FaseEntregas,
+    type EntregaItem,
 } from '@/hooks/useSeguimientoSemestre';
 import {
     Loader2,
     AlertCircle,
     RefreshCw,
-    ChevronDown,
     ChevronRight,
+    ChevronDown,
     Save,
     CheckCircle2,
     XCircle,
@@ -34,67 +31,268 @@ const estadoConfig = {
     entregado: {
         label: 'Entregado',
         icon: CheckCircle2,
-        color: 'text-[#16a34a]',
-        bg: 'bg-[#f0fdf4]',
-        border: 'border-[#bbf7d0]',
-    } as const,
+        cls: 'bg-[#f0fdf4] text-[#15803d] border-[#bbf7d0]',
+    },
     pendiente: {
         label: 'Pendiente',
         icon: Clock,
-        color: 'text-[#d97706]',
-        bg: 'bg-[#fffbeb]',
-        border: 'border-[#fde68a]',
-    } as const,
+        cls: 'bg-[#fffbeb] text-[#b45309] border-[#fde68a]',
+    },
     no_entrego: {
         label: 'No entregó',
         icon: XCircle,
-        color: 'text-[#dc2626]',
-        bg: 'bg-[#fef2f2]',
-        border: 'border-[#fecaca]',
-    } as const,
+        cls: 'bg-[#fef2f2] text-[#b91c1c] border-[#fecaca]',
+    },
 } as const;
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-function getObservacion(
-    proy: ProyectoSeguimiento,
-    faseKey: string,
-): string {
-    const obs = proy.observaciones.find((o) => o.fase === faseKey);
-    return obs?.contenido ?? '';
+function getObservacion(proy: ProyectoSeguimiento, fase: string): string {
+    return (
+        proy.observaciones.find((o) => o.fase === fase)?.contenido ?? ''
+    );
 }
 
 /* ------------------------------------------------------------------ */
-/*  Status cell                                                        */
+/*  Subcomponents                                                      */
 /* ------------------------------------------------------------------ */
 
-function EstadoCell({ estado }: { estado: string }) {
-    const cfg =
-        estadoConfig[estado as keyof typeof estadoConfig] ??
-        estadoConfig.pendiente;
+function EstadoCell({ estado }: { estado: EntregaItem['estado'] }) {
+    const cfg = estadoConfig[estado] ?? estadoConfig.pendiente;
     const Icon = cfg.icon;
     return (
         <span
             className={cn(
-                'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.03em] shadow-sm',
-                cfg.bg,
-                cfg.color,
-                cfg.border,
+                'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide shadow-sm',
+                cfg.cls,
             )}
         >
-            <Icon className="h-3.5 w-3.5 shrink-0" />
+            <Icon className="h-3 w-3 shrink-0" />
             {cfg.label}
         </span>
     );
 }
 
+interface PhaseHeaderProps {
+    fase: FaseEntregas;
+    collapsed: boolean;
+    onToggle: () => void;
+}
+
+function PhaseHeader({ fase, collapsed, onToggle }: PhaseHeaderProps) {
+    return (
+        <th
+            className={cn(
+                'border-l border-[#e5e5e5] p-0 align-middle text-center',
+                collapsed ? 'w-8' : 'min-w-[140px]',
+            )}
+        >
+            <button
+                type="button"
+                onClick={onToggle}
+                aria-label={
+                    collapsed
+                        ? `Expandir ${fase.fase}`
+                        : `Contraer ${fase.fase}`
+                }
+                title={fase.fase}
+                className={cn(
+                    'flex w-full items-center justify-center gap-1 px-2 py-3 text-[10px] font-bold uppercase tracking-wider text-[#57534e] transition-colors',
+                    'hover:bg-[#fafaf9] hover:text-[#1c1917]',
+                )}
+            >
+                {collapsed ? (
+                    <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+                ) : (
+                    <>
+                        <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                        <span className="whitespace-nowrap">
+                            {fase.fase}
+                        </span>
+                    </>
+                )}
+            </button>
+        </th>
+    );
+}
+
+function PhaseCell({ entregas }: { entregas: EntregaItem[] }) {
+    if (entregas.length === 0) {
+        return (
+            <div className="flex min-h-[48px] items-center justify-center text-[11px] text-[#a8a29e]">
+                —
+            </div>
+        );
+    }
+    return (
+        <div className="flex flex-col gap-2">
+            {entregas.map((ent) => (
+                <div
+                    key={ent.id}
+                    className="flex flex-col items-center gap-1"
+                >
+                    <span
+                        className="text-[10px] font-semibold text-[#57534e] text-center leading-tight truncate max-w-[120px]"
+                        title={ent.nombre}
+                    >
+                        {ent.nombre}
+                    </span>
+                    <EstadoCell estado={ent.estado} />
+                </div>
+            ))}
+        </div>
+    );
+}
+
+function BitacorasCell({ count }: { count: number }) {
+    return (
+        <span className="inline-flex items-center gap-0.5 rounded-full bg-[#fed7aa] px-2.5 py-0.5 text-[11px] font-bold tabular-nums text-[#c2410c]">
+            {count}
+            <span className="text-[10px] font-semibold text-[#c2410c]/70">
+                /16
+            </span>
+        </span>
+    );
+}
+
+interface ObservationsPanelProps {
+    proyecto: ProyectoSeguimiento;
+    selectedSemestre: number;
+    onSaved: () => void;
+}
+
+function ObservationsPanel({
+    proyecto,
+    selectedSemestre,
+    onSaved,
+}: ObservationsPanelProps) {
+    const [drafts, setDrafts] = useState<Record<string, string>>({});
+    const [saving, setSaving] = useState<Record<string, boolean>>({});
+
+    const handleSave = useCallback(
+        async (fase: string) => {
+            const value = drafts[fase];
+            if (value === undefined) return;
+
+            setSaving((prev) => ({ ...prev, [fase]: true }));
+            try {
+                const res = await apiFetch(
+                    '/api/admin/seguimiento/observaciones',
+                    {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            proyecto_id: proyecto.id,
+                            semestre_id: selectedSemestre,
+                            fase,
+                            observacion: value,
+                        }),
+                    },
+                );
+                if (!res.ok) throw new Error('Error al guardar');
+                setDrafts((prev) => {
+                    const next = { ...prev };
+                    delete next[fase];
+                    return next;
+                });
+                onSaved();
+            } catch (err) {
+                console.error('Error saving observation:', err);
+            } finally {
+                setSaving((prev) => ({ ...prev, [fase]: false }));
+            }
+        },
+        [drafts, proyecto.id, selectedSemestre, onSaved],
+    );
+
+    return (
+        <div className="rounded-lg border border-[#e5e5e5] bg-white shadow-sm">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-[#e5e5e5] bg-[#f5f5f4] px-4 py-2">
+                <span className="text-sm font-semibold text-[#1c1917]">
+                    Observaciones
+                </span>
+                <span className="text-xs text-[#a8a29e]">—</span>
+                <span className="text-sm font-medium text-[#1c1917]">
+                    {proyecto.proyecto_nombre}
+                </span>
+                <span className="rounded bg-white px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-[#78716c]">
+                    {proyecto.proyecto_codigo}
+                </span>
+            </div>
+            <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
+                {proyecto.fases.map((fase) => {
+                    const draftVal =
+                        drafts[fase.key] ??
+                        getObservacion(proyecto, fase.key);
+                    const savedVal = getObservacion(proyecto, fase.key);
+                    const isSaving = saving[fase.key];
+                    const dirty = draftVal !== savedVal;
+                    const fieldId = `obs-${proyecto.id}-${fase.key}`;
+                    return (
+                        <div
+                            key={fase.key}
+                            className="flex flex-col gap-1.5"
+                        >
+                            <label
+                                htmlFor={fieldId}
+                                className="text-[10px] font-bold uppercase tracking-wider text-[#57534e]"
+                            >
+                                {fase.fase}
+                            </label>
+                            <div className="flex gap-1.5">
+                                <textarea
+                                    id={fieldId}
+                                    value={draftVal}
+                                    onChange={(e) =>
+                                        setDrafts((prev) => ({
+                                            ...prev,
+                                            [fase.key]: e.target.value,
+                                        }))
+                                    }
+                                    rows={2}
+                                    placeholder="Sin observaciones..."
+                                    className="min-h-[36px] flex-1 resize-y rounded-md border border-[#e5e5e5] bg-white px-2.5 py-1.5 text-xs leading-snug text-[#1c1917] placeholder:text-[#a8a29e] transition-colors hover:border-[#c2410c] focus:border-[#c2410c] focus:outline-none focus:ring-2 focus:ring-[#c2410c]/20"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => handleSave(fase.key)}
+                                    disabled={!dirty || isSaving}
+                                    aria-label={`Guardar observación de ${fase.fase}`}
+                                    className={cn(
+                                        'inline-flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-md text-white shadow-sm transition-all',
+                                        dirty && !isSaving
+                                            ? 'bg-[#c2410c] hover:bg-[#9a3412] active:scale-[0.96]'
+                                            : 'bg-[#e5e5e5] text-[#a8a29e] cursor-not-allowed',
+                                    )}
+                                >
+                                    {isSaving ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                        <Save className="h-3.5 w-3.5" />
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
 /* ------------------------------------------------------------------ */
-/*  Component                                                          */
+/*  Main component                                                     */
 /* ------------------------------------------------------------------ */
 
-export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSemestreProps) {
+export interface SeguimientoSemestreProps {
+    showHeader?: boolean;
+}
+
+export default function SeguimientoSemestre({
+    showHeader = true,
+}: SeguimientoSemestreProps) {
     const [selectedSemestre, setSelectedSemestre] = useState<number | null>(
         null,
     );
@@ -107,73 +305,33 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
         new Set(),
     );
 
-    // Observations editing state: key = `${proyectoId}-${faseKey}`
-    const [obsDraft, setObsDraft] = useState<Record<string, string>>({});
-    const [savingObs, setSavingObs] = useState<Record<string, boolean>>({});
-
-    const togglePhase = (faseKey: string) => {
+    const togglePhase = useCallback((faseKey: string) => {
         setCollapsedPhases((prev) => {
             const next = new Set(prev);
             if (next.has(faseKey)) next.delete(faseKey);
             else next.add(faseKey);
             return next;
         });
-    };
+    }, []);
 
-    const handleObsChange = useCallback(
-        (proyId: number, faseKey: string, value: string) => {
-            const editKey = proyId + '-' + faseKey;
-            setObsDraft((prev) => ({
-                ...prev,
-                [editKey]: value,
-            }));
-        },
-        [],
+    const proyectos = data?.proyectos ?? [];
+
+    const canonicalPhases: FaseEntregas[] = useMemo(
+        () => proyectos[0]?.fases ?? [],
+        [proyectos],
     );
 
-    const saveObservation = useCallback(
-        async (proyId: number, faseKey: string) => {
-            const key = `${proyId}-${faseKey}`;
-            const contenido = obsDraft[key];
-            if (contenido === undefined) return;
-
-            setSavingObs((prev) => ({ ...prev, [key]: true }));
-
-            try {
-                const res = await apiFetch(
-                    '/api/admin/seguimiento/observaciones',
-                    {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            proyecto_id: proyId,
-                            semestre_id: selectedSemestre,
-                            fase: faseKey,
-                            observacion: contenido,
-                        }),
-                    },
-                );
-                if (!res.ok) throw new Error('Error al guardar observación');
-
-                // Clear draft and refetch to get fresh data with saved observation
-                setObsDraft((prev) => {
-                    const next = { ...prev };
-                    delete next[key];
-                    return next;
-                });
-                refetch();
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setSavingObs((prev) => ({ ...prev, [key]: false }));
-            }
-        },
-        [obsDraft, selectedSemestre, refetch],
+    const expandedProyecto = useMemo(
+        () =>
+            expandedProject === null
+                ? null
+                : proyectos.find((p) => p.id === expandedProject) ?? null,
+        [proyectos, expandedProject],
     );
 
-    // Derive canonical column layout from the first project (safe assumption)
-    const canonicalPhases: FaseEntregas[] =
-        data?.proyectos?.[0]?.fases ?? [];
+    const hasSemestre = selectedSemestre !== null;
+    const hasProyectos = proyectos.length > 0;
+    const canRenderTable = hasSemestre && !loading && !error && data;
 
     return (
         <div className="flex flex-col gap-6">
@@ -183,26 +341,31 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                     title="Seguimiento por Semestre"
                     subtitle="Monitoreo del avance de proyectos por semestre académico"
                     actions={
-                        selectedSemestre && (
+                        selectedSemestre ? (
                             <button
+                                type="button"
                                 onClick={refetch}
                                 disabled={loading}
-                                className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-white px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:bg-[#f5f5f4] active:scale-[0.98] disabled:opacity-60"
-                                aria-label="Refrescar datos"
+                                className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-white px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:bg-[#fafaf9] active:scale-[0.98] disabled:opacity-60"
                             >
                                 <RefreshCw
-                                    className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`}
+                                    className={cn(
+                                        'h-4 w-4',
+                                        loading && 'animate-spin',
+                                    )}
                                 />
                                 Refrescar
                             </button>
-                        )
+                        ) : null
                     }
                 />
             )}
 
-            {/* Semester selector */}
-            <div className="w-full max-w-xs">
-                <label className="mb-1.5 block text-xs font-semibold text-[#57534e]">
+            <div className="flex max-w-md flex-col gap-1.5">
+                <label
+                    htmlFor="semestre-trigger"
+                    className="text-xs font-semibold text-[#57534e]"
+                >
                     Semestre académico
                 </label>
                 <SemestreSelector
@@ -211,34 +374,35 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                 />
             </div>
 
-            {/* Error banner */}
             {error && (
-                <div className="flex items-center gap-2 rounded-lg border border-[#fecaca] bg-[#fee2e2] px-4 py-3 text-sm text-[#dc2626]">
+                <div
+                    role="alert"
+                    className="flex items-center gap-2 rounded-lg border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm text-[#b91c1c]"
+                >
                     <AlertCircle className="h-4 w-4 shrink-0" />
-                    {error}
+                    <span className="flex-1">{error}</span>
                     <button
+                        type="button"
                         onClick={refetch}
-                        className="ml-auto rounded-lg px-2 py-1 text-xs font-semibold text-[#dc2626] hover:bg-[#fecaca]"
+                        className="rounded-md px-2 py-1 text-xs font-semibold text-[#b91c1c] hover:bg-[#fecaca]"
                     >
                         Reintentar
                     </button>
                 </div>
             )}
 
-            {/* Loading skeleton */}
             {loading && (
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-3" aria-busy="true">
                     {[1, 2, 3].map((i) => (
                         <div
                             key={i}
-                            className="h-36 animate-pulse rounded-xl border border-[#e5e5e5] bg-[#f5f5f4]"
+                            className="h-36 animate-pulse rounded-xl border border-[#e5e5e5] bg-[#fafaf9]"
                         />
                     ))}
                 </div>
             )}
 
-            {/* No semester selected */}
-            {!selectedSemestre && !loading && (
+            {!hasSemestre && !loading && (
                 <EmptyState
                     icon={EyeOff}
                     title="Selecciona un semestre"
@@ -246,92 +410,83 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                 />
             )}
 
-            {/* Data table */}
-            {selectedSemestre &&
-                !loading &&
-                !error &&
-                data &&
-                (data.proyectos?.length === 0 ? (
-                    <EmptyState
-                        icon={FileText}
-                        title="Sin proyectos"
-                        description="No hay proyectos registrados para este semestre."
-                    />
-                ) : (
-                    <div className="w-full overflow-x-auto rounded-xl border border-[#e5e5e5] bg-white shadow-[0_1px_3px_rgba(28,25,23,0.08),0_1px_2px_rgba(28,25,23,0.06)]">
-                        <table className="w-full text-left text-sm tabular-nums">
-                            {/* ============= HEAD ============= */}
-                            <thead className="bg-[#f5f5f4] text-[11px] font-bold uppercase tracking-[0.05em] text-[#57534e]">
-                                {/* Row 1: group headers */}
+            {canRenderTable && !hasProyectos && (
+                <EmptyState
+                    icon={FileText}
+                    title="Sin proyectos"
+                    description="No hay proyectos registrados para este semestre."
+                />
+            )}
+
+            {canRenderTable && hasProyectos && (
+                <>
+                    <div className="overflow-x-auto rounded-xl border border-[#e5e5e5] bg-white shadow-[0_1px_3px_rgba(28,25,23,0.08),0_1px_2px_rgba(28,25,23,0.06)]">
+                        <table className="w-full text-left text-sm">
+                            <thead className="border-b border-[#e5e5e5] bg-[#fafaf9] text-[#1c1917]">
                                 <tr>
-                                    <th className="sticky left-0 z-10 whitespace-nowrap bg-[#f5f5f4] px-4 py-3 text-left">
+                                    <th
+                                        scope="col"
+                                        className="sticky left-0 z-10 whitespace-nowrap bg-[#fafaf9] px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider"
+                                    >
                                         Estudiantes
                                     </th>
-                                    <th className="whitespace-nowrap px-4 py-3 text-left">
+                                    <th
+                                        scope="col"
+                                        className="whitespace-nowrap px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider"
+                                    >
                                         Proyecto
                                     </th>
-                                    <th className="whitespace-nowrap px-4 py-3 text-left">
+                                    <th
+                                        scope="col"
+                                        className="whitespace-nowrap px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider"
+                                    >
                                         Director
                                     </th>
-
-                                    {canonicalPhases.map((fase) => {
-                                        const collapsed =
-                                            collapsedPhases.has(fase.key);
-                                        return (
-                                            <th
-                                                key={fase.key}
-                                                className={cn(
-                                                    'border-l border-[#e5e5e5] p-0 align-top',
-                                                    collapsed && 'w-0 overflow-hidden',
-                                                )}
-                                            >
-                                                <button
-                                                    onClick={() =>
-                                                        togglePhase(fase.key)
-                                                    }
-                                                    className="flex w-full items-center gap-1 px-2 py-3 text-[11px] font-bold uppercase tracking-[0.05em] text-[#57534e] whitespace-nowrap transition-colors hover:bg-[#e7e5e4]"
-                                                >
-                                                    {collapsed ? (
-                                                        <ChevronRight className="h-3 w-3 shrink-0" />
-                                                    ) : (
-                                                        <ChevronDown className="h-3 w-3 shrink-0" />
-                                                    )}
-                                                    {collapsed ? '' : fase.fase}
-                                                </button>
-                                            </th>
-                                        );
-                                    })}
-
-                                    <th className="border-l border-[#e5e5e5] px-4 py-3 text-center">
-                                        <div className="flex items-center justify-center gap-1">
+                                    {canonicalPhases.map((fase) => (
+                                        <PhaseHeader
+                                            key={fase.key}
+                                            fase={fase}
+                                            collapsed={collapsedPhases.has(
+                                                fase.key,
+                                            )}
+                                            onToggle={() =>
+                                                togglePhase(fase.key)
+                                            }
+                                        />
+                                    ))}
+                                    <th
+                                        scope="col"
+                                        className="border-l border-[#e5e5e5] whitespace-nowrap px-4 py-3 text-center text-[10px] font-bold uppercase tracking-wider"
+                                    >
+                                        <div className="flex items-center justify-center gap-1.5">
                                             <FileText className="h-3 w-3" />
-                                            Bitacoras Proyecto de Grado 1
+                                            Bitácoras PG1
                                         </div>
                                     </th>
-                                    <th className="border-l border-[#e5e5e5] px-4 py-3 text-center">
-                                        <div className="flex items-center justify-center gap-1">
+                                    <th
+                                        scope="col"
+                                        className="border-l border-[#e5e5e5] whitespace-nowrap px-4 py-3 text-center text-[10px] font-bold uppercase tracking-wider"
+                                    >
+                                        <div className="flex items-center justify-center gap-1.5">
                                             <FileText className="h-3 w-3" />
-                                            Bitacoras Proyecto de Grado 2
+                                            Bitácoras PG2
                                         </div>
                                     </th>
                                 </tr>
                             </thead>
-
-                            {/* ============= BODY ============= */}
                             <tbody>
-                                {data.proyectos?.map((proy) => {
+                                {proyectos.map((proy) => {
                                     const isExpanded =
                                         expandedProject === proy.id;
-
                                     return (
                                         <tr
                                             key={proy.id}
                                             className="group border-b border-[#e5e5e5] transition-colors hover:bg-[#fafaf9] last:border-b-0"
                                         >
-                                            {/* Estudiantes */}
-                                            <td className="sticky left-0 z-10 border-r border-[#e5e5e5] bg-white px-4 py-3">
+                                            <td className="sticky left-0 z-10 border-r border-[#e5e5e5] bg-white px-4 py-3 align-top transition-colors group-hover:bg-[#fafaf9]">
                                                 <div className="flex items-center gap-2">
                                                     <button
+                                                        type="button"
                                                         onClick={() =>
                                                             setExpandedProject(
                                                                 isExpanded
@@ -339,12 +494,15 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                                                                     : proy.id,
                                                             )
                                                         }
-                                                        className="shrink-0 text-[#78716c] transition-colors hover:text-[#1c1917]"
+                                                        aria-expanded={
+                                                            isExpanded
+                                                        }
                                                         aria-label={
                                                             isExpanded
-                                                                ? 'Contraer'
-                                                                : 'Expandir'
+                                                                ? 'Contraer observaciones'
+                                                                : 'Expandir observaciones'
                                                         }
+                                                        className="shrink-0 rounded p-0.5 text-[#78716c] transition-colors hover:bg-[#fed7aa] hover:text-[#c2410c]"
                                                     >
                                                         {isExpanded ? (
                                                             <ChevronDown className="h-4 w-4" />
@@ -357,9 +515,7 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                                                     </span>
                                                 </div>
                                             </td>
-
-                                            {/* Proyecto */}
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 align-top">
                                                 <div className="flex flex-col">
                                                     <span className="text-sm font-medium text-[#1c1917]">
                                                         {
@@ -373,59 +529,55 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                                                     </span>
                                                 </div>
                                             </td>
-
-                                            {/* Director */}
-                                            <td className="whitespace-nowrap px-4 py-3 text-sm text-[#1c1917]">
+                                            <td className="whitespace-nowrap px-4 py-3 align-top text-sm text-[#1c1917]">
                                                 {proy.director}
                                             </td>
-
-                                            {/* Phase columns: entregas stacked per phase */}
                                             {canonicalPhases.map((fase) => {
-                                                if (collapsedPhases.has(fase.key)) return null;
+                                                if (
+                                                    collapsedPhases.has(
+                                                        fase.key,
+                                                    )
+                                                ) {
+                                                    return (
+                                                        <td
+                                                            key={fase.key}
+                                                            className="w-0 p-0 overflow-hidden border-l border-[#e5e5e5]"
+                                                        />
+                                                    );
+                                                }
                                                 const proyFase =
                                                     proy.fases.find(
                                                         (f) =>
                                                             f.key ===
                                                             fase.key,
                                                     );
-                                                const entregas =
-                                                    proyFase?.entregas ?? [];
                                                 return (
                                                     <td
                                                         key={fase.key}
                                                         className="border-l border-[#e5e5e5] px-3 py-3 align-top"
                                                     >
-                                                        <div className="flex flex-col gap-2">
-                                                            {entregas.map((ent) => (
-                                                                <div key={ent.id} className="flex flex-col items-center gap-0.5">
-                                                                    <span className="text-[9px] font-semibold uppercase tracking-[0.05em] text-[#78716c] text-center leading-tight max-w-[100px] truncate" title={ent.title}>
-                                                                        {ent.title}
-                                                                    </span>
-                                                                    <EstadoCell estado={ent.estado} />
-                                                                </div>
-                                                            ))}
-                                                            {entregas.length === 0 && (
-                                                                <span className="text-[10px] text-[#a8a29e] text-center">—</span>
-                                                            )}
-                                                        </div>
+                                                        <PhaseCell
+                                                            entregas={
+                                                                proyFase?.entregas ??
+                                                                []
+                                                            }
+                                                        />
                                                     </td>
                                                 );
                                             })}
-
-                                            {/* Proyecto de Grado 1 (semana 1-16) */}
-                                            <td className="border-l border-[#e5e5e5] px-4 py-3 text-center">
-                                                <span className="inline-flex items-center gap-1 rounded-full bg-[#e0e7ff] px-2.5 py-0.5 text-[11px] font-bold text-[#312e81]">
-                                                    {proy.bitacoras_grupo_a}
-                                                    /16
-                                                </span>
+                                            <td className="border-l border-[#e5e5e5] px-4 py-3 text-center align-top">
+                                                <BitacorasCell
+                                                    count={
+                                                        proy.bitacoras_grupo_a
+                                                    }
+                                                />
                                             </td>
-
-                                            {/* Proyecto de Grado 2 (semana 17-32) */}
-                                            <td className="border-l border-[#e5e5e5] px-4 py-3 text-center">
-                                                <span className="inline-flex items-center gap-1 rounded-full bg-[#e0e7ff] px-2.5 py-0.5 text-[11px] font-bold text-[#312e81]">
-                                                    {proy.bitacoras_grupo_b}
-                                                    /16
-                                                </span>
+                                            <td className="border-l border-[#e5e5e5] px-4 py-3 text-center align-top">
+                                                <BitacorasCell
+                                                    count={
+                                                        proy.bitacoras_grupo_b
+                                                    }
+                                                />
                                             </td>
                                         </tr>
                                     );
@@ -433,79 +585,16 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                             </tbody>
                         </table>
                     </div>
-                ))}
 
-            {/* ============= Observaciones ============= */}
-            {data &&
-                expandedProject !== null &&
-                (() => {
-                    const proy = data.proyectos?.find(
-                        (p) => p.id === expandedProject,
-                    );
-                    if (!proy) return null;
-
-                    return (
-                        <div className="rounded-lg border border-[#e5e5e5] bg-[#fafaf9]">
-                            <div className="border-b border-[#e5e5e5] bg-white px-4 py-2.5">
-                                <span className="text-sm font-semibold text-[#1c1917]">
-                                    Observaciones — {proy.proyecto_nombre}
-                                </span>
-                                <span className="ml-2 text-xs text-[#78716c]">
-                                    {proy.proyecto_codigo}
-                                </span>
-                            </div>
-                            <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
-                                {proy.fases.map((fase) => {
-                                    const key = `${proy.id}-${fase.key}`;
-                                    const draftVal =
-                                        obsDraft[key] ??
-                                        getObservacion(proy, fase.key);
-                                    const saving = savingObs[key];
-
-                                    return (
-                                        <div key={fase.key} className="flex flex-col gap-1">
-                                            <span className="text-[10px] font-bold uppercase tracking-[0.05em] text-[#57534e]">
-                                                {fase.fase}
-                                            </span>
-                                            <div className="flex gap-1.5">
-                                                <textarea
-                                                    value={draftVal}
-                                                    onChange={(e) =>
-                                                        handleObsChange(
-                                                            proy.id,
-                                                            fase.key,
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    rows={2}
-                                                    className="min-h-[44px] flex-1 resize-y rounded-md border border-[#e5e5e5] bg-white px-2.5 py-1.5 text-xs text-[#1c1917] placeholder:text-[#a8a29e] transition-colors hover:border-[#c2410c] focus:border-[#c2410c] focus:outline-none focus:ring-1 focus:ring-[#c2410c]"
-                                                    placeholder="Sin observaciones..."
-                                                />
-                                                <button
-                                                    onClick={() =>
-                                                        saveObservation(
-                                                            proy.id,
-                                                            fase.key,
-                                                        )
-                                                    }
-                                                    disabled={saving || draftVal === getObservacion(proy, fase.key)}
-                                                    className="inline-flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-md border border-[#e5e5e5] bg-white text-[#78716c] transition-colors hover:bg-[#c2410c] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-                                                    title="Guardar"
-                                                >
-                                                    {saving ? (
-                                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                                    ) : (
-                                                        <Save className="h-3.5 w-3.5" />
-                                                    )}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    );
-                })()}
+                    {expandedProyecto && selectedSemestre && (
+                        <ObservationsPanel
+                            proyecto={expandedProyecto}
+                            selectedSemestre={selectedSemestre}
+                            onSaved={refetch}
+                        />
+                    )}
+                </>
+            )}
         </div>
     );
 }

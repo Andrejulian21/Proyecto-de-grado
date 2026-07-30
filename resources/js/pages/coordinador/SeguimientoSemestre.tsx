@@ -135,9 +135,9 @@ function PhaseCell({ entregas }: { entregas: EntregaItem[] }) {
                 >
                     <span
                         className="text-[10px] font-semibold text-[#57534e] text-center leading-tight truncate max-w-[120px]"
-                        title={ent.nombre}
+                        title={ent.title}
                     >
-                        {ent.nombre}
+                        {ent.title}
                     </span>
                     <EstadoCell estado={ent.estado} />
                 </div>

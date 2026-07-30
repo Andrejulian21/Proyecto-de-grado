@@ -7,7 +7,7 @@ import { apiFetch } from '@/lib/utils';
 
 export interface EntregaItem {
     id: number;
-    nombre: string;
+    title: string;
     estado: 'entregado' | 'pendiente' | 'no_entrego';
 }
 

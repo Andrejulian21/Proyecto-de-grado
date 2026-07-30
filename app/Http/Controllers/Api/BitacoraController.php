@@ -98,10 +98,17 @@ class BitacoraController extends Controller
         $existingWeek = Bitacora::where('proyecto_id', (int) $data['proyecto_id'])
             ->whereBetween('meeting_date', [$weekStart, $weekEnd])
             ->exists();
-
         if ($existingWeek) {
             return response()->json([
                 'error' => 'Ya existe una bitácora para esta semana. Solo puedes crear una por semana.',
+            ], 422);
+        }
+
+        // Validar que la semana sea mayor a la maxima existente
+        $maxSemana = Bitacora::where('proyecto_id', (int) $data['proyecto_id'])->max('semana');
+        if ($maxSemana !== null && (int) $data['semana'] <= (int) $maxSemana) {
+            return response()->json([
+                'error' => 'No puedes crear una bitacora con una semana anterior o igual a la ultima creada (Semana ' . $maxSemana . ').',
             ], 422);
         }
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\DirectorCupoController;
 use App\Http\Controllers\Admin\EntregaController;
 use App\Http\Controllers\Admin\ProyectoController;
+use App\Http\Controllers\Admin\SeguimientoController;
 use App\Http\Controllers\Admin\SemestreController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Api\DirectorController;
@@ -265,6 +266,13 @@ Route::middleware(['auth:sanctum', 'single_session', 'activity', 'role:Coordinad
         Route::get('/proyectos/{proyecto}/bitacoras', [\App\Http\Controllers\Api\BitacoraController::class, 'porProyecto'])
             ->whereNumber('proyecto')
             ->name('proyectos.bitacoras');
+
+        // PR 2 — Seguimiento (backend).
+        Route::get('/seguimiento/semestre/{semestre}', [SeguimientoController::class, 'porSemestre'])
+            ->whereNumber('semestre')
+            ->name('seguimiento.por-semestre');
+        Route::put('/seguimiento/observaciones', [SeguimientoController::class, 'guardarObservacion'])
+            ->name('seguimiento.guardar-observacion');
     });
 
 // Entregas — accessible by all authenticated roles (controller handles RBAC)

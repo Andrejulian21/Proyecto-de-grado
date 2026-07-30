@@ -38,10 +38,6 @@ export function SemestreSelector({ value, onChange }: SemestreSelectorProps) {
                     return b.id - a.id;
                 });
                 setSemestres(sorted);
-                // Auto-select if only one semester or if there's already a matching one
-                if (sorted.length === 1 && value === null) {
-                    onChange(sorted[0].id);
-                }
             })
             .catch((err) => {
                 if (cancelled) return;

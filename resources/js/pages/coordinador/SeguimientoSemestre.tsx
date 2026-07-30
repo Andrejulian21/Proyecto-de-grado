@@ -294,13 +294,16 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                                         );
                                     })}
 
-                                    <th
-                                        colSpan={2}
-                                        className="border-l border-[#e5e5e5] px-4 py-3 text-center"
-                                    >
+                                    <th className="border-l border-[#e5e5e5] px-4 py-3 text-center">
                                         <div className="flex items-center justify-center gap-1">
                                             <FileText className="h-3 w-3" />
-                                            Bitácoras
+                                            Proyecto de Grado 1
+                                        </div>
+                                    </th>
+                                    <th className="border-l border-[#e5e5e5] px-4 py-3 text-center">
+                                        <div className="flex items-center justify-center gap-1">
+                                            <FileText className="h-3 w-3" />
+                                            Proyecto de Grado 2
                                         </div>
                                     </th>
                                 </tr>
@@ -436,7 +439,7 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                                                 );
                                             })}
 
-                                            {/* Bitácoras Grupo A */}
+                                            {/* Proyecto de Grado 1 (semana 1-16) */}
                                             <td className="border-l border-[#e5e5e5] px-4 py-3 text-center">
                                                 <span className="inline-flex items-center gap-1 rounded-full bg-[#e0e7ff] px-2.5 py-0.5 text-[11px] font-bold text-[#312e81]">
                                                     {proy.bitacoras_grupo_a}
@@ -444,7 +447,7 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                                                 </span>
                                             </td>
 
-                                            {/* Bitácoras Grupo B */}
+                                            {/* Proyecto de Grado 2 (semana 17-32) */}
                                             <td className="border-l border-[#e5e5e5] px-4 py-3 text-center">
                                                 <span className="inline-flex items-center gap-1 rounded-full bg-[#e0e7ff] px-2.5 py-0.5 text-[11px] font-bold text-[#312e81]">
                                                     {proy.bitacoras_grupo_b}

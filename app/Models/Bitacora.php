@@ -23,6 +23,7 @@ class Bitacora extends Model
         'notes',
         'evidence_file',
         'meeting_date',
+        'semana',
         'signature_status',
         'signature_code',
         'signature_code_expires_at',
@@ -41,6 +42,7 @@ class Bitacora extends Model
             'student_signed_at' => 'datetime',
             'director_signed_at' => 'datetime',
             'duration_hours' => 'decimal:2',
+            'semana' => 'integer',
         ];
     }
 

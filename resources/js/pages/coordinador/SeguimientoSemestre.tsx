@@ -308,35 +308,7 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                                     </th>
                                 </tr>
 
-                                {/* Row 2: sub-headers per entrega */}
-                                {canonicalPhases.some(
-                                    (f) => !collapsedPhases.has(f.key),
-                                ) && (
-                                    <tr>
-                                        <th className="sticky left-0 z-10 bg-[#f5f5f4]" />
-                                        <th />
-                                        <th />
 
-                                        {canonicalPhases.map((fase) => {
-                                            if (
-                                                collapsedPhases.has(fase.key)
-                                            )
-                                                return null;
-                                            return fase.entregas.map(
-                                                (ent) => (
-                                                    <th
-                                                        key={`sub-${ent.id}`}
-                                                        className="border-l border-t border-[#e5e5e5] px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-[0.03em] text-[#78716c] last:border-r-0"
-                                                    >
-                                                        {ent.nombre}
-                                                    </th>
-                                                ),
-                                            );
-                                        })}
-
-
-                                    </tr>
-                                )}
                             </thead>
 
                             {/* ============= BODY ============= */}

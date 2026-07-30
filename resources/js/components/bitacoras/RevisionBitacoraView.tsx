@@ -72,7 +72,7 @@ export interface RevisionBitacoraViewProps {
     mode: 'director' | 'student';
     bitacora: BitacoraDetail;
     onBack: () => void;
-    onSign: (totpCode: string) => Promise<void>;
+    onSign?: () => Promise<void>;
     onRemoveSignature?: () => void;
     onSaveContent?: (content: string) => void;
     currentStudentName?: string;
@@ -268,7 +268,7 @@ export function RevisionBitacoraView({
 
                     {/* Signatures table */}
                     <div className={cardClass}>
-                        <h3 className="mb-4 text-base font-bold text-[#1c1917]">Tabla de firmas</h3>
+                        <h3 className="mb-4 text-base font-bold text-[#1c1917]">Información sobre la firma</h3>
                         <DataTable
                             columns={signatureColumns}
                             data={tableData}
@@ -308,7 +308,7 @@ export function RevisionBitacoraView({
                                                     : s,
                                             ),
                                         }));
-                                        onSign().then(() => {}).catch(() => {});
+                                        onSign?.().then(() => {}).catch(() => {});
                                     }}
                                 />
                             )

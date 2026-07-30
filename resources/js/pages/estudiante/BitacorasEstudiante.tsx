@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, Loader2, FileText, Plus, RefreshCw } from 'lucide-react';
+import { Eye, Loader2, FileText, Plus, RefreshCw, AlertTriangle } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { SignatureCodeDisplay } from '@/components/bitacoras/SignatureCode';
 import { apiFetch } from '@/lib/utils';
 

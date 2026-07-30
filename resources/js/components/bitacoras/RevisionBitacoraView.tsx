@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -10,9 +10,7 @@ import {
     User,
     FileText,
     ShieldCheck,
-    PenSquare,
     Loader2,
-    Trash2,
     Pencil,
     Save,
 } from 'lucide-react';
@@ -94,15 +92,13 @@ export function RevisionBitacoraView({
     const [bitacora, setBitacora] = useState(initialBitacora);
     const [content, setContent] = useState(bitacora.content);
     const [editing, setEditing] = useState(false);
-    const [totpCode, setTotpCode] = useState('');
-    const [totpError, setTotpError] = useState('');
-    const [submitting, setSubmitting] = useState(false);
+    const [signedOk, setSignedOk] = useState(false);
 
     const directorSignature = bitacora.signatures.find((s) => s.role === 'director');
     const directorSigned = directorSignature?.signed ?? false;
     const currentUserSigned =
         mode === 'director'
-            ? (directorSignature?.signed ?? false)
+            ? ((directorSignature?.signed ?? false) || signedOk)
             : (bitacora.signatures.find((s) => s.role === 'student' && s.name === currentStudentName)?.signed ?? false);
     const canEditContent = mode === 'student' && !directorSigned;
 
@@ -138,39 +134,6 @@ export function RevisionBitacoraView({
         .filter((s) => s.role === 'director')
         .map((s, i) => ({ ...s, id: `${s.role}-${i}` }));
 
-    function handleTOTPComplete(code: string) {
-        setTotpCode(code);
-        setTotpError('');
-    }
-
-    async function handleSign() {
-        if (totpCode.length !== 6) {
-            setTotpError('Debe ingresar el código TOTP de 6 dígitos.');
-            return;
-        }
-        setSubmitting(true);
-        try {
-            await onSign(totpCode);
-            setBitacora((prev) => ({
-                ...prev,
-                status: mode === 'director' ? 'signed' : prev.status,
-                signatures: prev.signatures.map((s) => {
-                    if (mode === 'director' && s.role === 'director') {
-                        return { ...s, signed: true, signedAt: new Date().toLocaleString('es-CO') };
-                    }
-                    if (mode === 'student' && s.role === 'student' && s.name === currentStudentName) {
-                        return { ...s, signed: true, signedAt: new Date().toLocaleString('es-CO') };
-                    }
-                    return s;
-                }),
-            }));
-            setTotpCode('');
-        } catch {
-            setTotpError('Error al firmar. Intente de nuevo.');
-        } finally {
-            setSubmitting(false);
-        }
-    }
 
     function handleRemoveSignature() {
         onRemoveSignature?.();
@@ -336,7 +299,7 @@ export function RevisionBitacoraView({
                                 <SignatureCodeInput
                                     bitacoraId={bitacora.id}
                                     onSuccess={() => {
-                                        // Refresca la vista apenas se firma correctamente
+                                        setSignedOk(true);
                                         onSign().then(() => {}).catch(() => {});
                                     }}
                                 />

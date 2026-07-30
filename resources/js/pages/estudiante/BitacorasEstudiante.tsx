@@ -4,6 +4,7 @@ import { Eye, Loader2, FileText, Plus, RefreshCw } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { SignatureCodeDisplay } from '@/components/bitacoras/SignatureCode';
 import { apiFetch } from '@/lib/utils';
 
 /* ── Types ── */
@@ -254,23 +255,12 @@ export default function BitacorasEstudiante() {
             )}
 
             {codeModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-                    onClick={() => setCodeModal(null)}>
-                    <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-lg"
-                        onClick={(e) => e.stopPropagation()}>
-                        <h2 className="mb-2 text-lg font-bold">Nuevo código de firma</h2>
-                        <p className="mb-4 text-sm text-[#57534e]">
-                            Comparte este código con tu director. Expira en 2 minutos.
-                        </p>
-                        <div className="mb-4 text-center font-mono text-4xl font-bold tracking-[0.4em] text-[#1c1917]">
-                            {codeModal.code}
-                        </div>
-                        <button onClick={() => setCodeModal(null)}
-                            className="w-full rounded-lg bg-[#c2410c] px-4 py-2 text-sm font-semibold text-white">
-                            Cerrar
-                        </button>
-                    </div>
-                </div>
+                <SignatureCodeDisplay
+                    bitacoraId={codeModal.id}
+                    code={codeModal.code}
+                    expiresAt={codeModal.expiresAt}
+                    onClose={() => setCodeModal(null)}
+                />
             )}
         </div>
     );

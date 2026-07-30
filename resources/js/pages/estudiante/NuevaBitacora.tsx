@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
+import { SignatureCodeDisplay } from '@/components/bitacoras/SignatureCode';
 
 export default function NuevaBitacora() {
     const navigate = useNavigate();
@@ -14,6 +15,11 @@ export default function NuevaBitacora() {
     const [duration, setDuration] = useState('1');
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
+    const [createdBitacora, setCreatedBitacora] = useState<{
+        id: number;
+        code: string;
+        expiresAt: string;
+    } | null>(null);
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -50,7 +56,17 @@ export default function NuevaBitacora() {
             });
 
             if (res.status === 201 || res.ok) {
-                navigate('/bitacora');
+                const body = await res.json();
+                const data = body.data ?? body;
+                if (data.signature_code_plain) {
+                    setCreatedBitacora({
+                        id: data.id,
+                        code: data.signature_code_plain,
+                        expiresAt: data.signature_code_expires_at,
+                    });
+                } else {
+                    navigate('/bitacora');
+                }
             } else {
                 const body = await res.json().catch(() => ({}));
                 setError(body.error || body.message || 'Error al crear la bitacora.');
@@ -201,6 +217,18 @@ export default function NuevaBitacora() {
                     </div>
                 </div>
             </form>
+
+            {createdBitacora && (
+                <SignatureCodeDisplay
+                    bitacoraId={createdBitacora.id}
+                    code={createdBitacora.code}
+                    expiresAt={createdBitacora.expiresAt}
+                    onClose={() => {
+                        setCreatedBitacora(null);
+                        navigate('/bitacora');
+                    }}
+                />
+            )}
         </div>
     );
 }

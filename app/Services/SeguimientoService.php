@@ -9,69 +9,65 @@ use App\Models\Entrega;
 use App\Models\Proyecto;
 use App\Models\SeguimientoObservacion;
 use App\Models\VersionDocumento;
+use Illuminate\Support\Facades\DB;
 
 class SeguimientoService
 {
     /**
-     * Check whether the given proyecto has submitted at least one version
-     * for the specified entrega.
-     *
-     * A version exists when VersionDocumento is linked through the
-     * entrega_proyecto pivot (direct FK on VersionDocumento.entrega_proyecto_id).
+     * Returns 'entregada', 'no_entrego', or 'pendiente'.
      */
-    public function calcularEstadoEntrega(Entrega $entrega, int $proyectoId): bool
+    public function calcularEstadoEntrega(Entrega $entrega, int $proyectoId): string
     {
-        return VersionDocumento::whereHas('entregaProyecto', function ($q) use ($entrega, $proyectoId) {
+        $tieneVersion = VersionDocumento::whereHas('entregaProyecto', function ($q) use ($entrega, $proyectoId) {
             $q->where('entrega_id', $entrega->id)
               ->where('proyecto_id', $proyectoId);
         })->exists();
+
+        // Fallback: versiones con FK directa
+        if (! $tieneVersion) {
+            $tieneVersion = $entrega->versiones()->exists();
+        }
+
+        if ($tieneVersion) {
+            return 'entregada';
+        }
+
+        if ($entrega->due_date !== null && $entrega->due_date->isPast()) {
+            return 'no_entrego';
+        }
+
+        return 'pendiente';
     }
 
     /**
-     * Count the number of bitácoras per group for a given proyecto.
-     *
-     * - grupo_a: semanas 1–16
-     * - grupo_b: semanas 17–32
-     * Returns total, grupo_a, and grupo_b counts.
-     *
      * @return array{total: int, grupo_a: int, grupo_b: int}
      */
     public function contarBitacorasPorGrupo(int $proyectoId): array
     {
         $total = Bitacora::where('proyecto_id', $proyectoId)->count();
-
         $grupoA = Bitacora::where('proyecto_id', $proyectoId)
             ->whereBetween('semana', [1, 16])
             ->count();
-
         $grupoB = Bitacora::where('proyecto_id', $proyectoId)
             ->whereBetween('semana', [17, 32])
             ->count();
 
-        return [
-            'total' => $total,
-            'grupo_a' => $grupoA,
-            'grupo_b' => $grupoB,
-        ];
+        return ['total' => $total, 'grupo_a' => $grupoA, 'grupo_b' => $grupoB];
     }
 
     /**
-     * Get full seguimiento data for all projects in a given semester.
-     *
-     * Returns an array of projects, each with:
-     *  - basic project info (id, code, title, current_phase, status)
-     *  - entregas grouped by phase, each with estado (submitted or not)
-     *  - bitacora counts per group
-     *  - coordinator observations per phase
-     *
-     * @return array<int, array>
+     * @return array{semestre: array, proyectos: array}
      */
     public function obtenerSeguimiento(int $semestreId): array
     {
+        $semestre = \App\Models\Semestre::findOrFail($semestreId);
+
         $proyectos = Proyecto::with([
             'entregas',
             'bitacoras',
             'entregasPivot',
+            'estudiantes',
+            'director',
         ])->where('semester_id', $semestreId)
             ->orderBy('code')
             ->get();
@@ -80,53 +76,77 @@ class SeguimientoService
             ->get()
             ->keyBy(fn ($o) => $o->proyecto_id . '-' . $o->fase);
 
-        $result = [];
+        $proyectosData = [];
 
         foreach ($proyectos as $proyecto) {
-            // Merge direct + pivot entregas, deduplicate by id
+            // Merge direct + pivot entregas, deduplicate
             $merged = $proyecto->entregas
                 ->concat($proyecto->entregasPivot)
                 ->unique('id')
                 ->values();
 
-            // Group entregas by phase
-            $entregasPorFase = [];
-            foreach ($merged as $entrega) {
-                $phase = $entrega->phase;
-                $entregasPorFase[$phase][] = [
-                    'id' => $entrega->id,
-                    'title' => $entrega->title,
-                    'status' => $entrega->status,
-                    'due_date' => $entrega->due_date?->format('Y-m-d'),
-                    'tiene_version' => $this->calcularEstadoEntrega($entrega, $proyecto->id),
+            // Group by phase
+            $fases = [];
+            $faseOrden = ['anteproyecto', 'presentacion_anteproyecto', 'desarrollo', 'presentacion_final'];
+            $faseLabels = [
+                'anteproyecto' => 'Anteproyecto',
+                'presentacion_anteproyecto' => 'Presentación Anteproyecto',
+                'desarrollo' => 'Desarrollo',
+                'presentacion_final' => 'Presentación Final',
+            ];
+
+            foreach ($faseOrden as $faseKey) {
+                $entregasFase = $merged->filter(fn ($e) => $e->phase === $faseKey)->values();
+
+                if ($entregasFase->isEmpty()) {
+                    continue;
+                }
+
+                $fases[] = [
+                    'fase' => $faseLabels[$faseKey] ?? $faseKey,
+                    'key' => $faseKey,
+                    'entregas' => $entregasFase->map(fn ($e) => [
+                        'id' => $e->id,
+                        'title' => $e->title,
+                        'due_date' => $e->due_date?->format('Y-m-d'),
+                        'estado' => $this->calcularEstadoEntrega($e, $proyecto->id),
+                    ])->values()->toArray(),
                 ];
             }
 
-            // Bitacora counts
-            $bitacoras = $this->contarBitacorasPorGrupo($proyecto->id);
-
-            // Observations grouped by phase
-            $observacionesPorFase = [];
-            foreach ($proyecto->entregas->merge($proyecto->entregasPivot)->unique('id') as $entrega) {
-                $phase = $entrega->phase;
-                $key = $proyecto->id . '-' . $phase;
-                if (isset($observaciones[$key]) && ! isset($observacionesPorFase[$phase])) {
-                    $observacionesPorFase[$phase] = $observaciones[$key]->observacion;
+            // Observations per phase
+            $obsArray = [];
+            foreach ($faseOrden as $faseKey) {
+                $key = $proyecto->id . '-' . $faseKey;
+                if (isset($observaciones[$key])) {
+                    $obsArray[] = [
+                        'fase' => $faseKey,
+                        'contenido' => $observaciones[$key]->observacion ?? '',
+                    ];
                 }
             }
 
-            $result[] = [
+            $bitacoras = $this->contarBitacorasPorGrupo($proyecto->id);
+
+            $proyectosData[] = [
                 'id' => $proyecto->id,
-                'code' => $proyecto->code,
-                'title' => $proyecto->title,
-                'current_phase' => $proyecto->current_phase?->value ?? $proyecto->current_phase,
-                'status' => $proyecto->status?->value ?? $proyecto->status,
-                'entregas' => $entregasPorFase,
-                'bitacoras' => $bitacoras,
-                'observaciones' => $observacionesPorFase,
+                'estudiantes' => $proyecto->estudiantes->pluck('name')->implode(', '),
+                'proyecto_nombre' => $proyecto->title,
+                'proyecto_codigo' => $proyecto->code ?? '',
+                'director' => $proyecto->director?->name ?? 'Sin asignar',
+                'fases' => $fases,
+                'bitacoras_grupo_a' => $bitacoras['grupo_a'],
+                'bitacoras_grupo_b' => $bitacoras['grupo_b'],
+                'observaciones' => $obsArray,
             ];
         }
 
-        return $result;
+        return [
+            'semestre' => [
+                'id' => $semestre->id,
+                'nombre' => $semestre->name,
+            ],
+            'proyectos' => $proyectosData,
+        ];
     }
 }

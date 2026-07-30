@@ -157,6 +157,7 @@ class DirectorController extends Controller
                 'id'               => $b->id,
                 'topic'            => $b->topic,
                 'notes'            => $b->notes,
+                'semana'           => $b->semana,
                 'meeting_date'     => $b->meeting_date?->toDateString(),
                 'duration_hours'   => $b->duration_hours,
                 'signature_status' => $b->signature_status?->value,

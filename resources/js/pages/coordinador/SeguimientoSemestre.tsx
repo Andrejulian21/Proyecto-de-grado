@@ -282,21 +282,21 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                                                 key={fase.key}
                                                 className={cn(
                                                     'border-l border-[#e5e5e5] p-0 align-top',
-                                                    collapsed && 'opacity-50',
+                                                    collapsed && 'w-0 overflow-hidden',
                                                 )}
                                             >
                                                 <button
                                                     onClick={() =>
                                                         togglePhase(fase.key)
                                                     }
-                                                    className="flex w-full items-center gap-1 px-3 py-3 text-[11px] font-bold uppercase tracking-[0.05em] text-[#57534e] transition-colors hover:bg-[#e7e5e4]"
+                                                    className="flex w-full items-center gap-1 px-2 py-3 text-[11px] font-bold uppercase tracking-[0.05em] text-[#57534e] whitespace-nowrap transition-colors hover:bg-[#e7e5e4]"
                                                 >
                                                     {collapsed ? (
                                                         <ChevronRight className="h-3 w-3 shrink-0" />
                                                     ) : (
                                                         <ChevronDown className="h-3 w-3 shrink-0" />
                                                     )}
-                                                    {fase.fase}
+                                                    {collapsed ? '' : fase.fase}
                                                 </button>
                                             </th>
                                         );
@@ -381,8 +381,7 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
 
                                             {/* Phase columns: entregas stacked per phase */}
                                             {canonicalPhases.map((fase) => {
-                                                const collapsed =
-                                                    collapsedPhases.has(fase.key);
+                                                if (collapsedPhases.has(fase.key)) return null;
                                                 const proyFase =
                                                     proy.fases.find(
                                                         (f) =>
@@ -394,10 +393,7 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                                                 return (
                                                     <td
                                                         key={fase.key}
-                                                        className={cn(
-                                                            'border-l border-[#e5e5e5] px-3 py-3 align-top',
-                                                            collapsed && 'opacity-30',
-                                                        )}
+                                                        className="border-l border-[#e5e5e5] px-3 py-3 align-top"
                                                     >
                                                         <div className="flex flex-col gap-2">
                                                             {entregas.map((ent) => (

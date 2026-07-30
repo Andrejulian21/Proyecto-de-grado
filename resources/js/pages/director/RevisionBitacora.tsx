@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import { RevisionBitacoraView, type BitacoraDetail } from '@/components/bitacoras/RevisionBitacoraView';
+import { SignatureCodeInput } from '@/components/bitacoras/SignatureCode';
 import { apiFetch } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -12,6 +13,7 @@ export default function RevisionBitacoraDirector() {
     const [bitacora, setBitacora] = useState<BitacoraDetail | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [showSignModal, setShowSignModal] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -108,38 +110,65 @@ export default function RevisionBitacoraDirector() {
     }
 
     return (
-        <RevisionBitacoraView
-            mode="director"
-            bitacora={bitacora}
-            onBack={() => navigate(`/supervision/${bitacora.projectId}/bitacoras`)}
-            onSign={async () => {
-                const res = await apiFetch(`/api/bitacoras/${id}/firmar`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                });
-                if (!res.ok) {
-                    const errBody = await res.json().catch(() => null);
-                    throw new Error(errBody?.error ?? 'Error al firmar la bitácora.');
-                }
-                // Refetch to get fresh state from server
-                const json = await res.json();
-                const updated = json.data;
-                setBitacora((prev) => {
-                    if (!prev) return prev;
-                    return {
-                        ...prev,
-                        status: updated.signature_status ?? 'Completada',
-                        signatures: prev.signatures.map((s) =>
-                            s.role === 'director'
-                                ? { ...s, signed: true, signedAt: new Date().toLocaleString('es-CO') }
-                                : s,
-                        ),
-                    };
-                });
-            }}
-            onRemoveSignature={() => {
-                // Sin endpoint para quitar firma aún — solo actualización local
-            }}
-        />
+        <>
+            <RevisionBitacoraView
+                mode="director"
+                bitacora={bitacora}
+                onBack={() => navigate(`/supervision/${bitacora.projectId}/bitacoras`)}
+                onSign={async () => {
+                    setShowSignModal(true);
+                    // Return a promise that never resolves to prevent
+                    // RevisionBitacoraView from showing success state —
+                    // SignatureCodeInput handles that.
+                    return new Promise<never>(() => {});
+                }}
+                onRemoveSignature={() => {
+                    // Sin endpoint para quitar firma aún — solo actualización local
+                }}
+            />
+
+            {showSignModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+                    onClick={() => setShowSignModal(false)}>
+                    <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-[0_20px_60px_rgba(28,25,23,0.15)]"
+                        onClick={(e) => e.stopPropagation()}>
+                        <div className="mb-4 flex items-center justify-between">
+                            <h2 className="text-lg font-bold text-[#1c1917]">Firmar Bitácora</h2>
+                            <button onClick={() => setShowSignModal(false)}
+                                className="rounded-lg p-1.5 text-[#57534e] hover:bg-[#f5f5f4]">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <p className="mb-4 text-sm text-[#57534e]">
+                            Ingrese el código de 6 dígitos que el estudiante le compartió:
+                        </p>
+                        <SignatureCodeInput
+                            bitacoraId={Number(id!)}
+                            onSuccess={() => {
+                                setShowSignModal(false);
+                                // Refetch to update the view
+                                apiFetch(`/api/bitacoras/${id}`).then(async (res) => {
+                                    if (!res.ok) return;
+                                    const json = await res.json();
+                                    const b = json.data;
+                                    setBitacora((prev) => {
+                                        if (!prev) return prev;
+                                        return {
+                                            ...prev,
+                                            status: b.signature_status ?? 'Completada',
+                                            signatures: prev.signatures.map((s) =>
+                                                s.role === 'director'
+                                                    ? { ...s, signed: true, signedAt: new Date().toLocaleString('es-CO') }
+                                                    : s,
+                                            ),
+                                        };
+                                    });
+                                });
+                            }}
+                        />
+                    </div>
+                </div>
+            )}
+        </>
     );
 }

@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Plus, Eye, FileText, Loader2, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { Eye, Loader2, FileText, Plus, RefreshCw } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { apiFetch } from '@/lib/utils';
 
 /* ── Types ── */
@@ -35,19 +34,20 @@ interface BitacoraRaw {
 
 /* ── Signature status config ── */
 
-const signatureConfig: Record<string, { label: string; variant: 'success' | 'warning' | 'inactivo' }> = {
+const signatureConfig: Record<string, { label: string; variant: 'success' | 'warning' | 'inactivo' | 'danger' }> = {
     signed: { label: 'Firmada', variant: 'success' },
     pending: { label: 'Pendiente', variant: 'warning' },
     unsigned: { label: 'No firmado', variant: 'inactivo' },
+    no_firmada: { label: 'No firmada', variant: 'danger' },
 };
 
 /* ── Helpers ── */
 
-function mapSignStatus(s: string | undefined): 'signed' | 'pending' | 'unsigned' {
+function mapSignStatus(s: string | undefined): 'signed' | 'pending' | 'unsigned' | 'no_firmada' {
     if (!s) return 'unsigned';
     if (s === 'Completada' || s === 'completada') return 'signed';
     if (s === 'Pendiente' || s === 'pendiente') return 'pending';
-    if (s === 'FirmadaEstudiante' || s === 'firmada_estudiante') return 'pending';
+    if (s === 'NoFirmada') return 'no_firmada';
     return 'unsigned';
 }
 
@@ -96,6 +96,31 @@ export default function BitacorasEstudiante() {
                     >
                         <Eye className="h-4 w-4" />
                     </button>
+                    {row.signatureStatus === 'no_firmada' && (
+                        <button
+                            onClick={async () => {
+                                setResendingId(row.id);
+                                try {
+                                    const res = await apiFetch(`/api/bitacoras/${row.id}/re-solicitar-codigo`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                    });
+                                    if (res.ok) {
+                                        const body = await res.json();
+                                        const d = body.data ?? body;
+                                        setCodeModal({ id: row.id, code: d.signature_code_plain, expiresAt: d.signature_code_expires_at });
+                                    }
+                                } catch { /* ignore */ }
+                                finally { setResendingId(null); }
+                            }}
+                            disabled={resendingId === row.id}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#c2410c] transition-colors hover:bg-[#fed7aa] active:scale-[0.98] disabled:opacity-60"
+                            aria-label="Solicitar nuevo código"
+                            title="Solicitar nuevo código"
+                        >
+                            <RefreshCw className={`h-4 w-4 ${resendingId === row.id ? 'animate-spin' : ''}`} />
+                        </button>
+                    )}
                 </div>
             ),
         },
@@ -104,6 +129,8 @@ export default function BitacorasEstudiante() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [pageState, setPageState] = useState<'loading' | 'empty' | 'data' | 'error'>('loading');
+    const [resendingId, setResendingId] = useState<number | null>(null);
+    const [codeModal, setCodeModal] = useState<{ id: number; code: string; expiresAt: string } | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -224,6 +251,26 @@ export default function BitacorasEstudiante() {
                     getRowKey={(row) => row.id}
                     emptyMessage="No has registrado bitacoras."
                 />
+            )}
+
+            {codeModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+                    onClick={() => setCodeModal(null)}>
+                    <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-lg"
+                        onClick={(e) => e.stopPropagation()}>
+                        <h2 className="mb-2 text-lg font-bold">Nuevo código de firma</h2>
+                        <p className="mb-4 text-sm text-[#57534e]">
+                            Comparte este código con tu director. Expira en 2 minutos.
+                        </p>
+                        <div className="mb-4 text-center font-mono text-4xl font-bold tracking-[0.4em] text-[#1c1917]">
+                            {codeModal.code}
+                        </div>
+                        <button onClick={() => setCodeModal(null)}
+                            className="w-full rounded-lg bg-[#c2410c] px-4 py-2 text-sm font-semibold text-white">
+                            Cerrar
+                        </button>
+                    </div>
+                </div>
             )}
         </div>
     );

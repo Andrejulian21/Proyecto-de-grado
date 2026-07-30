@@ -208,7 +208,7 @@ export default function NuevaBitacora() {
 
                         <div className="flex flex-col gap-1.5 sm:col-span-2">
                             <label htmlFor="binnacle-desc" className="text-sm font-semibold text-[#1c1917]">
-                                Descripcion detallada <span className="text-[#dc2626]">*</span>
+                                Contenido <span className="text-[#dc2626]">*</span>
                             </label>
                             <textarea
                                 id="binnacle-desc"

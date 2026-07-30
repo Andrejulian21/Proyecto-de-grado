@@ -62,7 +62,7 @@ Chain strategy: feature-branch-chain
 - [x] T-4.3: Modificar `BitacoraController@update` — rechazar PUT si `created_at + 15 min < now()` con 422. **Skills:** `skill(laravel-patterns)`, `skill(strict-tdd)`. Archivos: `BitacoraController.php`. RF-WK-04.
 - [x] T-4.4: Frontend — añadir `<select>` de semana (1-32) en formulario de creación de bitácora (`NuevaBitacora.tsx`). **Skills:** `skill(react-patterns)`. Archivos: `resources/js/pages/estudiante/NuevaBitacora.tsx`. Depende de T-4.2.
 - [x] T-4.5: Frontend — ocultar controles de edición si `created_at + 15 min < now()` y mostrar tiempo restante dentro de la ventana. **Skills:** `skill(react-patterns)`. Archivos: páginas de detalle/edición de bitácora. RF-WK-04.
-- [ ] T-4.6: Renombrar etiqueta "descripción detallada" → "contenido" en todas las vistas de bitácora. El campo BD `notes` no cambia. **Skills:** `skill(react-patterns)`. Archivos: `NuevaBitacora.tsx`, detalle, edición, listado. RF-WK-05.
+- [x] T-4.6: Renombrar etiqueta "descripción detallada" → "contenido" en todas las vistas de bitácora. El campo BD `notes` no cambia. **Skills:** `skill(react-patterns)`. Archivos: `NuevaBitacora.tsx`, detalle, edición, listado. RF-WK-05.
 - [ ] T-4.7: Tests — validación de semana (rango, duplicado), ventana de edición 15 min (dentro y fuera). **Skills:** `skill(strict-tdd)`. Archivos: `tests/Feature/BitacoraSemanaTest.php`. RF-WK-01 a RF-WK-04. Depende de T-4.2, T-4.3.
 
 ---

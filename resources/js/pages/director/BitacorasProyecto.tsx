@@ -114,7 +114,7 @@ export default function BitacorasProyecto() {
         },
         {
             key: 'notes',
-            label: 'Descripción',
+            label: 'Contenido',
             render: (row) => (
                 <span className="max-w-[250px] truncate text-[#57534e] block" title={row.notes ?? ''}>
                     {row.notes ?? '—'}

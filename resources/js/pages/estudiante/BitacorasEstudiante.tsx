@@ -66,7 +66,7 @@ export default function BitacorasEstudiante() {
         { key: 'topic', label: 'Tema' },
         {
             key: 'description',
-            label: 'Descripcion',
+            label: 'Contenido',
             className: 'max-w-xs truncate',
             render: (row) => (
                 <span className="block truncate text-[#57534e]" title={row.description}>

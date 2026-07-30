@@ -3,8 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { apiFetch } from '@/lib/utils';
+import { SignatureCodeInput } from '@/components/bitacoras/SignatureCode';
 import {
     ArrowLeft, Eye, PenSquare, FileText, Loader2,
     AlertCircle, RefreshCw, X,
@@ -49,8 +49,7 @@ export default function BitacorasProyecto() {
     // Confirm dialog state
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [selectedBitacora, setSelectedBitacora] = useState<ProyectoBitacora | null>(null);
-    const [signing, setSigning] = useState(false);
-    const [signError, setSignError] = useState<string | null>(null);
+
 
     useEffect(() => {
         if (!proyectoId) return;
@@ -190,38 +189,6 @@ export default function BitacorasProyecto() {
         return filterStatus === 'all' || b.signature_status === filterStatus;
     });
 
-    async function handleSign() {
-        if (!selectedBitacora) return;
-        setSigning(true);
-        setSignError(null);
-
-        try {
-            const res = await apiFetch(`/api/bitacoras/${selectedBitacora.id}/firmar`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-            });
-
-            if (!res.ok) {
-                const body = await res.json().catch(() => null);
-                throw new Error(body?.error ?? body?.message ?? 'Error al firmar la bitácora.');
-            }
-
-            setConfirmOpen(false);
-            setSelectedBitacora(null);
-
-            // Refetch data
-            const refreshRes = await apiFetch(`/api/director/proyectos/${proyectoId}/bitacoras`);
-            if (refreshRes.ok) {
-                const json = await refreshRes.json();
-                setBitacoras(json.data ?? json);
-            }
-        } catch (err) {
-            setSignError(err instanceof Error ? err.message : 'Error desconocido.');
-        } finally {
-            setSigning(false);
-        }
-    }
-
     const title = proyecto ? `${proyecto.code} — ${proyecto.title}` : 'Bitácoras del Proyecto';
 
     /* ── Loading ── */
@@ -330,62 +297,36 @@ export default function BitacorasProyecto() {
                 }
             />
 
-            {/* Sign ConfirmDialog */}
-            <ConfirmDialog
-                open={confirmOpen}
-                title="Firmar Bitácora"
-                message={
-                    selectedBitacora
-                        ? `¿Está seguro de firmar la bitácora "${selectedBitacora.topic}"?`
-                        : ''
-                }
-                confirmLabel={signing ? 'Firmando...' : 'Firmar'}
-                cancelLabel="Cancelar"
-                onConfirm={handleSign}
-                onCancel={() => {
-                    if (!signing) {
-                        setConfirmOpen(false);
-                        setSelectedBitacora(null);
-                        setSignError(null);
-                    }
-                }}
-                variant="default"
-            />
-
-            {/* Sign error dialog */}
-            {signError && (
-                <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-                    onClick={() => { setSignError(null); setConfirmOpen(true); }}
-                >
-                    <div
-                        className="w-full max-w-md rounded-xl bg-white p-6 shadow-[0_20px_60px_rgba(28,25,23,0.15)]"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="flex items-start gap-3">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#fee2e2] text-[#dc2626]">
-                                <AlertCircle className="h-5 w-5" />
-                            </div>
-                            <div className="flex flex-col gap-1 flex-1">
-                                <h2 className="text-lg font-bold text-[#1c1917]">Error al firmar</h2>
-                                <p className="text-sm text-[#57534e]">{signError}</p>
-                            </div>
-                            <button
-                                onClick={() => { setSignError(null); setConfirmOpen(true); }}
-                                className="rounded-lg p-1.5 text-[#57534e] transition-colors hover:bg-[#f5f5f4]"
-                                aria-label="Cerrar"
-                            >
+            {/* Sign code input modal */}
+            {confirmOpen && selectedBitacora && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+                    onClick={() => { setConfirmOpen(false); setSelectedBitacora(null); }}>
+                    <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-[0_20px_60px_rgba(28,25,23,0.15)]"
+                        onClick={(e) => e.stopPropagation()}>
+                        <div className="mb-4 flex items-center justify-between">
+                            <h2 className="text-lg font-bold text-[#1c1917]">Firmar Bitácora</h2>
+                            <button onClick={() => { setConfirmOpen(false); setSelectedBitacora(null); }}
+                                className="rounded-lg p-1.5 text-[#57534e] hover:bg-[#f5f5f4]">
                                 <X className="h-5 w-5" />
                             </button>
                         </div>
-                        <div className="mt-4 flex justify-end">
-                            <button
-                                onClick={() => { setSignError(null); setConfirmOpen(true); }}
-                                className="inline-flex items-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a]"
-                            >
-                                Reintentar
-                            </button>
-                        </div>
+                        <p className="mb-4 text-sm text-[#57534e]">
+                            Ingrese el código de 6 dígitos que el estudiante le compartió:
+                        </p>
+                        <SignatureCodeInput
+                            bitacoraId={selectedBitacora.id}
+                            onSuccess={() => {
+                                setConfirmOpen(false);
+                                setSelectedBitacora(null);
+                                const refreshRes = apiFetch(`/api/director/proyectos/${proyectoId}/bitacoras`);
+                                refreshRes.then(async (r) => {
+                                    if (r.ok) {
+                                        const json = await r.json();
+                                        setBitacoras(json.data ?? json);
+                                    }
+                                });
+                            }}
+                        />
                     </div>
                 </div>
             )}

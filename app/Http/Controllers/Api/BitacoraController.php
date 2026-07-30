@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class BitacoraController extends Controller
 {
@@ -57,12 +58,25 @@ class BitacoraController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        // PR 4 — RF-WK-03: `semana` is required, in 1..32, and must be
+        // unique within the same proyecto. The unique rule is scoped via
+        // a where() on proyecto_id so two different projects can both
+        // use the same week number.
         $validator = Validator::make($request->all(), [
             'proyecto_id' => 'required|exists:proyectos,id',
             'topic' => 'required|string|max:500',
             'notes' => 'nullable|string',
             'evidence_file' => 'nullable|string|max:500',
             'meeting_date' => 'required|date',
+            'semana' => [
+                'required',
+                'integer',
+                'between:1,32',
+                Rule::unique('bitacoras', 'semana')->where(
+                    'proyecto_id',
+                    $request->input('proyecto_id'),
+                ),
+            ],
             'duration_hours' => 'nullable|numeric|min:0|max:999.99',
         ]);
 

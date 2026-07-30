@@ -74,6 +74,7 @@ it('estudiante puede crear bitacora en su proyecto', function () {
             'notes' => 'Avanzamos en los módulos',
             'meeting_date' => '2026-04-10',
             'duration_hours' => 1.5,
+            'semana' => 1,
         ]);
 
     $response->assertCreated()
@@ -101,6 +102,7 @@ it('estudiante NO puede crear bitacora en proyecto ajeno', function () {
             'proyecto_id' => $otroProyecto->id,
             'topic' => 'Intrusión',
             'meeting_date' => '2026-04-10',
+            'semana' => 1,
         ]);
 
     $response->assertStatus(403);
@@ -112,6 +114,7 @@ it('director puede crear bitacora en su proyecto', function () {
             'proyecto_id' => $this->proyecto->id,
             'topic' => 'Sprint Planning',
             'meeting_date' => '2026-04-11',
+            'semana' => 1,
         ]);
 
     $response->assertCreated();

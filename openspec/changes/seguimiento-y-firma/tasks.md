@@ -58,7 +58,7 @@ Chain strategy: feature-branch-chain
 ## PR 4 — Semana, Edición 15 min, Renombre (7 tareas)
 
 - [x] T-4.1: Migración — agregar `semana` (unsignedTinyInteger) a `bitacoras`, `UNIQUE(proyecto_id, semana)`, backfill con `ROW_NUMBER() OVER (PARTITION BY proyecto_id ORDER BY created_at)`. **Skills:** `skill(database-migrations)`, `skill(laravel-patterns)`. Archivos: `database/migrations/*_add_semana_to_bitacoras.php`. RF-WK-01, RF-WK-02.
-- [ ] T-4.2: Modificar `BitacoraController@store` — validar `semana` requerido, `between:1,32`, único por proyecto. **Skills:** `skill(laravel-patterns)`, `skill(strict-tdd)`. Archivos: `app/Http/Controllers/Api/BitacoraController.php`. RF-WK-03. Depende de T-4.1.
+- [x] T-4.2: Modificar `BitacoraController@store` — validar `semana` requerido, `between:1,32`, único por proyecto. **Skills:** `skill(laravel-patterns)`, `skill(strict-tdd)`. Archivos: `app/Http/Controllers/Api/BitacoraController.php`. RF-WK-03. Depende de T-4.1.
 - [ ] T-4.3: Modificar `BitacoraController@update` — rechazar PUT si `created_at + 15 min < now()` con 422. **Skills:** `skill(laravel-patterns)`, `skill(strict-tdd)`. Archivos: `BitacoraController.php`. RF-WK-04.
 - [ ] T-4.4: Frontend — añadir `<select>` de semana (1-32) en formulario de creación de bitácora (`NuevaBitacora.tsx`). **Skills:** `skill(react-patterns)`. Archivos: `resources/js/pages/estudiante/NuevaBitacora.tsx`. Depende de T-4.2.
 - [ ] T-4.5: Frontend — ocultar controles de edición si `created_at + 15 min < now()` y mostrar tiempo restante dentro de la ventana. **Skills:** `skill(react-patterns)`. Archivos: páginas de detalle/edición de bitácora. RF-WK-04.

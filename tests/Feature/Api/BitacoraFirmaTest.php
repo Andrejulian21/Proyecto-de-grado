@@ -67,6 +67,7 @@ it('store genera un codigo hasheado y devuelve el plain text en la respuesta', f
             'notes' => 'Avances de la semana',
             'meeting_date' => '2026-04-10',
             'duration_hours' => 1.5,
+            'semana' => 1,
         ]);
 
     $response->assertCreated()
@@ -89,6 +90,7 @@ it('el codigo persistido en BD esta hasheado, no en texto plano', function () {
             'proyecto_id' => $this->proyecto->id,
             'topic' => 'Hash check',
             'meeting_date' => '2026-04-10',
+            'semana' => 1,
         ]);
     $response->assertCreated();
 

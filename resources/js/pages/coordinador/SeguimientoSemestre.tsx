@@ -280,8 +280,10 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                                         return (
                                             <th
                                                 key={fase.key}
-                                                colSpan={fase.entregas.length}
-                                                className="border-l border-[#e5e5e5] p-0 align-top"
+                                                className={cn(
+                                                    'border-l border-[#e5e5e5] p-0 align-top',
+                                                    collapsed && 'opacity-50',
+                                                )}
                                             >
                                                 <button
                                                     onClick={() =>
@@ -313,31 +315,6 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                                         </div>
                                     </th>
                                 </tr>
-
-                                {/* Sub-header: nombres de cada entrega */}
-                                {canonicalPhases.some(
-                                    (f) => !collapsedPhases.has(f.key),
-                                ) && (
-                                    <tr>
-                                        <th className="sticky left-0 z-10 bg-[#f5f5f4]" />
-                                        <th />
-                                        <th />
-                                        {canonicalPhases.map((fase) => {
-                                            if (collapsedPhases.has(fase.key))
-                                                return null;
-                                            return fase.entregas.map((ent) => (
-                                                <th
-                                                    key={`sub-${ent.id}`}
-                                                    className="border-l border-t border-[#e5e5e5] px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-[0.03em] text-[#78716c]"
-                                                >
-                                                    {ent.title}
-                                                </th>
-                                            ));
-                                        })}
-                                        <th className="border-l border-t border-[#e5e5e5] px-2 py-2" />
-                                        <th className="border-l border-t border-[#e5e5e5] px-2 py-2" />
-                                    </tr>
-                                )}
                             </thead>
 
                             {/* ============= BODY ============= */}
@@ -402,23 +379,10 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                                                 {proy.director}
                                             </td>
 
-                                            {/* Dynamic columns: entregas grouped by phase */}
+                                            {/* Phase columns: entregas stacked per phase */}
                                             {canonicalPhases.map((fase) => {
-                                                if (
-                                                    collapsedPhases.has(
-                                                        fase.key,
-                                                    )
-                                                ) {
-                                                    // Empty cells to preserve column alignment when collapsed
-                                                    return fase.entregas.map(
-                                                        (ent) => (
-                                                            <td
-                                                                key={`${proy.id}-${ent.id}`}
-                                                                className="border-l border-[#e5e5e5] px-3 py-3"
-                                                            />
-                                                        ),
-                                                    );
-                                                }
+                                                const collapsed =
+                                                    collapsedPhases.has(fase.key);
                                                 const proyFase =
                                                     proy.fases.find(
                                                         (f) =>
@@ -426,21 +390,29 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                                                             fase.key,
                                                     );
                                                 const entregas =
-                                                    proyFase?.entregas ??
-                                                    [];
-                                                return entregas.map(
-                                                    (ent) => (
-                                                        <td
-                                                            key={`${proy.id}-${ent.id}`}
-                                                            className="border-l border-[#e5e5e5] px-3 py-3 text-center"
-                                                        >
-                                                            <EstadoCell
-                                                                estado={
-                                                                    ent.estado
-                                                                }
-                                                            />
-                                                        </td>
-                                                    ),
+                                                    proyFase?.entregas ?? [];
+                                                return (
+                                                    <td
+                                                        key={fase.key}
+                                                        className={cn(
+                                                            'border-l border-[#e5e5e5] px-3 py-3 align-top',
+                                                            collapsed && 'opacity-30',
+                                                        )}
+                                                    >
+                                                        <div className="flex flex-col gap-2">
+                                                            {entregas.map((ent) => (
+                                                                <div key={ent.id} className="flex flex-col items-center gap-0.5">
+                                                                    <span className="text-[9px] font-semibold uppercase tracking-[0.05em] text-[#78716c] text-center leading-tight max-w-[100px] truncate" title={ent.title}>
+                                                                        {ent.title}
+                                                                    </span>
+                                                                    <EstadoCell estado={ent.estado} />
+                                                                </div>
+                                                            ))}
+                                                            {entregas.length === 0 && (
+                                                                <span className="text-[10px] text-[#a8a29e] text-center">—</span>
+                                                            )}
+                                                        </div>
+                                                    </td>
                                                 );
                                             })}
 
@@ -467,7 +439,7 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                     </div>
                 ))}
 
-            {/* ============= Observaciones (expanded row) ============= */}
+            {/* ============= Observaciones ============= */}
             {data &&
                 expandedProject !== null &&
                 (() => {
@@ -477,16 +449,16 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                     if (!proy) return null;
 
                     return (
-                        <div className="rounded-xl border border-[#e5e5e5] bg-white shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
-                            <div className="border-b border-[#e5e5e5] px-5 py-3">
-                                <h3 className="text-sm font-bold text-[#1c1917]">
+                        <div className="rounded-lg border border-[#e5e5e5] bg-[#fafaf9]">
+                            <div className="border-b border-[#e5e5e5] bg-white px-4 py-2.5">
+                                <span className="text-sm font-semibold text-[#1c1917]">
                                     Observaciones — {proy.proyecto_nombre}
-                                </h3>
-                                <p className="text-xs text-[#78716c]">
-                                    {proy.proyecto_codigo} | {proy.estudiantes}
-                                </p>
+                                </span>
+                                <span className="ml-2 text-xs text-[#78716c]">
+                                    {proy.proyecto_codigo}
+                                </span>
                             </div>
-                            <div className="flex flex-col gap-4 p-5">
+                            <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
                                 {proy.fases.map((fase) => {
                                     const key = `${proy.id}-${fase.key}`;
                                     const draftVal =
@@ -495,11 +467,11 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                                     const saving = savingObs[key];
 
                                     return (
-                                        <div key={fase.key}>
-                                            <label className="mb-1 block text-xs font-bold uppercase tracking-[0.05em] text-[#57534e]">
+                                        <div key={fase.key} className="flex flex-col gap-1">
+                                            <span className="text-[10px] font-bold uppercase tracking-[0.05em] text-[#57534e]">
                                                 {fase.fase}
-                                            </label>
-                                            <div className="flex items-start gap-2">
+                                            </span>
+                                            <div className="flex gap-1.5">
                                                 <textarea
                                                     value={draftVal}
                                                     onChange={(e) =>
@@ -510,8 +482,8 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                                                         )
                                                     }
                                                     rows={2}
-                                                    className="min-h-[60px] flex-1 resize-y rounded-lg border border-[#e5e5e5] bg-[#fafaf9] px-3 py-2 text-sm text-[#1c1917] placeholder:text-[#a8a29e] transition-colors hover:border-[#c2410c] focus:border-[#c2410c] focus:outline-none focus:ring-1 focus:ring-[#c2410c]"
-                                                    placeholder="Sin observaciones…"
+                                                    className="min-h-[44px] flex-1 resize-y rounded-md border border-[#e5e5e5] bg-white px-2.5 py-1.5 text-xs text-[#1c1917] placeholder:text-[#a8a29e] transition-colors hover:border-[#c2410c] focus:border-[#c2410c] focus:outline-none focus:ring-1 focus:ring-[#c2410c]"
+                                                    placeholder="Sin observaciones..."
                                                 />
                                                 <button
                                                     onClick={() =>
@@ -520,22 +492,15 @@ export default function SeguimientoSemestre({ showHeader = true }: SeguimientoSe
                                                             fase.key,
                                                         )
                                                     }
-                                                    disabled={
-                                                        saving ||
-                                                        draftVal ===
-                                                            getObservacion(
-                                                                proy,
-                                                                fase.key,
-                                                            )
-                                                    }
-                                                    className="inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-xs font-semibold text-[#1c1917] transition-colors hover:bg-[#f5f5f4] disabled:cursor-not-allowed disabled:opacity-50"
+                                                    disabled={saving || draftVal === getObservacion(proy, fase.key)}
+                                                    className="inline-flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-md border border-[#e5e5e5] bg-white text-[#78716c] transition-colors hover:bg-[#c2410c] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                                                    title="Guardar"
                                                 >
                                                     {saving ? (
                                                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                                     ) : (
                                                         <Save className="h-3.5 w-3.5" />
                                                     )}
-                                                    Guardar
                                                 </button>
                                             </div>
                                         </div>

@@ -55,6 +55,39 @@ class Bitacora extends Model
     }
 
     /**
+     * Auto-expire: transition bitácoras whose signature code has expired
+     * from Pendiente to NoFirmada. Called automatically from read endpoints.
+     */
+    public function scopeExpireAutomaticamente(Builder $query): Builder
+    {
+        $query->where('signature_status', EstadoFirma::Pendiente)
+            ->where('signature_code_expires_at', '<', now())
+            ->whereNotNull('signature_code_expires_at')
+            ->update(['signature_status' => EstadoFirma::NoFirmada]);
+
+        return $query;
+    }
+
+    /**
+     * Check whether this specific bitácora's code has expired and
+     * transition it if so. Returns true if it was just expired.
+     */
+    public function checkExpiration(): bool
+    {
+        if ($this->signature_status === EstadoFirma::Pendiente
+            && $this->signature_code_expires_at !== null
+            && $this->signature_code_expires_at->isPast()
+        ) {
+            $this->signature_status = EstadoFirma::NoFirmada;
+            $this->save();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * PR 1 — RF-SIG-04: a signature is considered valid when the director
      * has signed the bitacora (`signature_status === FirmadaDirector`).
      */

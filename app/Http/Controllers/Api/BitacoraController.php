@@ -37,6 +37,9 @@ class BitacoraController extends Controller
             return response()->json(['error' => 'No autorizado.'], 403);
         }
 
+        // Auto-expire codes before listing
+        Bitacora::expireAutomaticamente();
+
         $bitacoras = Bitacora::where('proyecto_id', $proyectoId)
             ->orderByDesc('created_at')
             ->get();
@@ -101,7 +104,10 @@ class BitacoraController extends Controller
             return response()->json(['error' => 'No autorizado.'], 403);
         }
 
-        return response()->json(['data' => $bitacora]);
+        // Auto-expire if the signature code has expired
+        $bitacora->checkExpiration();
+
+        return response()->json(['data' => $bitacora->fresh()]);
     }
 
     /**
@@ -115,7 +121,10 @@ class BitacoraController extends Controller
             return response()->json(['error' => 'No autorizado.'], 403);
         }
 
-        if ($bitacora->signature_status->value !== EstadoFirma::Pendiente->value) {
+        // Auto-expire if the signature code has expired before checking edit rules
+        $bitacora->checkExpiration();
+
+        if ($bitacora->fresh()->signature_status->value !== EstadoFirma::Pendiente->value) {
             return response()->json([
                 'error' => 'No se puede modificar una bitácora que ya fue firmada.',
             ], 422);

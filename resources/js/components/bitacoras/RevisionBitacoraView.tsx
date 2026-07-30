@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -68,6 +68,16 @@ function bitacoraStatusLabel(status: string): string {
 
 const cardClass = 'rounded-xl border border-[#e5e5e5] bg-white p-5 shadow-[0_1px_2px_rgba(28,25,23,0.05)]';
 
+const EDIT_WINDOW_MS = 15 * 60 * 1000;
+
+function formatRemaining(ms: number): string {
+    if (ms <= 0) return '0:00';
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
 export interface RevisionBitacoraViewProps {
     mode: 'director' | 'student';
     bitacora: BitacoraDetail;
@@ -93,6 +103,37 @@ export function RevisionBitacoraView({
     const [content, setContent] = useState(bitacora.content);
     const [editing, setEditing] = useState(false);
     const [signedOk, setSignedOk] = useState(false);
+    const [now, setNow] = useState(() => new Date());
+
+    // PR 4 — RF-WK-04: edits are only allowed inside a 15-minute window
+    // from creation. Compute the deadline once and tick `now` every 30 s
+    // so the remaining-time indicator stays roughly accurate without
+    // burning cycles on a per-second update.
+    const editableUntil = useMemo(() => {
+        if (!bitacora.createdAt) return null;
+        const createdMs = new Date(bitacora.createdAt).getTime();
+        if (Number.isNaN(createdMs)) return null;
+        return new Date(createdMs + EDIT_WINDOW_MS);
+    }, [bitacora.createdAt]);
+
+    useEffect(() => {
+        if (!editableUntil) return;
+        const id = setInterval(() => setNow(new Date()), 30_000);
+        return () => clearInterval(id);
+    }, [editableUntil]);
+
+    const isWithinEditWindow = editableUntil ? now < editableUntil : false;
+    const remainingMs = editableUntil ? editableUntil.getTime() - now.getTime() : 0;
+    const remainingLabel = formatRemaining(remainingMs);
+
+    // If the window expires while the student is mid-edit, force-close the
+    // editor so they cannot keep typing into a form the server will reject.
+    useEffect(() => {
+        if (editing && !isWithinEditWindow) {
+            setContent(bitacora.content);
+            setEditing(false);
+        }
+    }, [editing, isWithinEditWindow, bitacora.content]);
 
     const directorSignature = bitacora.signatures.find((s) => s.role === 'director');
     const directorSigned = directorSignature?.signed ?? false;
@@ -100,7 +141,7 @@ export function RevisionBitacoraView({
         mode === 'director'
             ? ((directorSignature?.signed ?? false) || signedOk)
             : (bitacora.signatures.find((s) => s.role === 'student' && s.name === currentStudentName)?.signed ?? false);
-    const canEditContent = mode === 'student' && !directorSigned;
+    const canEditContent = mode === 'student' && !directorSigned && isWithinEditWindow;
 
     const signatureColumns: Column<BitacoraSignature & { id: string }>[] = [
         {
@@ -212,6 +253,25 @@ export function RevisionBitacoraView({
                     <div className={cardClass}>
                         <div className="mb-4 flex items-center justify-between gap-3">
                             <h3 className="text-base font-bold text-[#1c1917]">Contenido</h3>
+                            {mode === 'student' && !directorSigned && (
+                                isWithinEditWindow ? (
+                                    <span
+                                        className="inline-flex items-center gap-1.5 rounded-full bg-[#dbeafe] px-2.5 py-1 text-xs font-semibold text-[#1e40af] tabular-nums"
+                                        title="Tiempo restante para editar"
+                                    >
+                                        <span aria-hidden>⏱</span>
+                                        Puedes editar {remainingLabel}
+                                    </span>
+                                ) : (
+                                    <span
+                                        className="inline-flex items-center gap-1.5 rounded-full bg-[#f5f5f4] px-2.5 py-1 text-xs font-semibold text-[#57534e]"
+                                        title="La ventana de edición de 15 minutos ya cerró"
+                                    >
+                                        <span aria-hidden>🔒</span>
+                                        Edición cerrada (15 min)
+                                    </span>
+                                )
+                            )}
                             {canEditContent && !editing && (
                                 <button
                                     type="button"

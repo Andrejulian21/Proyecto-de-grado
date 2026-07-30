@@ -135,6 +135,16 @@ class BitacoraController extends Controller
             return response()->json(['error' => 'No autorizado.'], 403);
         }
 
+        // PR 4 — RF-WK-04: edits are only allowed inside a 15-minute
+        // window from creation. The check runs before the firma-status
+        // check so unsigned bitacoras older than 15 min are rejected
+        // with the same message regardless of their signature state.
+        if ($bitacora->created_at->addMinutes(15)->isPast()) {
+            return response()->json([
+                'error' => 'El tiempo de edición ha expirado (15 minutos desde la creación).',
+            ], 422);
+        }
+
         // Auto-expire if the signature code has expired before checking edit rules
         $bitacora->checkExpiration();
 

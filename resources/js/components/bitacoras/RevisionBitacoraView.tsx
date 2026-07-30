@@ -216,7 +216,7 @@ export function RevisionBitacoraView({
                                 <FileText className="h-5 w-5 text-[#c2410c]" />
                                 <h3 className="text-base font-bold text-[#1c1917]">Detalle de la sesión</h3>
                             </div>
-                            <StatusBadge variant={bitacora.status === 'Completada' ? 'success' : 'warning'}>
+                            <StatusBadge variant={bitacora.status === 'Completada' || bitacora.status === 'FirmadaDirector' ? 'success' : 'warning'}>
                                 {bitacoraStatusLabel(bitacora.status)}
                             </StatusBadge>
                         </div>

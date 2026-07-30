@@ -45,7 +45,7 @@ const signatureConfig: Record<string, { label: string; variant: 'success' | 'war
 
 function mapSignStatus(s: string | undefined): 'signed' | 'pending' | 'unsigned' | 'no_firmada' {
     if (!s) return 'unsigned';
-    if (s === 'Completada' || s === 'completada') return 'signed';
+    if (s === 'FirmadaDirector' || s === 'Completada' || s === 'completada') return 'signed';
     if (s === 'Pendiente' || s === 'pendiente') return 'pending';
     if (s === 'NoFirmada') return 'no_firmada';
     return 'unsigned';

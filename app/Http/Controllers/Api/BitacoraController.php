@@ -91,6 +91,20 @@ class BitacoraController extends Controller
             return response()->json(['error' => 'No autorizado.'], 403);
         }
 
+        // PR 4 — RF-WK-05: validar que no exista otra bitácora en la misma
+        // semana calendario (lunes a domingo) para el mismo proyecto.
+        $weekStart = \Carbon\Carbon::parse($data['meeting_date'])->startOfWeek();
+        $weekEnd   = \Carbon\Carbon::parse($data['meeting_date'])->endOfWeek();
+        $existingWeek = Bitacora::where('proyecto_id', (int) $data['proyecto_id'])
+            ->whereBetween('meeting_date', [$weekStart, $weekEnd])
+            ->exists();
+
+        if ($existingWeek) {
+            return response()->json([
+                'error' => 'Ya existe una bitácora para esta semana. Solo puedes crear una por semana.',
+            ], 422);
+        }
+
         $data['signature_status'] = EstadoFirma::Pendiente->value;
 
         $bitacora = Bitacora::create($data);
@@ -333,6 +347,7 @@ class BitacoraController extends Controller
                     'topic'            => $bitacora->topic,
                     'notes'            => $bitacora->notes,
                     'meeting_date'     => $bitacora->meeting_date?->toDateString(),
+                    'semana'           => $bitacora->semana,
                     'duration_hours'   => $bitacora->duration_hours,
                     'signature_status' => $bitacora->signature_status?->value,
                     'fecha'            => $bitacora->created_at->toISO8601String(),

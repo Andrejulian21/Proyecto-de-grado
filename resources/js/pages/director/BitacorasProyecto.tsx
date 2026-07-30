@@ -19,6 +19,7 @@ interface ProyectoBitacora {
     duration_hours: number | null;
     signature_status: string;
     created_at: string;
+    semana?: number;
 }
 
 interface ProyectoSimple {
@@ -132,6 +133,16 @@ export default function BitacorasProyecto() {
                     </span>
                 );
             },
+        },
+        {
+            key: 'semana',
+            label: 'Semana',
+            className: 'whitespace-nowrap',
+            render: (row) => (
+                <span className="text-[#57534e] tabular-nums">
+                    {row.semana != null ? `Sem ${row.semana}` : '—'}
+                </span>
+            ),
         },
         {
             key: 'duration_hours',

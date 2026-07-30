@@ -1,9 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
 import { SignatureCodeDisplay } from '@/components/bitacoras/SignatureCode';
+
+const MAX_SEMANAS = 32;
+
+interface BitacoraListItem {
+    id: number;
+    semana?: number | null;
+}
 
 export default function NuevaBitacora() {
     const navigate = useNavigate();
@@ -21,12 +28,94 @@ export default function NuevaBitacora() {
         code: string;
         expiresAt: string;
     } | null>(null);
+    const [usedSemanas, setUsedSemanas] = useState<Set<number>>(new Set());
+    const [loadingSemanas, setLoadingSemanas] = useState(false);
+
+    // PR 4 — RF-WK-05: load the project's existing bitacoras so we can
+    // hide weeks that are already taken. The endpoint requires
+    // proyecto_id, so we resolve the student's project first.
+    useEffect(() => {
+        let cancelled = false;
+
+        async function loadUsedSemanas() {
+            setLoadingSemanas(true);
+            try {
+                const proyRes = await apiFetch('/api/estudiante/proyecto');
+                if (!proyRes.ok) {
+                    return;
+                }
+                const proyData = await proyRes.json();
+                const proyectoId = proyData.data?.id;
+                if (!proyectoId) {
+                    return;
+                }
+
+                const res = await apiFetch(`/api/bitacoras?proyecto_id=${proyectoId}`);
+                if (!res.ok) {
+                    return;
+                }
+                const json = await res.json();
+                const items: BitacoraListItem[] = Array.isArray(json.data) ? json.data : [];
+                if (cancelled) {
+                    return;
+                }
+                const taken = new Set<number>();
+                for (const item of items) {
+                    if (typeof item.semana === 'number') {
+                        taken.add(item.semana);
+                    }
+                }
+                setUsedSemanas(taken);
+            } catch {
+                // Soft-fail: the form is still usable without the suggestion
+                // list. The unique constraint on the server is the source of
+                // truth either way.
+            } finally {
+                if (!cancelled) {
+                    setLoadingSemanas(false);
+                }
+            }
+        }
+
+        loadUsedSemanas();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    const availableSemanas = useMemo(
+        () =>
+            Array.from({ length: MAX_SEMANAS }, (_, i) => i + 1).filter(
+                (n) => !usedSemanas.has(n),
+            ),
+        [usedSemanas],
+    );
+
+    const sortedUsedSemanas = useMemo(
+        () => Array.from(usedSemanas).sort((a, b) => a - b),
+        [usedSemanas],
+    );
+
+    // If the student's current selection collides with a freshly loaded
+    // occupied week, jump them to the first available slot.
+    useEffect(() => {
+        const current = parseInt(semana, 10);
+        if (Number.isInteger(current) && usedSemanas.has(current) && availableSemanas.length > 0) {
+            setSemana(String(availableSemanas[0]));
+        }
+    }, [availableSemanas, semana, usedSemanas]);
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         setError('');
 
         if (!date || !topic.trim() || !description.trim()) return;
+
+        const semanaInt = parseInt(semana, 10);
+        if (usedSemanas.has(semanaInt)) {
+            setError(`La semana ${semanaInt} ya tiene una bitácora asociada.`);
+            return;
+        }
 
         setSubmitting(true);
         try {
@@ -53,7 +142,7 @@ export default function NuevaBitacora() {
                     notes: description.trim(),
                     meeting_date: `${date}T${time}:00`,
                     duration_hours: parseFloat(duration),
-                    semana: parseInt(semana, 10),
+                    semana: semanaInt,
                 }),
             });
 
@@ -176,19 +265,55 @@ export default function NuevaBitacora() {
                             <label htmlFor="binnacle-semana" className="text-sm font-semibold text-[#1c1917]">
                                 Semana <span className="text-[#dc2626]">*</span>
                             </label>
-                            <select
+                            <input
                                 id="binnacle-semana"
+                                type="number"
+                                min={1}
+                                max={MAX_SEMANAS}
+                                step={1}
+                                inputMode="numeric"
+                                list="semanas-disponibles"
                                 value={semana}
-                                onChange={(e) => setSemana(e.target.value)}
+                                onChange={(e) => {
+                                    const next = e.target.value;
+                                    if (next === '') {
+                                        setSemana('');
+                                        return;
+                                    }
+                                    const n = parseInt(next, 10);
+                                    if (Number.isInteger(n) && n >= 1 && n <= MAX_SEMANAS) {
+                                        setSemana(String(n));
+                                    }
+                                }}
+                                onBlur={() => {
+                                    const n = parseInt(semana, 10);
+                                    if (!Number.isInteger(n) || n < 1) {
+                                        setSemana('1');
+                                    } else if (n > MAX_SEMANAS) {
+                                        setSemana(String(MAX_SEMANAS));
+                                    }
+                                }}
+                                placeholder="1"
                                 className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] tabular-nums"
                                 required
-                            >
-                                {Array.from({ length: 32 }, (_, i) => i + 1).map((n) => (
-                                    <option key={n} value={n}>
-                                        Semana {n}
-                                    </option>
+                            />
+                            <datalist id="semanas-disponibles">
+                                {availableSemanas.map((n) => (
+                                    <option key={n} value={n} />
                                 ))}
-                            </select>
+                            </datalist>
+                            {loadingSemanas ? (
+                                <span className="text-xs text-[#78716c]">Cargando semanas disponibles...</span>
+                            ) : sortedUsedSemanas.length > 0 ? (
+                                <span className="text-xs text-[#78716c]">
+                                    Semanas ocupadas:{' '}
+                                    <span className="font-semibold text-[#57534e] tabular-nums">
+                                        {sortedUsedSemanas.join(', ')}
+                                    </span>
+                                </span>
+                            ) : (
+                                <span className="text-xs text-[#78716c]">Aún no hay bitácoras registradas.</span>
+                            )}
                         </div>
 
                         <div className="flex flex-col gap-1.5 sm:col-span-2">

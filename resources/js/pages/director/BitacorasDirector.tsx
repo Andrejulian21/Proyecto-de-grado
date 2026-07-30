@@ -50,6 +50,16 @@ export default function BitacorasDirector() {
             },
         },
         {
+            key: 'semana',
+            label: 'Semana',
+            className: 'whitespace-nowrap',
+            render: (row) => (
+                <span className="text-[#57534e] tabular-nums">
+                    {row.semana != null ? `Sem ${row.semana}` : '—'}
+                </span>
+            ),
+        },
+        {
             key: 'project_code',
             label: 'Proyecto',
             render: (row) => (

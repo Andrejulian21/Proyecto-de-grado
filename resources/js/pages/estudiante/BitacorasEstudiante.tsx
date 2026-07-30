@@ -12,6 +12,7 @@ import { apiFetch } from '@/lib/utils';
 interface Binnacle {
     id: number;
     date: string;
+    semana: number;
     topic: string;
     description: string;
     duration: string;
@@ -30,6 +31,7 @@ interface BitacoraRaw {
     duracion_horas?: number;
     signature_status?: string;
     estado_firma?: string;
+    semana?: number;
     proyecto_id: number;
 }
 
@@ -63,6 +65,7 @@ export default function BitacorasEstudiante() {
     const navigate = useNavigate();
     const columns: Column<Binnacle>[] = [
         { key: 'date', label: 'Fecha', className: 'whitespace-nowrap' },
+        { key: 'semana', label: 'Semana', className: 'whitespace-nowrap' },
         { key: 'topic', label: 'Tema' },
         {
             key: 'description',
@@ -166,6 +169,7 @@ export default function BitacorasEstudiante() {
                 const mapped: Binnacle[] = (bitData.data || []).map((b: BitacoraRaw) => ({
                     id: b.id,
                     date: formatDate(b.meeting_date || b.fecha_reunion),
+                    semana: b.semana ?? 0,
                     topic: b.tema || b.topic || 'Sin titulo',
                     description: b.notes || b.observaciones || '',
                     duration: b.duration_hours ? `${b.duration_hours}h` : b.duracion_horas ? `${b.duracion_horas}h` : '—',

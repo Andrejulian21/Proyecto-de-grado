@@ -53,6 +53,7 @@ export default function RevisionBitacoraEstudiante() {
                     status: b.signature_status ?? 'Pendiente',
                     author: estudianteName,
                     projectId: b.proyecto_id,
+                    semana: typeof b.semana === 'number' ? b.semana : undefined,
                     signatures: [
                         {
                             role: 'director',

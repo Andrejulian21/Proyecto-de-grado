@@ -33,22 +33,8 @@ export interface BitacoraDetail {
     status: string;
     author: string;
     projectId: number;
+    semana?: number;
     signatures: BitacoraSignature[];
-}
-
-function bitacoraStatusEmoji(status: string): string {
-    switch (status) {
-        case 'Completada':
-            return '✅';
-        case 'FirmadaEstudiante':
-            return '👤';
-        case 'FirmadaDirector':
-            return '👤';
-        case 'Sospechosa':
-            return '⚠️';
-        default:
-            return '⏳';
-    }
 }
 
 function bitacoraStatusLabel(status: string): string {
@@ -141,9 +127,19 @@ export function RevisionBitacoraView({
         mode === 'director'
             ? ((directorSignature?.signed ?? false) || signedOk)
             : (bitacora.signatures.find((s) => s.role === 'student' && s.name === currentStudentName)?.signed ?? false);
-    const canEditContent = mode === 'student' && !directorSigned && isWithinEditWindow;
+    const canEditContent = mode === 'student' && isWithinEditWindow;
 
     const signatureColumns: Column<BitacoraSignature & { id: string }>[] = [
+        {
+            key: 'semana',
+            label: 'Semana',
+            className: 'text-[#57534e] tabular-nums whitespace-nowrap',
+            render: () => (
+                <span className="text-[#57534e] tabular-nums">
+                    {bitacora.semana != null ? `Sem ${bitacora.semana}` : '—'}
+                </span>
+            ),
+        },
         {
             key: 'role',
             label: 'Rol',
@@ -246,6 +242,15 @@ export function RevisionBitacoraView({
                                     <p className="text-sm font-semibold text-[#1c1917]">{bitacora.author}</p>
                                 </div>
                             </div>
+                            <div className="flex items-center gap-3 rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-3.5">
+                                <Calendar className="h-5 w-5 text-[#c2410c]" />
+                                <div>
+                                    <p className="text-xs text-[#78716c]">Semana</p>
+                                    <p className="text-sm font-semibold text-[#1c1917] tabular-nums">
+                                        {bitacora.semana != null ? `Semana ${bitacora.semana}` : '—'}
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -259,7 +264,6 @@ export function RevisionBitacoraView({
                                         className="inline-flex items-center gap-1.5 rounded-full bg-[#dbeafe] px-2.5 py-1 text-xs font-semibold text-[#1e40af] tabular-nums"
                                         title="Tiempo restante para editar"
                                     >
-                                        <span aria-hidden>⏱</span>
                                         Puedes editar {remainingLabel}
                                     </span>
                                 ) : (
@@ -267,7 +271,6 @@ export function RevisionBitacoraView({
                                         className="inline-flex items-center gap-1.5 rounded-full bg-[#f5f5f4] px-2.5 py-1 text-xs font-semibold text-[#57534e]"
                                         title="La ventana de edición de 15 minutos ya cerró"
                                     >
-                                        <span aria-hidden>🔒</span>
                                         Edición cerrada (15 min)
                                     </span>
                                 )

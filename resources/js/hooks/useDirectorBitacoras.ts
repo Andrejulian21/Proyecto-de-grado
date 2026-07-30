@@ -9,6 +9,7 @@ export interface BitacoraEntry {
     duration_hours: number | null;
     signature_status: string;
     created_at: string;
+    semana?: number;
     /** Enriched with project info after aggregation */
     project_code?: string;
     project_title?: string;

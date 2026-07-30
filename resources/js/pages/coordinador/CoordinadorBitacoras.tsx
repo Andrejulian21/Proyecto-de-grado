@@ -10,6 +10,7 @@ interface BinnacleEntry {
     student: string;
     director: string;
     date: string;
+    semana: number;
     topic: string;
     status: 'signed' | 'pending' | 'unsigned';
 }
@@ -20,6 +21,7 @@ const ALL_BINNACLES: BinnacleEntry[] = Array.from({ length: 25 }, (_, i) => ({
     student: ['Carlos Méndez', 'María Rincón', 'Andrés Torres', 'Diana Rojas', 'Juan Pérez'][i % 5],
     director: ['Dr. Ricardo Gómez', 'Dra. Laura Martínez', 'Dr. Andrés Vega'][i % 3],
     date: `${String(10 + (i % 20)).padStart(2, '0')}/04/2026`,
+    semana: (i % 32) + 1,
     topic: ['Revisión de arquitectura', 'Análisis de requisitos', 'Implementación', 'Pruebas', 'Diseño'][i % 5],
     status: (['signed', 'pending', 'unsigned'] as const)[i % 3],
 }));
@@ -32,6 +34,12 @@ const statusConfig: Record<string, { label: string; variant: 'success' | 'warnin
 
 const columns: Column<BinnacleEntry>[] = [
     { key: 'date', label: 'Fecha', className: 'whitespace-nowrap' },
+    {
+        key: 'semana',
+        label: 'Semana',
+        className: 'whitespace-nowrap',
+        render: (row) => <span className="text-[#57534e] tabular-nums">Sem {row.semana}</span>,
+    },
     { key: 'project', label: 'Proyecto' },
     { key: 'student', label: 'Estudiante' },
     { key: 'director', label: 'Director' },

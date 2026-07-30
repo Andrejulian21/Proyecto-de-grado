@@ -4,8 +4,8 @@ import { Loader2, ChevronDown } from 'lucide-react';
 
 interface Semestre {
     id: number;
-    nombre: string;
-    activo: boolean;
+    name: string;
+    is_active: boolean;
 }
 
 interface SemestreSelectorProps {
@@ -32,12 +32,11 @@ export function SemestreSelector({ value, onChange }: SemestreSelectorProps) {
             .then((json) => {
                 if (cancelled) return;
                 const data: Semestre[] = json.data ?? json ?? [];
-                // Activos primero, luego inactivos; dentro de cada grupo, más reciente primero
-                const sorted = [...data].sort((a, b) => {
-                    if (a.activo !== b.activo) return a.activo ? -1 : 1;
-                    return b.id - a.id;
-                });
-                setSemestres(sorted);
+                // Solo mostrar semestres activos, ordenados por id descendente
+                const active = [...data]
+                    .filter((s) => s.is_active)
+                    .sort((a, b) => b.id - a.id);
+                setSemestres(active);
             })
             .catch((err) => {
                 if (cancelled) return;
@@ -47,10 +46,8 @@ export function SemestreSelector({ value, onChange }: SemestreSelectorProps) {
                 if (!cancelled) setLoading(false);
             });
 
-        return () => {
-            cancelled = true;
-        };
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+        return () => { cancelled = true; };
+    }, []);
 
     if (loading) {
         return (
@@ -70,18 +67,18 @@ export function SemestreSelector({ value, onChange }: SemestreSelectorProps) {
     }
 
     return (
-        <div className="relative">
+        <div className="relative max-w-md">
             <select
                 value={value ?? ''}
                 onChange={(e) => onChange(Number(e.target.value))}
-                className="w-full appearance-none rounded-lg border border-[#e5e5e5] bg-white px-4 py-2.5 pr-10 text-sm font-medium text-[#1c1917] transition-colors hover:border-[#c2410c] focus:border-[#c2410c] focus:outline-none focus:ring-1 focus:ring-[#c2410c]"
+                className="w-full appearance-none rounded-lg border border-[#e5e5e5] bg-white px-4 py-2.5 pr-10 text-sm font-semibold text-[#1c1917] outline-none transition-colors hover:border-[#c2410c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
             >
                 <option value="" disabled>
                     Seleccionar semestre
                 </option>
                 {semestres.map((sem) => (
                     <option key={sem.id} value={sem.id}>
-                        {sem.nombre} {sem.activo ? '(Activo)' : '(Inactivo)'}
+                        {sem.name}
                     </option>
                 ))}
             </select>

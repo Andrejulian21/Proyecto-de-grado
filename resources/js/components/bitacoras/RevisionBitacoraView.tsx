@@ -300,6 +300,14 @@ export function RevisionBitacoraView({
                                     bitacoraId={bitacora.id}
                                     onSuccess={() => {
                                         setSignedOk(true);
+                                        setBitacora((prev) => ({
+                                            ...prev,
+                                            signatures: prev.signatures.map((s) =>
+                                                s.role === 'director'
+                                                    ? { ...s, signed: true, signedAt: new Date().toLocaleString('es-CO') }
+                                                    : s,
+                                            ),
+                                        }));
                                         onSign().then(() => {}).catch(() => {});
                                     }}
                                 />

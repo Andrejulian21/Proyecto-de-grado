@@ -438,7 +438,7 @@ export default function SeguimientoSemestre({
                                     </th>
                                     <th
                                         scope="col"
-                                        className="whitespace-nowrap px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider"
+                                        className="border-l border-[#e5e5e5] whitespace-nowrap px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider"
                                     >
                                         Director
                                     </th>
@@ -529,7 +529,7 @@ export default function SeguimientoSemestre({
                                                     </span>
                                                 </div>
                                             </td>
-                                            <td className="whitespace-nowrap px-4 py-3 align-top text-sm text-[#1c1917]">
+                                            <td className="border-l border-[#e5e5e5] whitespace-nowrap px-4 py-3 align-top text-sm text-[#1c1917]">
                                                 {proy.director}
                                             </td>
                                             {canonicalPhases.map((fase) => {

@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Copy, Check, RefreshCw, Loader2, X, ShieldCheck, Clock } from 'lucide-react';
+import { Copy, Check, RefreshCw, Loader2, X, ShieldCheck, Clock, Send } from 'lucide-react';
 import { cn, apiFetch } from '@/lib/utils';
-import { TOTPInput } from '@/components/ui/TOTPInput';
 
 export interface SignatureCodeDisplayProps {
     bitacoraId: number;
@@ -220,10 +219,16 @@ export function SignatureCodeInput({
     const [error, setError] = useState<string | null>(null);
     const [attempts, setAttempts] = useState(0);
     const [submitting, setSubmitting] = useState(false);
+    const inputRef = useRef<HTMLInputElement>(null);
     const attemptsLeft = Math.max(0, maxAttempts - attempts);
     const locked = attempts >= maxAttempts || disabled;
 
-    async function handleSign(value: string) {
+    async function handleSign() {
+        const trimmed = code.trim();
+        if (trimmed.length !== 6 || !/^\d{6}$/.test(trimmed)) {
+            setError('Debe ingresar un codigo de 6 digitos numericos.');
+            return;
+        }
         if (locked) return;
         setSubmitting(true);
         setError(null);
@@ -231,7 +236,7 @@ export function SignatureCodeInput({
             const res = await apiFetch(`/api/bitacoras/${bitacoraId}/firmar`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code: value }),
+                body: JSON.stringify({ code: trimmed }),
             });
             const body = (await res.json().catch(() => null)) as
                 | { data?: { signature_status?: string }; error?: string; message?: string }
@@ -249,6 +254,7 @@ export function SignatureCodeInput({
                 body?.error ?? body?.message ?? 'No se pudo firmar la bitacora.',
             );
             setCode('');
+            inputRef.current?.focus();
         } catch {
             setAttempts((n) => n + 1);
             setError('Error de conexion. Intente de nuevo.');
@@ -258,32 +264,63 @@ export function SignatureCodeInput({
         }
     }
 
+    function handleKeyDown(e: React.KeyboardEvent) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleSign();
+        }
+    }
+
     return (
         <div className="flex flex-col gap-4">
             <p className="text-sm text-[#57534e]">
                 Ingrese el codigo de 6 digitos que el estudiante le compartio.
             </p>
-            <TOTPInput
-                onComplete={handleSign}
-                error={error ?? undefined}
-                disabled={locked || submitting}
-            />
-            <div className="flex items-center justify-between text-xs">
-                <span
-                    className={cn(
-                        'font-semibold',
-                        attemptsLeft <= 1 ? 'text-[#dc2626]' : 'text-[#57534e]',
-                    )}
+            <div className="flex items-center gap-2">
+                <input
+                    ref={inputRef}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+                    onKeyDown={handleKeyDown}
+                    disabled={locked || submitting}
+                    placeholder="000000"
+                    className="w-40 rounded-lg border border-[#e5e5e5] bg-white px-4 py-3 text-center font-mono text-xl font-bold tracking-[0.3em] text-[#1c1917] outline-none transition-colors placeholder:text-[#d6d3d1] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] disabled:cursor-not-allowed disabled:opacity-60"
+                    autoFocus
+                    aria-label="Codigo de firma de 6 digitos"
+                />
+                <button
+                    type="button"
+                    onClick={handleSign}
+                    disabled={locked || submitting || code.length !== 6}
+                    className="inline-flex min-h-[46px] items-center gap-2 rounded-lg bg-[#c2410c] px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                    {attemptsLeft} {attemptsLeft === 1 ? 'intento restante' : 'intentos restantes'}
-                </span>
-                {submitting && (
-                    <span className="inline-flex items-center gap-1.5 text-[#78716c]">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        Verificando...
-                    </span>
-                )}
+                    {submitting ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                        <Send className="h-4 w-4" />
+                    )}
+                    Enviar
+                </button>
             </div>
+
+            {error && (
+                <p className="text-sm font-medium text-[#dc2626]" role="alert">{error}</p>
+            )}
+
+            {attempts > 0 && !locked && (
+                <p className={cn('text-xs font-semibold', attemptsLeft <= 1 ? 'text-[#dc2626]' : 'text-[#57534e]')}>
+                    {attemptsLeft} {attemptsLeft === 1 ? 'intento restante' : 'intentos restantes'}
+                </p>
+            )}
+
+            {locked && (
+                <p className="text-xs font-semibold text-[#dc2626]">
+                    Se agotaron los intentos. Solicite un nuevo codigo.
+                </p>
+            )}
         </div>
     );
 }

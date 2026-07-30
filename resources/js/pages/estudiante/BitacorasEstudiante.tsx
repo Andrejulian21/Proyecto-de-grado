@@ -65,7 +65,11 @@ export default function BitacorasEstudiante() {
     const navigate = useNavigate();
     const columns: Column<Binnacle>[] = [
         { key: 'date', label: 'Fecha', className: 'whitespace-nowrap' },
-        { key: 'semana', label: 'Semana', className: 'whitespace-nowrap' },
+        { key: 'semana', label: 'Semana', className: 'whitespace-nowrap', render: (row) => (
+            <span className="text-[#1c1917] tabular-nums">
+                {row.semana != null ? `Sem ${row.semana}` : '-'}
+            </span>
+        ) },
         { key: 'topic', label: 'Tema' },
         {
             key: 'description',

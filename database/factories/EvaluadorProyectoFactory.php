@@ -23,6 +23,7 @@ class EvaluadorProyectoFactory extends Factory
             'evaluador_id' => User::factory(),
             'invitation_status' => 'Pendiente',
             'assigned_at' => now(),
+            'evaluado' => false,
         ];
     }
 }

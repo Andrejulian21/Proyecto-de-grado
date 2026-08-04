@@ -24,6 +24,7 @@ class EvaluadorProyecto extends Model
         'hora_inicio',
         'hora_fin',
         'fase',
+        'evaluado',
     ];
 
     protected function casts(): array
@@ -34,6 +35,7 @@ class EvaluadorProyecto extends Model
             'fecha' => 'date:Y-m-d',
             'hora_inicio' => 'string',
             'hora_fin' => 'string',
+            'evaluado' => 'boolean',
         ];
     }
 

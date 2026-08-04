@@ -49,8 +49,8 @@ function columnIsDecimalLike(?array $col): bool
 }
 
 /**
- * Check if a column has boolean type. SQLite uses "boolean" (affinity =
- * numeric) and PostgreSQL uses "bool".
+ * Check if a column has boolean type. SQLite reports "tinyint(1)" (Laravel's
+ * boolean translation) and PostgreSQL reports "bool".
  */
 function columnIsBooleanLike(?array $col): bool
 {
@@ -60,7 +60,27 @@ function columnIsBooleanLike(?array $col): bool
 
     $type = strtolower((string) ($col['type'] ?? $col['type_name'] ?? ''));
 
-    return str_contains($type, 'bool');
+    return str_contains($type, 'bool')
+        || str_contains($type, 'tinyint');
+}
+
+/**
+ * Normalize a column default value for comparison. SQLite wraps string/char
+ * defaults in single quotes; we strip them. PHP booleans pass through.
+ */
+function normalizeColumnDefault(mixed $value): string
+{
+    if ($value === null) {
+        return '';
+    }
+
+    $s = (string) $value;
+
+    if (strlen($s) >= 2 && $s[0] === "'" && substr($s, -1) === "'") {
+        $s = substr($s, 1, -1);
+    }
+
+    return trim($s);
 }
 
 // ---------------------------------------------------------------------------
@@ -173,19 +193,19 @@ test('evaluador_proyecto.evaluado defaults to false at the DB level', function (
     $col = collect($columns)->firstWhere('name', 'evaluado');
 
     if (DB::getDriverName() === 'pgsql') {
-        $default = trim((string) ($col['default'] ?? ''), "'");
+        $default = normalizeColumnDefault($col['default'] ?? null);
         expect(in_array($default, ['false', '0'], true))->toBeTrue(
             "evaluado default on PostgreSQL should be false/0, got '{$default}'"
         );
     } else {
-        // SQLite: ensure the raw column default is '0' (false) — but SQLite may
-        // not always surface a default in the schema array. We verify behavior
-        // at the model/factory level below.
         $rawDefault = DB::selectOne(
             "SELECT dflt_value AS default_value FROM pragma_table_info('evaluador_proyecto') WHERE name = 'evaluado'"
         );
         if ($rawDefault && $rawDefault->default_value !== null) {
-            expect(in_array(trim((string) $rawDefault->default_value), ['0', 'false'], true))->toBeTrue();
+            $default = normalizeColumnDefault($rawDefault->default_value);
+            expect(in_array($default, ['0', 'false'], true))->toBeTrue(
+                "evaluado default on SQLite should be '0' or 'false', got '{$default}'"
+            );
         } else {
             // No DB-level default means the model default takes over. See
             // the factory test below for behavior verification.

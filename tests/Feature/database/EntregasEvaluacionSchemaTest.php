@@ -2,11 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Models\Entrega;
 use App\Models\EvaluacionEvaluador;
 use App\Models\EvaluadorProyecto;
 use App\Models\Proyecto;
 use App\Models\Semestre;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -139,7 +142,7 @@ test('Entrega persists grade_percentage as decimal via cast', function () {
     $semestre = Semestre::create(['name' => '2026-1', 'start_date' => '2026-02-01', 'end_date' => '2026-06-30']);
     $proyecto = Proyecto::create(['title' => 'P', 'semester_id' => $semestre->id]);
 
-    $entrega = \App\Models\Entrega::create([
+    $entrega = Entrega::create([
         'proyecto_id' => $proyecto->id,
         'phase' => 'anteproyecto',
         'title' => 'E1',
@@ -155,7 +158,7 @@ test('Entrega persists director_grade as decimal via cast', function () {
     $semestre = Semestre::create(['name' => '2026-1', 'start_date' => '2026-02-01', 'end_date' => '2026-06-30']);
     $proyecto = Proyecto::create(['title' => 'P', 'semester_id' => $semestre->id]);
 
-    $entrega = \App\Models\Entrega::create([
+    $entrega = Entrega::create([
         'proyecto_id' => $proyecto->id,
         'phase' => 'anteproyecto',
         'title' => 'E1',
@@ -168,7 +171,7 @@ test('Entrega persists director_grade as decimal via cast', function () {
 });
 
 test('Entrega fillable includes grade_percentage and director_grade', function () {
-    $entrega = new \App\Models\Entrega;
+    $entrega = new Entrega;
 
     expect($entrega->getFillable())->toContain('grade_percentage')
         ->and($entrega->getFillable())->toContain('director_grade');
@@ -201,6 +204,7 @@ test('evaluador_proyecto.evaluado defaults to false at the DB level', function (
         $rawDefault = DB::selectOne(
             "SELECT dflt_value AS default_value FROM pragma_table_info('evaluador_proyecto') WHERE name = 'evaluado'"
         );
+
         if ($rawDefault && $rawDefault->default_value !== null) {
             $default = normalizeColumnDefault($rawDefault->default_value);
             expect(in_array($default, ['0', 'false'], true))->toBeTrue(
@@ -333,7 +337,7 @@ test('evaluaciones_evaluador has timestamps', function () {
 test('EvaluacionEvaluador model exists and extends Model', function () {
     $model = new EvaluacionEvaluador;
 
-    expect($model)->toBeInstanceOf(Illuminate\Database\Eloquent\Model::class);
+    expect($model)->toBeInstanceOf(Model::class);
 });
 
 test('EvaluacionEvaluador fillable contains evaluador_proyecto_id, nota, observaciones', function () {
@@ -356,7 +360,7 @@ test('EvaluacionEvaluador belongs to EvaluadorProyecto', function () {
     $model = new EvaluacionEvaluador;
     $relation = $model->evaluadorProyecto();
 
-    expect($relation)->toBeInstanceOf(Illuminate\Database\Eloquent\Relations\BelongsTo::class);
+    expect($relation)->toBeInstanceOf(BelongsTo::class);
     expect($relation->getRelated())->toBeInstanceOf(EvaluadorProyecto::class);
 });
 

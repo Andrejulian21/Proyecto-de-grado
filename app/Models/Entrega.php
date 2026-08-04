@@ -143,9 +143,9 @@ class Entrega extends Model
     {
         return $query->where(function ($q) use ($proyectoId) {
             $q->where('proyecto_id', $proyectoId)
-              ->orWhereHas('proyectos', function ($q2) use ($proyectoId) {
-                  $q2->where('proyectos.id', $proyectoId);
-              });
+                ->orWhereHas('proyectos', function ($q2) use ($proyectoId) {
+                    $q2->where('proyectos.id', $proyectoId);
+                });
         });
     }
 }

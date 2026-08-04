@@ -30,6 +30,8 @@ class Entrega extends Model
         'status',
         'consolidated_grade',
         'evaluation_complete',
+        'grade_percentage',
+        'director_grade',
         'acceptance_criteria',
         'hora_maxima',
         'archivos_requeridos',
@@ -45,6 +47,8 @@ class Entrega extends Model
             'start_date' => 'date',
             'consolidated_grade' => 'decimal:2',
             'evaluation_complete' => 'boolean',
+            'grade_percentage' => 'decimal:2',
+            'director_grade' => 'decimal:2',
             'archivos_requeridos' => 'json',
         ];
     }

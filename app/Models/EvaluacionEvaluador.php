@@ -35,12 +35,14 @@ class EvaluacionEvaluador extends Model
         'evaluador_proyecto_id',
         'nota',
         'observaciones',
+        'evaluated_at',
     ];
 
     protected function casts(): array
     {
         return [
             'nota' => 'decimal:2',
+            'evaluated_at' => 'datetime',
         ];
     }
 

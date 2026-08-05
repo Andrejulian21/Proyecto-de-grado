@@ -18,6 +18,11 @@ return new class extends Migration
             $table->unsignedBigInteger('evaluador_proyecto_id')->unique();
             $table->decimal('nota', 4, 2);
             $table->text('observaciones')->nullable();
+            // RF-EVA-02/RF-EVA-03: timestamp the moment the evaluator
+            // submitted the grade. Distinct from created_at so the audit
+            // story stays explicit (when the row hit the DB vs. when the
+            // user pressed "Enviar").
+            $table->timestamp('evaluated_at')->nullable();
             $table->timestamps();
 
             $table->foreign('evaluador_proyecto_id')

@@ -143,7 +143,7 @@ export default function CoordinadorEntregas() {
                 creatingRef.current = false;
             }
         },
-        [selectedGroup, formFase, formTitulo, formDesc, formFecha, formGradePercentage, formArchivos, crear],
+        [selectedGroup, formFase, formTitulo, formDesc, formFecha, formFechaInicio, formHoraInicio, formHora, formGradePercentage, formArchivos, crear],
     );
 
     // ── Edit modal state ─────────────────────────────────────────
@@ -233,7 +233,7 @@ export default function CoordinadorEntregas() {
         } catch (err) {
             setEditError(err instanceof Error ? err.message : 'Error al actualizar');
         }
-    }, [editingEntrega, editFecha, editTitulo, editDesc, editHora, editCriterios, editGradePercentage, editFase, editArchivos, actualizar, closeEditModal]);
+    }, [editingEntrega, editFecha, editFechaInicio, editHoraInicio, editTitulo, editDesc, editHora, editCriterios, editGradePercentage, editFase, editArchivos, actualizar, closeEditModal]);
 
     // ── Delete confirmation state ────────────────────────────────
     const [deletingId, setDeletingId] = useState<number | null>(null);

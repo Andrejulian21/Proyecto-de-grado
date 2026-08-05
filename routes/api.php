@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\SemestreController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Api\DirectorController;
 use App\Http\Controllers\Api\EntregaEstudianteController;
+use App\Http\Controllers\Api\EvaluadorAsignacionesController;
 use App\Http\Controllers\Auth\AuthController;
 use Illuminate\Support\Facades\Route;
 
@@ -165,6 +166,18 @@ Route::middleware([
         Route::get('/evaluaciones', [DirectorController::class, 'evaluaciones']);
         Route::get('/proyectos/{proyecto}/entrega-fase', [DirectorController::class, 'entregaFase'])
             ->whereNumber('proyecto');
+    });
+
+    // Evaluador — asignaciones y evaluación (PR 3, T-017..T-019).
+    Route::prefix('evaluador')->name('evaluador.')->group(function () {
+        Route::get('/mis-asignaciones', [EvaluadorAsignacionesController::class, 'index'])
+            ->name('mis-asignaciones');
+        Route::get('/asignaciones/{id}/detalle', [EvaluadorAsignacionesController::class, 'detalle'])
+            ->whereNumber('id')
+            ->name('asignaciones.detalle');
+        Route::post('/asignaciones/{id}/evaluar', [EvaluadorAsignacionesController::class, 'evaluar'])
+            ->whereNumber('id')
+            ->name('asignaciones.evaluar');
     });
 });
 

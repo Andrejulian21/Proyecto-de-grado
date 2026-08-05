@@ -37,6 +37,16 @@ con versionado, bitácoras firmadas con TOTP, evaluación y generación de repor
 5. **Una tarea a la vez**, respetando dependencias.
 6. **UI en español, código/documentación en inglés.** Los mensajes de error en español.
 
+## ⛔ REGLAS DURAS — PROHIBICIONES ABSOLUTAS (incidente 2026-08-04)
+
+Estas reglas son **obligatorias** para CUALQUIER agente que trabaje en este repo (orquestador o subagente). Violarlas causó la pérdida de la base de datos local.
+
+1. **NUNCA toques la base de datos local.** PROHIBIDO borrar, crear, renombrar o modificar `database/database.sqlite` (ni ningún archivo `.sqlite*`). Es la BD de desarrollo con datos reales del usuario.
+2. **NUNCA corras migraciones contra la BD real.** PROHIBIDO `php artisan migrate`, `migrate:fresh`, `migrate:rollback`, `php artisan db:seed` o cualquier comando que escriba en la BD local fuera de tests. Los tests usan `:memory:` (phpunit.xml) — eso es lo único permitido.
+3. **NUNCA uses `git clean`** (ninguna variante: `-fd`, `-fdx`, etc.) ni `Remove-Item`/borrado de archivos ignorados. `git clean -fdx` borra silenciosamente `vendor/`, `.env` ignorado y la BD.
+4. **NUNCA hagas push, abras PR ni corras `gentle-ai review`** por tu cuenta — eso lo decide el orquestador.
+5. Si un subagente necesita verificar migraciones/schema, debe hacerlo SOLO en `:memory:` vía tests (`vendor/bin/pest`), o en un archivo temporal separado (`database/testing.sqlite`) que NUNCA sea la BD real.
+
 ## Stack confirmado
 
 | Capa | Tecnología |

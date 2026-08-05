@@ -8,7 +8,7 @@
 |---|----------|-----------|
 | D1 | ¿Más de una entrega por fase en el mismo semestre? | SÍ. La suma del par incluye TODAS las entregas de ambas fases (no se agrega constraint UNIQUE). |
 | D2 | Semestre con entregas incompletas (una fase del par sin % NOT NULL) | No se dispara bloqueo. El frontend MUST mostrar advertencia visual "Par incompleto: falta asignar % en la fase X". |
-| D3 | Ubicación técnica de `director_grade` | Columna en `entregas` (la nota es por entrega, no por versión de documento). |
+| D3 | Ubicación técnica de `director_grade` | Columna en `entrega_proyecto` (la nota es POR ENTREGA DEL ESTUDIANTE/proyecto, no de la entrega general/plantilla). Ver enmienda **D3-rev** abajo. |
 | D4 | Edición de `%` en entrega existente | Misma lógica de validación de pesos que en Store (RF-ENT-04 aplica a Store y Update). |
 | D5 | Edición de `director_grade` con la entrega cerrada | Bloqueado (ver RF-NOT-03). |
 | D6 | Re-envío de evaluación del evaluador | Bloqueado con 409 (ver RF-EVA-03). |
@@ -204,15 +204,22 @@ La página "Mis Asignaciones" MUST ocultar por defecto las asignaciones con `eva
 
 ## Capacidad: nota-director
 
-Nota de la entrega que el director asigna al aprobar, editable mientras la entrega esté activa.
+Nota que el director asigna al aprobar la ENTREGA DEL ESTUDIANTE (por proyecto), editable mientras la entrega esté activa.
 
-### RF-NOT-01: Columna `director_grade` en `entregas`
+> **Enmienda D3-rev (2026-08-05)**: la nota del director corresponde a la
+> entrega DEL ESTUDIANTE (por proyecto), NO a la entrega general (plantilla).
+> `director_grade` vive en `entrega_proyecto` (junto a `observaciones_director`),
+> y se resuelve vía la versión revisada (`versiones_documento.entrega_proyecto_id`).
+> La columna legacy `entregas.director_grade` queda SIN USO (no se elimina:
+> una migración destructiva no está justificada en este punto).
 
-La tabla `entregas` MUST tener `director_grade` (decimal 4,2, nullable). El valor MUST estar entre 0 y 5 con 2 decimales cuando se asigne.
+### RF-NOT-01: Columna `director_grade` en `entrega_proyecto`
+
+La tabla `entrega_proyecto` MUST tener `director_grade` (decimal 4,2, nullable). El valor MUST estar entre 0 y 5 con 2 decimales cuando se asigne.
 
 #### Escenario: Columna disponible tras migración
 - GIVEN una migración aplicada
-- WHEN se consulta el esquema de `entregas`
+- WHEN se consulta el esquema de `entrega_proyecto`
 - THEN la columna `director_grade` MUST existir como `decimal(4,2) NULL`
 
 #### Escenario: Nota fuera de rango
@@ -222,7 +229,7 @@ La tabla `entregas` MUST tener `director_grade` (decimal 4,2, nullable). El valo
 
 ### RF-NOT-02: Nota aparece al aprobar observación del director
 
-Cuando el director marca una observación de la entrega como "aprobada", la vista MUST mostrar un campo para ingresar `director_grade`. Si no hay observación aprobada, el campo MUST permanecer oculto.
+Cuando el director marca una observación de la ENTREGA DEL PROYECTO como "aprobada", la vista MUST mostrar un campo para ingresar `director_grade`, y el backend MUST persistirlo en la `entrega_proyecto` del proyecto evaluado (resuelta por la versión revisada: versión → `entrega_proyecto_id`). Si no hay observación aprobada, el campo MUST permanecer oculto.
 
 #### Escenario: Campo de nota visible tras aprobación
 - GIVEN el director marca una observación como aprobada
@@ -233,6 +240,11 @@ Cuando el director marca una observación de la entrega como "aprobada", la vist
 - GIVEN el director solo tiene observaciones pendientes (ninguna aprobada)
 - WHEN se renderiza la vista
 - THEN el sistema MUST ocultar el campo de nota
+
+#### Escenario: La nota se persiste en la entrega del proyecto
+- GIVEN el director aprueba con `director_grade = 4.5` y `version_id = V`
+- WHEN se envía la revisión
+- THEN el sistema MUST persistir 4.50 en `entrega_proyecto.director_grade` de la entrega del proyecto dueña de V, y NO en `entregas.director_grade`
 
 ### RF-NOT-03: Nota y observación editables mientras la entrega esté activa
 
@@ -248,18 +260,23 @@ El director MAY editar `director_grade` y sus observaciones mientras `entrega.st
 - WHEN el director intenta modificar la nota o la observación
 - THEN el sistema MUST responder 422 con `error.message = "La entrega está cerrada; la nota y las observaciones no pueden modificarse"`
 
-### RF-NOT-04: Nota del director visible al evaluador
+### RF-NOT-04: Nota del director visible al evaluador (por proyecto)
 
-El endpoint `GET /api/evaluador/asignaciones/{id}/detalle` MUST incluir `director_grade` (puede ser null) en la sección `entrega`.
+El endpoint `GET /api/evaluador/asignaciones/{id}/detalle` MUST incluir `director_grade` (puede ser null) en la sección `entrega`, tomado de la `entrega_proyecto` del PROYECTO evaluado (D3-rev) — nunca de la entrega general/plantilla. La card `GET /api/evaluador/mis-asignaciones` MAY incluir el mismo `director_grade` por proyecto.
 
 #### Escenario: Nota del director presente
-- GIVEN una entrega con `director_grade = 4.0` ya asignada
+- GIVEN una `entrega_proyecto` del proyecto evaluado con `director_grade = 4.0` ya asignada
 - WHEN el evaluador solicita el detalle
 - THEN la respuesta MUST incluir `entrega.director_grade = 4.0`
 
 > Nota: la nota se almacena en escala 0-5 con 2 decimales (ver RF-NOT-01). El ejemplo 4.0 permanece válido dentro del rango.
 
 #### Escenario: Nota del director ausente
-- GIVEN una entrega con `director_grade = NULL`
+- GIVEN el proyecto evaluado sin `director_grade` asignada (NULL)
 - WHEN el evaluador solicita el detalle
 - THEN la respuesta MUST incluir `entrega.director_grade = null`
+
+#### Escenario: Dos proyectos no comparten la nota (D3-rev)
+- GIVEN dos proyectos comparten la misma entrega general de la fase, con `director_grade` 4.0 y 3.5 en sus `entrega_proyecto` respectivas
+- WHEN cada evaluador solicita el detalle de su asignación
+- THEN cada respuesta MUST incluir el `director_grade` de SU proyecto (4.0 y 3.5, respectivamente)

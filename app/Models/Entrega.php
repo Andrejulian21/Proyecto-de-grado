@@ -148,4 +148,48 @@ class Entrega extends Model
                 });
         });
     }
+
+    /**
+     * Whether the given user is a student of any project linked to this
+     * entrega (checks the pivot projects and falls back to the direct FK).
+     */
+    public function esEstudiante(int $userId): bool
+    {
+        $proyectos = $this->proyectos()->get();
+
+        foreach ($proyectos as $proyecto) {
+            $esEstudiante = $proyecto->estudiantes()
+                ->where('user_id', $userId)
+                ->exists();
+
+            if ($esEstudiante) {
+                return true;
+            }
+        }
+
+        if ($this->proyecto) {
+            return $this->proyecto->estudiantes()
+                ->where('user_id', $userId)
+                ->exists();
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether the given user is the director of any project linked to this
+     * entrega (checks the pivot projects and falls back to the direct FK).
+     */
+    public function esDirector(int $userId): bool
+    {
+        $proyectos = $this->proyectos()->get();
+
+        foreach ($proyectos as $proyecto) {
+            if ($proyecto->director_id === $userId) {
+                return true;
+            }
+        }
+
+        return $this->proyecto !== null && $this->proyecto->director_id === $userId;
+    }
 }

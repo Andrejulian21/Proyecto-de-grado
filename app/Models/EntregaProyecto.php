@@ -17,12 +17,14 @@ class EntregaProyecto extends Model
         'proyecto_id',
         'estado',
         'observaciones_director',
+        'director_grade',
     ];
 
     protected function casts(): array
     {
         return [
             'estado' => 'string',
+            'director_grade' => 'decimal:2',
         ];
     }
 

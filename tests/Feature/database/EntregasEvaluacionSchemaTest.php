@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Entrega;
+use App\Models\EntregaProyecto;
 use App\Models\EvaluacionEvaluador;
 use App\Models\EvaluadorProyecto;
 use App\Models\Proyecto;
@@ -128,6 +129,52 @@ test('Entrega fillable includes grade_percentage and director_grade', function (
 
     expect($entrega->getFillable())->toContain('grade_percentage')
         ->and($entrega->getFillable())->toContain('director_grade');
+});
+
+// ---------------------------------------------------------------------------
+// D3-rev (2026-08-05): director_grade lives on the per-project delivery
+// ---------------------------------------------------------------------------
+
+test('entrega_proyecto has director_grade column (nullable decimal/numeric)', function () {
+    expect(Schema::hasColumn('entrega_proyecto', 'director_grade'))->toBeTrue();
+
+    $columns = Schema::getColumns('entrega_proyecto');
+    $col = collect($columns)->firstWhere('name', 'director_grade');
+
+    expect($col)->not->toBeNull();
+    expect($col['nullable'] ?? false)->toBeTrue();
+    expect(columnIsDecimalLike($col))->toBeTrue();
+});
+
+test('entrega_proyecto director_grade has precision 4, scale 2 on PostgreSQL', function () {
+    if (DB::getDriverName() !== 'pgsql') {
+        $this->markTestSkipped('Precision/scale only exposed on PostgreSQL — SQLite stores numeric affinity and is checked at model level.');
+    }
+
+    $columns = Schema::getColumns('entrega_proyecto');
+    $col = collect($columns)->firstWhere('name', 'director_grade');
+
+    expect((int) ($col['precision'] ?? 0))->toBe(4);
+    expect((int) ($col['scale'] ?? 0))->toBe(2);
+});
+
+test('EntregaProyecto fillable includes director_grade', function () {
+    $ep = new EntregaProyecto;
+
+    expect($ep->getFillable())->toContain('director_grade');
+});
+
+test('EntregaProyecto casts director_grade to decimal:2', function () {
+    $ep = new EntregaProyecto;
+
+    expect($ep->getCasts())->toHaveKey('director_grade');
+    expect($ep->getCasts()['director_grade'])->toBe('decimal:2');
+});
+
+test('director_grade migration is reversible (down drops the column)', function () {
+    $migration = include database_path('migrations/2026_08_05_000001_add_director_grade_to_entrega_proyecto_table.php');
+
+    expect(method_exists($migration, 'down'))->toBeTrue();
 });
 
 // ---------------------------------------------------------------------------

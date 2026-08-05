@@ -4,8 +4,8 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import {
     ArrowLeft, Download, FileText, Calendar, Loader2,
-    AlertTriangle, MessageSquareText, Star, Clock,
-    CheckCircle2, XCircle, Send,
+    AlertTriangle, MessageSquareText, Star,
+    CheckCircle2, Send,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
 import type { ArchivoRequeridoConfig } from '@/types/entregas';
@@ -42,6 +42,7 @@ interface EntregaDetail {
     acceptance_criteria: string | null;
     archivos_requeridos?: ArchivoRequeridoConfig[];
     consolidated_grade: string | number | null;
+    director_grade?: number | null;
     evaluation_complete: boolean;
     proyecto?: { id: number; code: string; title: string };
     proyectos?: { id: number; code: string; title: string }[];
@@ -95,14 +96,6 @@ function formatDateShort(dateStr: string | null | undefined): string {
         return dateStr;
     }
 }
-
-function formatFileSize(bytes: number | null): string {
-    if (bytes === null || bytes === undefined) return '—';
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 function getDownloadUrl(filePath: string): string {
     return `/storage/${filePath}`;
 }
@@ -142,6 +135,7 @@ export default function RevisionEntregaDirector() {
 
     /* ── Review form state ── */
     const [directorNotes, setDirectorNotes] = useState('');
+    const [directorGrade, setDirectorGrade] = useState('');
     const [decision, setDecision] = useState<'aprobada' | 'revisada' | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
@@ -163,7 +157,11 @@ export default function RevisionEntregaDirector() {
                     throw new Error(body?.message ?? `Error ${res.status}`);
                 }
                 const json = await res.json();
-                setEntrega(json.data ?? json);
+                const data = json.data ?? json;
+                setEntrega(data);
+                setDirectorGrade(
+                    data.director_grade != null ? String(data.director_grade) : '',
+                );
             } catch (err) {
                 if (!cancelled) {
                     setError(err instanceof Error ? err.message : 'Error al cargar la entrega');
@@ -185,6 +183,21 @@ export default function RevisionEntregaDirector() {
     async function handleSubmitReview() {
         if (!entregaId || !decision) return;
 
+        // RF-NOT-02: the note is captured when the review approves the delivery.
+        let directorGradePayload: number | undefined;
+        if (decision === 'aprobada' && directorGrade.trim() !== '') {
+            const nota = Number(directorGrade);
+            if (!Number.isFinite(nota) || nota < 0 || nota > 5) {
+                setSubmitError('La nota del director debe estar entre 0 y 5.');
+                return;
+            }
+            if (Math.round(nota * 100) / 100 !== nota) {
+                setSubmitError('La nota del director debe tener máximo 2 decimales.');
+                return;
+            }
+            directorGradePayload = nota;
+        }
+
         setSubmitting(true);
         setSubmitError(null);
 
@@ -198,6 +211,9 @@ export default function RevisionEntregaDirector() {
                     director_notes: directorNotes || null,
                     version_id: selectedVersion?.id,
                     archivo_requerido_id: activeArchivo?.config.id ?? null,
+                    ...(directorGradePayload !== undefined
+                        ? { director_grade: directorGradePayload }
+                        : {}),
                 }),
             });
 
@@ -273,6 +289,16 @@ export default function RevisionEntregaDirector() {
     }
 
     const statusCfg = statusConfig(entrega.status);
+
+    /* ── RF-NOT-03: the delivery is closed when its status is terminal
+       or its due_date is in the past; note and observations are read-only. */
+    const esTerminal = entrega.status === 'aprobada' || entrega.status === 'rechazada';
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const dueInicio = entrega.due_date ? new Date(entrega.due_date) : null;
+    if (dueInicio) dueInicio.setHours(0, 0, 0, 0);
+    const vencida = dueInicio !== null && dueInicio < hoy;
+    const cerrada = esTerminal || vencida;
 
     /* ══════════════════════════════════════════════════
        Submitted (success screen)
@@ -560,6 +586,16 @@ export default function RevisionEntregaDirector() {
                         </h3>
                     </div>
 
+                    {cerrada && (
+                        <div
+                            className="mb-6 flex items-center gap-2 rounded-lg border border-[#fecaca] bg-[#fee2e2] px-4 py-3 text-sm text-[#dc2626]"
+                            role="alert"
+                        >
+                            <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                            La entrega está cerrada; la nota y las observaciones no pueden modificarse.
+                        </div>
+                    )}
+
                     <div className="flex flex-col gap-6">
                         {/* 1. Observaciones */}
                         <div>
@@ -574,8 +610,9 @@ export default function RevisionEntregaDirector() {
                                 rows={5}
                                 value={directorNotes}
                                 onChange={(e) => setDirectorNotes(e.target.value)}
+                                disabled={cerrada}
                                 placeholder="Escriba sus observaciones sobre la entrega..."
-                                className="w-full min-h-[100px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y"
+                                className="w-full min-h-[100px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] disabled:bg-[#f5f5f4] disabled:opacity-70 resize-y"
                             />
                         </div>
 
@@ -588,7 +625,8 @@ export default function RevisionEntregaDirector() {
                                 <button
                                     type="button"
                                     onClick={() => setDecision('aprobada')}
-                                    className={`flex flex-1 items-center gap-3 rounded-lg border p-4 text-left transition-all active:scale-[0.98] ${
+                                    disabled={cerrada}
+                                    className={`flex flex-1 items-center gap-3 rounded-lg border p-4 text-left transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${
                                         decision === 'aprobada'
                                             ? 'border-[#16a34a] bg-[#dcfce7]'
                                             : 'border-[#e5e5e5] hover:bg-[#fafaf9]'
@@ -609,7 +647,8 @@ export default function RevisionEntregaDirector() {
                                 <button
                                     type="button"
                                     onClick={() => setDecision('revisada')}
-                                    className={`flex flex-1 items-center gap-3 rounded-lg border p-4 text-left transition-all active:scale-[0.98] ${
+                                    disabled={cerrada}
+                                    className={`flex flex-1 items-center gap-3 rounded-lg border p-4 text-left transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${
                                         decision === 'revisada'
                                             ? 'border-[#d97706] bg-[#fef3c7]'
                                             : 'border-[#e5e5e5] hover:bg-[#fafaf9]'
@@ -630,6 +669,33 @@ export default function RevisionEntregaDirector() {
                             </div>
                         </div>
 
+                        {/* RF-NOT-02: nota del director visible al aprobar */}
+                        {decision === 'aprobada' && (
+                            <div className="flex flex-col gap-1.5">
+                                <label
+                                    htmlFor="director-grade"
+                                    className="text-xs font-bold uppercase tracking-[0.05em] text-[#57534e]"
+                                >
+                                    Nota del director (0 – 5)
+                                </label>
+                                <input
+                                    id="director-grade"
+                                    type="number"
+                                    min={0}
+                                    max={5}
+                                    step={0.1}
+                                    value={directorGrade}
+                                    onChange={(e) => setDirectorGrade(e.target.value)}
+                                    disabled={cerrada}
+                                    placeholder="Ej: 4.5"
+                                    className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] disabled:bg-[#f5f5f4] disabled:opacity-70 tabular-nums"
+                                />
+                                <p className="text-xs text-[#a8a29e]">
+                                    La nota se guarda al aprobar la entrega (escala 0-5).
+                                </p>
+                            </div>
+                        )}
+
                         {/* Error message */}
                         {submitError && (
                             <div className="rounded-lg border border-[#fee2e2] bg-[#fef2f2] px-4 py-3 text-sm text-[#dc2626]">
@@ -641,7 +707,7 @@ export default function RevisionEntregaDirector() {
                         <button
                             type="button"
                             onClick={handleSubmitReview}
-                            disabled={!decision || submitting}
+                            disabled={!decision || submitting || cerrada}
                             className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             {submitting ? (
@@ -663,6 +729,20 @@ export default function RevisionEntregaDirector() {
                         </div>
                         <p className="mt-1 text-2xl font-bold text-[#1c1917]">
                             {Number(entrega.consolidated_grade).toFixed(2)}
+                            <span className="text-sm font-normal text-[#78716c]"> / 5.00</span>
+                        </p>
+                    </div>
+                )}
+
+                {/* ── G. Nota del director (RF-NOT-04) ── */}
+                {entrega.director_grade != null && (
+                    <div className="rounded-xl border border-[#e5e5e5] bg-white p-5 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
+                        <div className="flex items-center gap-2">
+                            <Star className="h-4 w-4 text-[#d97706]" aria-hidden="true" />
+                            <p className="text-xs text-[#78716c]">Nota del director</p>
+                        </div>
+                        <p className="mt-1 text-2xl font-bold text-[#1c1917]">
+                            {Number(entrega.director_grade).toFixed(2)}
                             <span className="text-sm font-normal text-[#78716c]"> / 5.00</span>
                         </p>
                     </div>

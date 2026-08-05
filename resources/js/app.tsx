@@ -43,6 +43,7 @@ const VerBitacorasCoordinador = lazy(() => import('@/pages/coordinador/VerBitaco
 const RevisionBitacoraCoordinador = lazy(() => import('@/pages/coordinador/RevisionBitacoraCoordinador'));
 const EvaluarProyecto = lazy(() => import('@/pages/evaluador/EvaluarProyecto'));
 const EvaluadorCalificar = lazy(() => import('@/pages/evaluador/EvaluadorCalificar'));
+const MisAsignaciones = lazy(() => import('@/pages/evaluador/MisAsignaciones'));
 const AnalisisAutomaticoEntregas = lazy(() => import('@/pages/estudiante/AnalisisAutomaticoEntregas'));
 const AsistenteOrientacion = lazy(() => import('@/pages/estudiante/AsistenteOrientacion'));
 const EvaluacionesDirector = lazy(() => import('@/pages/director/EvaluacionesDirector'));
@@ -152,6 +153,9 @@ function App() {
                                 {/* PR13: Evaluador */}
                                 <Route path="/evaluaciones/:id" element={<ProtectedRoute allowedRoles={['Director', 'EvaluadorExterno']}><SuspenseWrapper><EvaluarProyecto /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/evaluaciones/:id/calificar" element={<ProtectedRoute allowedRoles={['EvaluadorExterno']}><SuspenseWrapper><EvaluadorCalificar /></SuspenseWrapper></ProtectedRoute>} />
+                                {/* PR5: Mis asignaciones (evaluador externo y director) */}
+                                <Route path="/evaluador/mis-asignaciones" element={<ProtectedRoute allowedRoles={['EvaluadorExterno', 'Director']}><SuspenseWrapper><MisAsignaciones /></SuspenseWrapper></ProtectedRoute>} />
+                                <Route path="/evaluador/asignaciones/:id" element={<ProtectedRoute allowedRoles={['EvaluadorExterno', 'Director']}><SuspenseWrapper><EvaluadorCalificar /></SuspenseWrapper></ProtectedRoute>} />
                                 {/* Estudiante detalle entrega */}
                                 <Route path="/estudiante/entregas/:entregaId" element={<ProtectedRoute allowedRoles={['Estudiante']}><SuspenseWrapper><DetalleEntregaEstudiante /></SuspenseWrapper></ProtectedRoute>} />
                                 {/* PR14: IA mock */}

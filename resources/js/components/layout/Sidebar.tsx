@@ -11,7 +11,6 @@ import {
     X,
     UserCheck,
     Bell,
-    Calendar,
     BarChart3,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -38,7 +37,7 @@ const navConfig: Record<string, { to: string; icon: typeof LayoutDashboard; labe
     Director: [
         { to: '/dashboard/director', label: 'Panel', icon: LayoutDashboard },
         { to: '/supervision', label: 'Supervisión', icon: FolderKanban },
-        { to: '/evaluaciones', label: 'Evaluaciones', icon: ClipboardCheck },
+        { to: '/evaluador/mis-asignaciones', label: 'Evaluaciones', icon: ClipboardCheck },
         { to: '/anuncios', label: 'Anuncios', icon: Megaphone },
         { to: '/recursos', label: 'Recursos', icon: FolderKanban },
     ],
@@ -52,7 +51,7 @@ const navConfig: Record<string, { to: string; icon: typeof LayoutDashboard; labe
     ],
     EvaluadorExterno: [
         { to: '/', label: 'Panel de Control', icon: LayoutDashboard },
-        { to: '/evaluaciones', label: 'Evaluaciones', icon: ClipboardCheck },
+        { to: '/evaluador/mis-asignaciones', label: 'Mis Asignaciones', icon: ClipboardCheck },
         { to: '/anuncios', label: 'Anuncios', icon: Megaphone },
         { to: '/recursos', label: 'Recursos', icon: FolderKanban },
     ],
@@ -108,7 +107,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                                 <li key={item.to}>
                                     <NavLink
                                         to={item.to}
-                                        end={['/', '/dashboard/director', '/dashboard/estudiante', '/dashboard/coordinador', '/anuncios', '/anuncios/admin', '/evaluaciones'].includes(item.to)}
+                                        end={['/', '/dashboard/director', '/dashboard/estudiante', '/dashboard/coordinador', '/anuncios', '/anuncios/admin', '/evaluaciones', '/evaluador/mis-asignaciones'].includes(item.to)}
                                         onClick={onClose}
                                         className={({ isActive }) =>
                                             cn(

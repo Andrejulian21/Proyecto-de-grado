@@ -94,3 +94,32 @@ it('validates unique slugs in archivos_requeridos', function () {
 
     $response->assertStatus(422);
 });
+
+it('persiste fecha de inicio, hora de inicio y hora máxima al crear', function () {
+    $response = $this->actingAs($this->coordinador)
+        ->postJson('/api/admin/entregas', [
+            'grupo_id' => $this->semestre->id,
+            'fase' => 'anteproyecto',
+            'titulo' => 'Entrega con ventana',
+            'descripcion' => 'Descripción',
+            'fecha_limite' => '2026-08-20',
+            'fecha_inicio' => '2026-08-05',
+            'hora_inicio' => '09:00',
+            'hora_maxima' => '18:30',
+            'archivos_requeridos' => [
+                ['id' => 'documento-proyecto', 'nombre' => 'Documento', 'versionamiento' => true],
+            ],
+        ]);
+
+    $response->assertStatus(201);
+
+    $entrega = Entrega::first();
+    expect($entrega->start_date->toDateString())->toBe('2026-08-05');
+    expect($entrega->start_time)->toBe('09:00');
+    expect($entrega->hora_maxima)->toBe('18:30');
+
+    // The response must echo the persisted window so the UI can lock/disable.
+    expect($response->json('data.start_date'))->not->toBeNull();
+    expect($response->json('data.start_time'))->toBe('09:00');
+    expect($response->json('data.hora_maxima'))->toBe('18:30');
+});

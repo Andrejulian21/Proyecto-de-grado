@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -140,9 +140,6 @@ export default function DetalleEntregaEstudiante() {
     /* Expanded version history */
     const [expandedSlugs, setExpandedSlugs] = useState<Set<string>>(new Set());
 
-    /* Locked state */
-    const [isLocked, setIsLocked] = useState(false);
-
     useEffect(() => {
         if (!entregaId) return;
         let cancelled = false;
@@ -160,17 +157,6 @@ export default function DetalleEntregaEstudiante() {
                 const json = await res.json();
                 const data: EntregaDetail = json.data ?? json;
                 setEntrega(data);
-
-                /* Check if locked by start_date */
-                if (data.start_date) {
-                    const startDate = new Date(data.start_date);
-                    const now = new Date();
-                    if (data.start_time) {
-                        const [hours, minutes] = data.start_time.split(':').map(Number);
-                        startDate.setHours(hours || 0, minutes || 0, 0, 0);
-                    }
-                    setIsLocked(now < startDate);
-                }
             } catch (err) {
                 if (!cancelled) {
                     setError(err instanceof Error ? err.message : 'Error al cargar la entrega');
@@ -309,6 +295,44 @@ export default function DetalleEntregaEstudiante() {
         desarrollo: 'Desarrollo del proyecto',
         presentacion_final: 'Presentación Final',
     };
+
+    /* Business window (mirrors EntregaEstudianteController::verificarVentanaTiempo):
+       - before start_date (+ start_time): locked — cannot view/upload.
+       - after due_date (+ hora_maxima): can view, cannot upload. */
+    function fechaLocalISO(date: Date): string {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    function parsearFechaLocal(fecha: string, hora?: string | null): Date {
+        const [y, m, d] = fecha.slice(0, 10).split('-').map(Number);
+        const date = new Date(y, (m || 1) - 1, d || 1);
+        if (hora) {
+            const [hh, mm] = hora.split(':').map(Number);
+            date.setHours(hh || 0, mm || 0, 0, 0);
+        }
+        return date;
+    }
+
+    const isLocked = useMemo(() => {
+        if (!entrega?.start_date) return false;
+        return new Date() < parsearFechaLocal(entrega.start_date, entrega.start_time);
+    }, [entrega]);
+
+    const vencida = useMemo(() => {
+        if (!entrega?.due_date) return false;
+        const now = new Date();
+        const hoy = fechaLocalISO(now);
+        const dueDia = String(entrega.due_date).slice(0, 10);
+        if (hoy > dueDia) return true;
+        if (hoy === dueDia && entrega.hora_maxima) {
+            const horaActual = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+            if (horaActual > entrega.hora_maxima) return true;
+        }
+        return false;
+    }, [entrega]);
 
     function canDeleteVersion(v: Version): boolean {
         return !v.director_notes || v.director_notes.trim().length === 0;
@@ -453,6 +477,13 @@ export default function DetalleEntregaEstudiante() {
                 ) : (
                     /* ── Per-file cards ── */
                     <div className="flex flex-col gap-4">
+                        {vencida && (
+                            <div className="flex items-center gap-2 rounded-lg bg-[#fef3c7] px-4 py-2 text-sm text-[#78350f]">
+                                <AlertTriangle className="h-4 w-4 shrink-0" />
+                                La fecha límite de la entrega ya pasó. Puedes ver los archivos, pero no subir nuevas versiones.
+                            </div>
+                        )}
+
                         {archivosConVersiones.length === 0 ? (
                             <div className="rounded-xl border border-[#e5e5e5] bg-white p-8 text-center shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                                 <p className="text-sm text-[#a8a29e]">
@@ -509,7 +540,8 @@ export default function DetalleEntregaEstudiante() {
                                                 {config.versionamiento && versiones.length < MAX_VERSIONS_PER_ARCHIVO && (
                                                     <button
                                                         onClick={() => fileInputRefs.current[config.id]?.click()}
-                                                        disabled={uploadingSlug === config.id}
+                                                        disabled={uploadingSlug === config.id || vencida}
+                                                        title={vencida ? 'La fecha límite ya pasó' : undefined}
                                                         className="inline-flex min-h-[32px] items-center gap-1.5 rounded-lg bg-[#c2410c] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#9a330a] disabled:cursor-not-allowed disabled:opacity-50"
                                                     >
                                                         {uploadingSlug === config.id ? (
@@ -524,7 +556,8 @@ export default function DetalleEntregaEstudiante() {
                                                 {!config.versionamiento && (
                                                     <button
                                                         onClick={() => fileInputRefs.current[config.id]?.click()}
-                                                        disabled={uploadingSlug === config.id}
+                                                        disabled={uploadingSlug === config.id || vencida}
+                                                        title={vencida ? 'La fecha límite ya pasó' : undefined}
                                                         className="inline-flex min-h-[32px] items-center gap-1.5 rounded-lg bg-[#c2410c] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#9a330a] disabled:cursor-not-allowed disabled:opacity-50"
                                                     >
                                                         {uploadingSlug === config.id ? (

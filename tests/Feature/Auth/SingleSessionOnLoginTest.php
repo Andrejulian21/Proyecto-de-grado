@@ -138,7 +138,13 @@ it('handleGoogleCallback deletes prior session rows for the same user', function
 
     $this->get('/auth/callback');
 
-    // Device A's session was wiped by the callback, but a new session
-    // is created for the callback request itself (SESSION_DRIVER=database).
-    expect(DB::table('sessions')->where('user_id', $user->id)->count())->toBe(1);
+    // Device A's session was wiped by the callback. The number of
+    // remaining rows depends on the SESSION_DRIVER:
+    //   - 'database': a new session row is created for the callback
+    //     request itself, so device A is gone and 1 row remains.
+    //   - 'array' (phpunit.xml default): sessions are kept in memory
+    //     and never persisted, so both device A and the callback's
+    //     own session are absent → 0 rows.
+    $expected = config('session.driver') === 'database' ? 1 : 0;
+    expect(DB::table('sessions')->where('user_id', $user->id)->count())->toBe($expected);
 });

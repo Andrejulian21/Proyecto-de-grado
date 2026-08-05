@@ -36,55 +36,10 @@ use Illuminate\Support\Facades\Schema;
 
 uses(RefreshDatabase::class);
 
-/**
- * Check if a column has decimal/numeric type. SQLite reports "numeric" and
- * PostgreSQL reports "decimal" / "numeric" depending on the variant.
- */
-function columnIsDecimalLike(?array $col): bool
-{
-    if ($col === null) {
-        return false;
-    }
-
-    $type = strtolower((string) ($col['type'] ?? $col['type_name'] ?? ''));
-
-    return str_contains($type, 'numeric') || str_contains($type, 'decimal');
-}
-
-/**
- * Check if a column has boolean type. SQLite reports "tinyint(1)" (Laravel's
- * boolean translation) and PostgreSQL reports "bool".
- */
-function columnIsBooleanLike(?array $col): bool
-{
-    if ($col === null) {
-        return false;
-    }
-
-    $type = strtolower((string) ($col['type'] ?? $col['type_name'] ?? ''));
-
-    return str_contains($type, 'bool')
-        || str_contains($type, 'tinyint');
-}
-
-/**
- * Normalize a column default value for comparison. SQLite wraps string/char
- * defaults in single quotes; we strip them. PHP booleans pass through.
- */
-function normalizeColumnDefault(mixed $value): string
-{
-    if ($value === null) {
-        return '';
-    }
-
-    $s = (string) $value;
-
-    if (strlen($s) >= 2 && $s[0] === "'" && substr($s, -1) === "'") {
-        $s = substr($s, 1, -1);
-    }
-
-    return trim($s);
-}
+// Schema inspection helpers (columnIsDecimalLike, columnIsBooleanLike,
+// normalizeColumnDefault) live in tests/Pest.php so other schema tests can
+// share them. They are global functions on purpose: pest hoists them into
+// the test process and they are pure (no closures over test state).
 
 // ---------------------------------------------------------------------------
 // T-002: grade_percentage + director_grade columns on `entregas`
@@ -102,17 +57,15 @@ test('entregas has grade_percentage column (nullable decimal/numeric)', function
 });
 
 test('grade_percentage has precision 5, scale 2 on PostgreSQL', function () {
+    if (DB::getDriverName() !== 'pgsql') {
+        $this->markTestSkipped('Precision/scale only exposed on PostgreSQL — SQLite stores numeric affinity and is checked at model level.');
+    }
+
     $columns = Schema::getColumns('entregas');
     $col = collect($columns)->firstWhere('name', 'grade_percentage');
 
-    // SQLite does not surface precision/scale via Schema::getColumns().
-    // On production (PostgreSQL) the migration declares decimal(5,2).
-    if (DB::getDriverName() === 'pgsql') {
-        expect((int) ($col['precision'] ?? 0))->toBe(5);
-        expect((int) ($col['scale'] ?? 0))->toBe(2);
-    } else {
-        expect(true)->toBeTrue(); // SQLite stores numeric affinity; precision checked at model level.
-    }
+    expect((int) ($col['precision'] ?? 0))->toBe(5);
+    expect((int) ($col['scale'] ?? 0))->toBe(2);
 });
 
 test('entregas has director_grade column (nullable decimal/numeric)', function () {
@@ -127,15 +80,15 @@ test('entregas has director_grade column (nullable decimal/numeric)', function (
 });
 
 test('director_grade has precision 4, scale 2 on PostgreSQL', function () {
+    if (DB::getDriverName() !== 'pgsql') {
+        $this->markTestSkipped('Precision/scale only exposed on PostgreSQL — SQLite stores numeric affinity and is checked at model level.');
+    }
+
     $columns = Schema::getColumns('entregas');
     $col = collect($columns)->firstWhere('name', 'director_grade');
 
-    if (DB::getDriverName() === 'pgsql') {
-        expect((int) ($col['precision'] ?? 0))->toBe(4);
-        expect((int) ($col['scale'] ?? 0))->toBe(2);
-    } else {
-        expect(true)->toBeTrue();
-    }
+    expect((int) ($col['precision'] ?? 0))->toBe(4);
+    expect((int) ($col['scale'] ?? 0))->toBe(2);
 });
 
 test('Entrega persists grade_percentage as decimal via cast', function () {
@@ -303,15 +256,15 @@ test('evaluaciones_evaluador has nota decimal/numeric column', function () {
 });
 
 test('evaluaciones_evaluador.nota has precision 4, scale 2 on PostgreSQL', function () {
+    if (DB::getDriverName() !== 'pgsql') {
+        $this->markTestSkipped('Precision/scale only exposed on PostgreSQL — SQLite stores numeric affinity and is checked at model level.');
+    }
+
     $columns = Schema::getColumns('evaluaciones_evaluador');
     $col = collect($columns)->firstWhere('name', 'nota');
 
-    if (DB::getDriverName() === 'pgsql') {
-        expect((int) ($col['precision'] ?? 0))->toBe(4);
-        expect((int) ($col['scale'] ?? 0))->toBe(2);
-    } else {
-        expect(true)->toBeTrue();
-    }
+    expect((int) ($col['precision'] ?? 0))->toBe(4);
+    expect((int) ($col['scale'] ?? 0))->toBe(2);
 });
 
 test('evaluaciones_evaluador has observaciones text column', function () {
@@ -331,6 +284,62 @@ test('evaluaciones_evaluador has timestamps', function () {
 });
 
 // ---------------------------------------------------------------------------
+// RF-EVA-05 (amended 2026-08-04): evaluated_at column
+// ---------------------------------------------------------------------------
+
+test('evaluaciones_evaluador has evaluated_at column (nullable timestamp)', function () {
+    expect(Schema::hasColumn('evaluaciones_evaluador', 'evaluated_at'))->toBeTrue();
+
+    $columns = Schema::getColumns('evaluaciones_evaluador');
+    $col = collect($columns)->firstWhere('name', 'evaluated_at');
+
+    expect($col)->not->toBeNull();
+    expect($col['nullable'] ?? false)->toBeTrue();
+});
+
+test('EvaluacionEvaluador persists evaluated_at when explicitly set', function () {
+    $user = User::factory()->create();
+    $semestre = Semestre::create(['name' => '2026-1', 'start_date' => '2026-02-01', 'end_date' => '2026-06-30']);
+    $proyecto = Proyecto::create(['title' => 'P', 'semester_id' => $semestre->id]);
+    $ep = EvaluadorProyecto::factory()->create([
+        'proyecto_id' => $proyecto->id,
+        'evaluador_id' => $user->id,
+    ]);
+
+    $now = now();
+    $eval = EvaluacionEvaluador::create([
+        'evaluador_proyecto_id' => $ep->id,
+        'nota' => 4.5,
+        'observaciones' => 'Documento bien estructurado',
+        'evaluated_at' => $now,
+    ]);
+
+    expect($eval->evaluated_at)->not->toBeNull();
+    expect($eval->evaluated_at->toIso8601String())->toBe($now->toIso8601String());
+});
+
+test('EvaluacionEvaluador.evaluated_at is nullable when omitted (backfill safety)', function () {
+    $user = User::factory()->create();
+    $semestre = Semestre::create(['name' => '2026-1', 'start_date' => '2026-02-01', 'end_date' => '2026-06-30']);
+    $proyecto = Proyecto::create(['title' => 'P', 'semester_id' => $semestre->id]);
+    $ep = EvaluadorProyecto::factory()->create([
+        'proyecto_id' => $proyecto->id,
+        'evaluador_id' => $user->id,
+    ]);
+
+    // No evaluated_at provided — row is created (e.g. backfill path) and
+    // the column stays NULL. The model contract MUST allow this.
+    $eval = EvaluacionEvaluador::create([
+        'evaluador_proyecto_id' => $ep->id,
+        'nota' => 3.0,
+        'observaciones' => null,
+    ]);
+
+    expect($eval->exists)->toBeTrue();
+    expect($eval->evaluated_at)->toBeNull();
+});
+
+// ---------------------------------------------------------------------------
 // T-007: EvaluacionEvaluador model
 // ---------------------------------------------------------------------------
 
@@ -340,20 +349,23 @@ test('EvaluacionEvaluador model exists and extends Model', function () {
     expect($model)->toBeInstanceOf(Model::class);
 });
 
-test('EvaluacionEvaluador fillable contains evaluador_proyecto_id, nota, observaciones', function () {
+test('EvaluacionEvaluador fillable contains evaluador_proyecto_id, nota, observaciones, evaluated_at', function () {
     $model = new EvaluacionEvaluador;
     $fillable = $model->getFillable();
 
     expect($fillable)->toContain('evaluador_proyecto_id')
         ->and($fillable)->toContain('nota')
-        ->and($fillable)->toContain('observaciones');
+        ->and($fillable)->toContain('observaciones')
+        ->and($fillable)->toContain('evaluated_at');
 });
 
-test('EvaluacionEvaluador casts nota to decimal:2', function () {
+test('EvaluacionEvaluador casts nota to decimal:2 and evaluated_at to datetime', function () {
     $model = new EvaluacionEvaluador;
 
     expect($model->getCasts())->toHaveKey('nota');
     expect($model->getCasts()['nota'])->toBe('decimal:2');
+    expect($model->getCasts())->toHaveKey('evaluated_at');
+    expect($model->getCasts()['evaluated_at'])->toBe('datetime');
 });
 
 test('EvaluacionEvaluador belongs to EvaluadorProyecto', function () {

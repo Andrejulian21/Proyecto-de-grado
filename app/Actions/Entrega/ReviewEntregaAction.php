@@ -33,21 +33,39 @@ final class ReviewEntregaAction
             'evaluation_complete' => true,
         ];
 
-        // RF-NOT-02: the director grade is captured when the observation is
-        // approved; it is never persisted on a non-approval review.
-        if ($data['status'] === 'aprobada' && isset($data['director_grade'])) {
-            $updateData['director_grade'] = $data['director_grade'];
-        }
-
         $entrega->update($updateData);
+
+        // Resolve the reviewed version (RF-NOT-02: notes are per version).
+        $version = VersionDocumento::where('entrega_id', $entrega->id)
+            ->where('id', $data['version_id'])
+            ->firstOrFail();
 
         // Save director notes to the specific version sent by the frontend
         if (! empty($data['director_notes'])) {
-            $version = VersionDocumento::where('entrega_id', $entrega->id)
-                ->where('id', $data['version_id'])
-                ->firstOrFail();
-
             $version->update(['director_notes' => $data['director_notes']]);
+        }
+
+        // D3-rev: the director grade and observations belong to the STUDENT
+        // delivery (per project). The reviewed version resolves its
+        // EntregaProyecto; legacy versions without a pivot are skipped.
+        $entregaProyecto = $version->entregaProyecto;
+
+        if ($entregaProyecto !== null) {
+            $pivotData = [];
+
+            // RF-NOT-02: the grade is only captured when the delivery is
+            // approved; it is never persisted on a non-approval review.
+            if ($data['status'] === 'aprobada' && isset($data['director_grade'])) {
+                $pivotData['director_grade'] = $data['director_grade'];
+            }
+
+            if (! empty($data['director_notes'])) {
+                $pivotData['observaciones_director'] = $data['director_notes'];
+            }
+
+            if ($pivotData !== []) {
+                $entregaProyecto->update($pivotData);
+            }
         }
 
         // Auto-advance phase if all entregas in the current phase are approved

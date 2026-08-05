@@ -80,6 +80,11 @@ export interface AsignacionEvaluador {
      * definitive note is always available in the detail (RF-EVA-02/04).
      */
     nota?: number | null;
+    /**
+     * Director's grade for THAT project's delivery (D3-rev), resolved from
+     * `entrega_proyecto` — never the shared general-delivery template grade.
+     */
+    director_grade?: number | null;
 }
 
 /** Evaluation sent by the evaluador (RF-EVA-02/03) — immutable. */

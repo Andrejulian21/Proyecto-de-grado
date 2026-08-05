@@ -264,7 +264,7 @@ export default function EvaluadorCalificar() {
                             <div className="flex items-center gap-3">
                                 <Star className="h-5 w-5 shrink-0 text-[#78716c]" aria-hidden="true" />
                                 <div>
-                                    <p className="text-xs text-[#78716c]">Nota del director</p>
+                                    <p className="text-xs text-[#78716c]">Nota del director (proyecto)</p>
                                     <p className="text-sm font-semibold text-[#1c1917] tabular-nums">
                                         {entrega?.director_grade != null
                                             ? `${Number(entrega.director_grade).toFixed(2)} / 5.00`

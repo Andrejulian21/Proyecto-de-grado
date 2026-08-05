@@ -98,6 +98,18 @@ function AsignacionCard({ asignacion }: { asignacion: AsignacionEvaluador }) {
                 </div>
             )}
 
+            {evaluada && asignacion.director_grade != null && (
+                <div className="mb-4 flex items-center gap-1.5 text-xs text-[#57534e]">
+                    <Star className="h-3.5 w-3.5 shrink-0 text-[#d97706]" aria-hidden="true" />
+                    <span>
+                        Nota del director (proyecto):{' '}
+                        <span className="tabular-nums font-semibold text-[#1c1917]">
+                            {Number(asignacion.director_grade).toFixed(2)} / 5.00
+                        </span>
+                    </span>
+                </div>
+            )}
+
             <button
                 type="button"
                 onClick={() => navigate(`/evaluador/asignaciones/${asignacion.id}`)}

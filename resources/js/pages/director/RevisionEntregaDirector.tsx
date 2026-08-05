@@ -22,6 +22,11 @@ interface Version {
     uploaded_at: string;
     created_at: string;
     archivo_requerido_id: string | null;
+    /**
+     * Director's grade of the per-project delivery this version belongs to
+     * (D3-rev). The general delivery template never stores the note.
+     */
+    director_grade?: number | null;
 }
 
 interface ArchivoConVersiones {
@@ -159,9 +164,6 @@ export default function RevisionEntregaDirector() {
                 const json = await res.json();
                 const data = json.data ?? json;
                 setEntrega(data);
-                setDirectorGrade(
-                    data.director_grade != null ? String(data.director_grade) : '',
-                );
             } catch (err) {
                 if (!cancelled) {
                     setError(err instanceof Error ? err.message : 'Error al cargar la entrega');
@@ -257,6 +259,16 @@ export default function RevisionEntregaDirector() {
     const sortedVersions = activeArchivo?.versiones ?? [];
     const safeVersionIdx = Math.min(selectedVersionIdx, Math.max(0, sortedVersions.length - 1));
     const selectedVersion: Version | null = sortedVersions[safeVersionIdx] ?? null;
+
+    /* ── D3-rev: the grade input follows the selected version's project
+       delivery (entrega_proyecto), never the shared template grade. ── */
+    useEffect(() => {
+        setDirectorGrade(
+            selectedVersion?.director_grade != null
+                ? String(selectedVersion.director_grade)
+                : '',
+        );
+    }, [selectedVersion?.id]);
 
     /* ══════════════════════════════════════════════════
        Loading state
@@ -734,15 +746,15 @@ export default function RevisionEntregaDirector() {
                     </div>
                 )}
 
-                {/* ── G. Nota del director (RF-NOT-04) ── */}
-                {entrega.director_grade != null && (
+                {/* ── G. Nota del director (RF-NOT-04 / D3-rev) ── */}
+                {selectedVersion?.director_grade != null && (
                     <div className="rounded-xl border border-[#e5e5e5] bg-white p-5 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                         <div className="flex items-center gap-2">
                             <Star className="h-4 w-4 text-[#d97706]" aria-hidden="true" />
-                            <p className="text-xs text-[#78716c]">Nota del director</p>
+                            <p className="text-xs text-[#78716c]">Nota del director (este proyecto)</p>
                         </div>
                         <p className="mt-1 text-2xl font-bold text-[#1c1917]">
-                            {Number(entrega.director_grade).toFixed(2)}
+                            {Number(selectedVersion.director_grade).toFixed(2)}
                             <span className="text-sm font-normal text-[#78716c]"> / 5.00</span>
                         </p>
                     </div>

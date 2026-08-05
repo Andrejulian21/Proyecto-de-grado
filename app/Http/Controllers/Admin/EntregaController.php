@@ -180,6 +180,7 @@ class EntregaController extends Controller
             'proyectos.estudiantes:id,name',
             'semestre:id,name',
             'versiones' => fn ($q) => $q->orderByDesc('version_number'),
+            'versiones.entregaProyecto',
         ])->findOrFail($id);
 
         // Authorize: director of linked project, student of linked project, or coordinator
@@ -203,6 +204,19 @@ class EntregaController extends Controller
         $data = $entrega->toArray();
         $data['proyectos_count'] = $entrega->proyectos->count();
         $data['versiones_count'] = $entrega->versiones->count();
+
+        // D3-rev: each version exposes the director_grade of ITS per-project
+        // delivery (EntregaProyecto). The review UI shows the note of the
+        // selected version's project, never a shared template grade.
+        $data['versiones'] = $entrega->versiones->map(function (VersionDocumento $version) {
+            $pivot = $version->entregaProyecto;
+            $array = $version->toArray();
+            $array['director_grade'] = $pivot?->director_grade !== null
+                ? (float) $pivot->director_grade
+                : null;
+
+            return $array;
+        })->values()->toArray();
 
         return response()->json(['data' => $data]);
     }

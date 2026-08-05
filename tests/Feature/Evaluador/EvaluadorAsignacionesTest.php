@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Entrega;
+use App\Models\EntregaProyecto;
 use App\Models\EvaluacionEvaluador;
 use App\Models\EvaluadorProyecto;
 use App\Models\Proyecto;
@@ -182,9 +183,15 @@ it('rechaza el detalle de una asignación de otro evaluador con 403 (RF-EVA-02)'
     expect($response->json('error.message'))->toBe('No tiene acceso a esta asignación');
 });
 
-it('incluye director_grade del director cuando existe (RF-NOT-04)', function () {
+it('incluye director_grade del proyecto cuando existe (RF-NOT-04 / D3-rev)', function () {
     $ctx = evaluadorAsignacionContext();
-    crearEntregaParaEvaluador($ctx, 'anteproyecto', ['director_grade' => 4.0]);
+    $entrega = crearEntregaParaEvaluador($ctx);
+    EntregaProyecto::create([
+        'entrega_id' => $entrega->id,
+        'proyecto_id' => $ctx['proyecto']->id,
+        'estado' => 'pendiente',
+        'director_grade' => 4.0,
+    ]);
 
     $response = $this->actingAs($ctx['evaluador'])
         ->getJson("/api/evaluador/asignaciones/{$ctx['asignacion']->id}/detalle");
@@ -193,7 +200,7 @@ it('incluye director_grade del director cuando existe (RF-NOT-04)', function () 
     expect((float) $response->json('entrega.director_grade'))->toBe(4.0);
 });
 
-it('incluye director_grade como null cuando no hay nota del director (RF-NOT-04)', function () {
+it('incluye director_grade como null cuando el proyecto no tiene nota (RF-NOT-04)', function () {
     $ctx = evaluadorAsignacionContext();
     crearEntregaParaEvaluador($ctx);
 
@@ -202,6 +209,49 @@ it('incluye director_grade como null cuando no hay nota del director (RF-NOT-04)
 
     $response->assertOk();
     expect($response->json('entrega.director_grade'))->toBeNull();
+});
+
+it('devuelve el director_grade del proyecto evaluado, no el de la entrega general (D3-rev)', function () {
+    $semestre = Semestre::create(['name' => '2026-1', 'start_date' => '2026-02-01', 'end_date' => '2026-06-30']);
+    $ctxA = evaluadorAsignacionContext([], $semestre);
+    $ctxB = evaluadorAsignacionContext([], $semestre);
+
+    // Both projects share the SAME general delivery (same semester + phase).
+    $entrega = crearEntregaParaEvaluador($ctxA);
+    EntregaProyecto::create([
+        'entrega_id' => $entrega->id,
+        'proyecto_id' => $ctxA['proyecto']->id,
+        'director_grade' => 4.0,
+    ]);
+    EntregaProyecto::create([
+        'entrega_id' => $entrega->id,
+        'proyecto_id' => $ctxB['proyecto']->id,
+        'director_grade' => 3.5,
+    ]);
+
+    $respA = $this->actingAs($ctxA['evaluador'])
+        ->getJson("/api/evaluador/asignaciones/{$ctxA['asignacion']->id}/detalle");
+    $respB = $this->actingAs($ctxB['evaluador'])
+        ->getJson("/api/evaluador/asignaciones/{$ctxB['asignacion']->id}/detalle");
+
+    expect((float) $respA->json('entrega.director_grade'))->toBe(4.0);
+    expect((float) $respB->json('entrega.director_grade'))->toBe(3.5);
+});
+
+it('incluye director_grade del proyecto en la card cuando existe (D3-rev)', function () {
+    $ctx = evaluadorAsignacionContext();
+    $entrega = crearEntregaParaEvaluador($ctx);
+    EntregaProyecto::create([
+        'entrega_id' => $entrega->id,
+        'proyecto_id' => $ctx['proyecto']->id,
+        'director_grade' => 4.5,
+    ]);
+
+    $response = $this->actingAs($ctx['evaluador'])
+        ->getJson('/api/evaluador/mis-asignaciones');
+
+    $response->assertOk();
+    expect((float) $response->json('data.0.director_grade'))->toBe(4.5);
 });
 
 it('devuelve la evaluación enviada cuando la asignación ya fue evaluada (RF-EVA-02)', function () {

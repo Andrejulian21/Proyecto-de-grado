@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Entrega;
+use App\Models\EntregaProyecto;
 use App\Models\EvaluacionEvaluador;
 use App\Models\EvaluadorProyecto;
 use App\Models\Proyecto;
@@ -33,6 +34,8 @@ class EvaluadorAsignacionesController extends Controller
      *
      * Cards of the authenticated evaluador's assignments in the active flow.
      * Eager loads proyecto.estudiantes and proyecto.director to avoid N+1.
+     * Each card carries the director_grade of THAT project's delivery
+     * (D3-rev), so evaluated cards never show a shared template note.
      */
     public function index(Request $request): JsonResponse
     {
@@ -54,7 +57,9 @@ class EvaluadorAsignacionesController extends Controller
      * Full context: proyecto, fase, entrega (archivos_requeridos, due_date,
      * director_grade, versiones_documento) and the evaluation (null when
      * pending). The entrega is resolved by semester + delivery phase because
-     * EvaluadorProyecto has no entrega_id (design TBD-4).
+     * EvaluadorProyecto has no entrega_id (design TBD-4). The director_grade
+     * is read from the entrega_proyecto of the EVALUATED project (D3-rev),
+     * not from the general delivery template.
      */
     public function detalle(Request $request, int $id): JsonResponse
     {
@@ -83,7 +88,7 @@ class EvaluadorAsignacionesController extends Controller
         return response()->json([
             'proyecto' => $this->mapProyecto($asignacion->proyecto),
             'fase' => $fase,
-            'entrega' => $entrega !== null ? $this->mapEntrega($entrega) : null,
+            'entrega' => $entrega !== null ? $this->mapEntrega($entrega, $asignacion) : null,
             'evaluacion' => $evaluacion !== null ? [
                 'nota' => (float) $evaluacion->nota,
                 'observaciones' => $evaluacion->observaciones,
@@ -163,16 +168,22 @@ class EvaluadorAsignacionesController extends Controller
 
     /**
      * Map an assignment to the evaluator card shape (RF-EVA-01).
+     * Includes the director_grade of THAT project's delivery (D3-rev).
      *
      * @return array<string, mixed>
      */
     private function mapCard(EvaluadorProyecto $asignacion): array
     {
+        $entregaProyecto = $this->entregaProyectoDeAsignacion($asignacion);
+
         return [
             'id' => $asignacion->id,
             'proyecto' => $this->mapProyecto($asignacion->proyecto),
             'fase' => $this->faseEntrega((string) $asignacion->fase),
             'evaluado' => (bool) $asignacion->evaluado,
+            'director_grade' => $entregaProyecto?->director_grade !== null
+                ? (float) $entregaProyecto->director_grade
+                : null,
             'created_at' => $asignacion->created_at?->toDateString(),
         ];
     }
@@ -204,17 +215,23 @@ class EvaluadorAsignacionesController extends Controller
     }
 
     /**
-     * Map a delivery to the detail shape (RF-EVA-02, RF-NOT-04).
+     * Map a delivery to the detail shape (RF-EVA-02, RF-NOT-04). The
+     * director_grade is read from the per-project delivery of the evaluated
+     * project (D3-rev), never from the general delivery template.
      *
      * @return array<string, mixed>
      */
-    private function mapEntrega(Entrega $entrega): array
+    private function mapEntrega(Entrega $entrega, EvaluadorProyecto $asignacion): array
     {
+        $entregaProyecto = $this->entregaProyectoDeAsignacion($asignacion);
+
         return [
             'id' => $entrega->id,
             'archivos_requeridos' => $entrega->archivos_requeridos ?? [],
             'due_date' => $entrega->due_date?->toDateString(),
-            'director_grade' => $entrega->director_grade !== null ? (float) $entrega->director_grade : null,
+            'director_grade' => $entregaProyecto?->director_grade !== null
+                ? (float) $entregaProyecto->director_grade
+                : null,
             'versiones_documento' => $entrega->versiones->map(
                 fn (VersionDocumento $version) => [
                     'version_number' => $version->version_number,
@@ -225,6 +242,35 @@ class EvaluadorAsignacionesController extends Controller
                 ]
             )->values()->toArray(),
         ];
+    }
+
+    /**
+     * Resolve the per-project delivery (EntregaProyecto) of the evaluated
+     * project for the assignment's phase. The general delivery is found by
+     * semester + phase (design TBD-4); the pivot distinguishes projects that
+     * share the same delivery template (D3-rev).
+     */
+    private function entregaProyectoDeAsignacion(EvaluadorProyecto $asignacion): ?EntregaProyecto
+    {
+        $proyecto = $asignacion->proyecto;
+
+        if ($proyecto === null || $proyecto->semester_id === null) {
+            return null;
+        }
+
+        $entrega = Entrega::query()
+            ->where('semester_id', $proyecto->semester_id)
+            ->where('phase', $this->faseEntrega((string) $asignacion->fase))
+            ->first();
+
+        if ($entrega === null) {
+            return null;
+        }
+
+        return EntregaProyecto::query()
+            ->where('entrega_id', $entrega->id)
+            ->where('proyecto_id', $proyecto->id)
+            ->first();
     }
 
     /**

@@ -3,7 +3,11 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { GroupSelector } from '@/components/forms/GroupSelector';
 import { useEntregas, FASE_SEQUENCE, type Fase, type Entrega, type UpdateEntregaPayload } from '@/hooks/useEntregas';
-import ArchivosRequeridosBuilder from '@/components/entregas/ArchivosRequeridosBuilder';
+import ArchivosRequeridosBuilder, {
+    SLUG_DOCUMENTO_PROYECTO,
+    NOMBRE_DOCUMENTO_PROYECTO,
+} from '@/components/entregas/ArchivosRequeridosBuilder';
+import IndicadorSumaPar from '@/components/entregas/IndicadorSumaPar';
 import type { ArchivoRequeridoConfig } from '@/types/entregas';
 import {
     Search,
@@ -18,12 +22,19 @@ import {
     AlertTriangle,
 } from 'lucide-react';
 
-const FASE_LABELS: Record<Fase, string> = {
+const FASE_LABELS: Record<string, string> = {
     anteproyecto: 'Anteproyecto',
     presentacion_anteproyecto: 'Presentación Anteproyecto',
     desarrollo: 'Desarrollo del proyecto',
     presentacion_final: 'Presentación Final',
 };
+
+/** Default main file enforced by RF-ENT-01 (slug documento-proyecto). */
+function archivosPorDefecto(): ArchivoRequeridoConfig[] {
+    return [
+        { id: SLUG_DOCUMENTO_PROYECTO, nombre: NOMBRE_DOCUMENTO_PROYECTO, versionamiento: true },
+    ];
+}
 
 function formatDate(dateStr: string): string {
     if (!dateStr) return '—';
@@ -76,9 +87,8 @@ export default function CoordinadorEntregas() {
     const [formHoraInicio, setFormHoraInicio] = useState('');
     const [formHora, setFormHora] = useState('');
     const [formCriterios, setFormCriterios] = useState('');
-    const [formArchivos, setFormArchivos] = useState<ArchivoRequeridoConfig[]>([
-        { id: 'documento', nombre: 'Documento', versionamiento: true },
-    ]);
+    const [formGradePercentage, setFormGradePercentage] = useState('');
+    const [formArchivos, setFormArchivos] = useState<ArchivoRequeridoConfig[]>(archivosPorDefecto);
     const [formArchivosError, setFormArchivosError] = useState<string | null>(null);
     const [createError, setCreateError] = useState<string | null>(null);
 
@@ -113,6 +123,7 @@ export default function CoordinadorEntregas() {
                     hora_inicio: formHoraInicio || undefined,
                     criterios: formCriterios.trim() || undefined,
                     hora_maxima: formHora || undefined,
+                    grade_percentage: formGradePercentage === '' ? null : Number(formGradePercentage),
                     archivos_requeridos: validArchivos,
                 });
                 setFormTitulo('');
@@ -122,9 +133,8 @@ export default function CoordinadorEntregas() {
                 setFormHoraInicio('');
                 setFormHora('');
                 setFormCriterios('');
-                setFormArchivos([
-                    { id: 'documento', nombre: 'Documento', versionamiento: true },
-                ]);
+                setFormGradePercentage('');
+                setFormArchivos(archivosPorDefecto());
                 setFormArchivosError(null);
                 setShowCreateForm(false);
             } catch (err) {
@@ -133,7 +143,7 @@ export default function CoordinadorEntregas() {
                 creatingRef.current = false;
             }
         },
-        [selectedGroup, formFase, formTitulo, formDesc, formFecha, formArchivos, crear],
+        [selectedGroup, formFase, formTitulo, formDesc, formFecha, formGradePercentage, formArchivos, crear],
     );
 
     // ── Edit modal state ─────────────────────────────────────────
@@ -145,6 +155,7 @@ export default function CoordinadorEntregas() {
     const [editDesc, setEditDesc] = useState('');
     const [editHora, setEditHora] = useState('');
     const [editCriterios, setEditCriterios] = useState('');
+    const [editGradePercentage, setEditGradePercentage] = useState('');
     const [editFase, setEditFase] = useState<string>('');
     const [editGrupoId, setEditGrupoId] = useState<number | null>(null);
     const [editArchivos, setEditArchivos] = useState<ArchivoRequeridoConfig[]>([]);
@@ -168,11 +179,10 @@ export default function CoordinadorEntregas() {
         setEditDesc(entrega.description || '');
         setEditHora(entrega.hora_maxima ?? '');
         setEditCriterios(entrega.acceptance_criteria ?? '');
+        setEditGradePercentage(entrega.grade_percentage != null ? String(entrega.grade_percentage) : '');
         setEditFase(entrega.phase);
         setEditGrupoId(entrega.grupo_id);
-        setEditArchivos(entrega.archivos_requeridos ?? [
-            { id: 'documento', nombre: 'Documento', versionamiento: true },
-        ]);
+        setEditArchivos(entrega.archivos_requeridos ?? archivosPorDefecto());
         setEditArchivosError(null);
         setEditError(null);
     }, []);
@@ -206,6 +216,7 @@ export default function CoordinadorEntregas() {
                 start_date: editFechaInicio || null,
                 start_time: editHoraInicio || null,
                 phase: editFase,
+                grade_percentage: editGradePercentage === '' ? null : Number(editGradePercentage),
                 archivos_requeridos: validArchivos,
             };
             await actualizar(editingEntrega.id, payload);
@@ -213,7 +224,7 @@ export default function CoordinadorEntregas() {
         } catch (err) {
             setEditError(err instanceof Error ? err.message : 'Error al actualizar');
         }
-    }, [editingEntrega, editFecha, editTitulo, editDesc, editHora, editCriterios, editFase, editArchivos, actualizar, closeEditModal]);
+    }, [editingEntrega, editFecha, editTitulo, editDesc, editHora, editCriterios, editGradePercentage, editFase, editArchivos, actualizar, closeEditModal]);
 
     // ── Delete confirmation state ────────────────────────────────
     const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -391,6 +402,34 @@ export default function CoordinadorEntregas() {
                                 }}
                                 error={formArchivosError ?? undefined}
                             />
+                        </div>
+
+                        {/* Porcentaje de nota del par de fases (RF-ENT-03/05) */}
+                        <div className="flex flex-col gap-1.5 sm:col-span-2">
+                            <label htmlFor="form-grade-percentage" className="text-sm font-semibold text-[#1c1917]">
+                                Porcentaje de nota (%)
+                                <span className="ml-1 text-xs font-normal text-[#a8a29e]">
+                                    Peso del par de fases (0-100)
+                                </span>
+                            </label>
+                            <input
+                                id="form-grade-percentage"
+                                type="number"
+                                min={0}
+                                max={100}
+                                step={0.01}
+                                value={formGradePercentage}
+                                onChange={(e) => setFormGradePercentage(e.target.value)}
+                                placeholder="Ej: 60"
+                                className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] tabular-nums"
+                            />
+                            {selectedGroup != null && (
+                                <IndicadorSumaPar
+                                    entregas={entregas}
+                                    fase={formFase}
+                                    valorForm={formGradePercentage}
+                                />
+                            )}
                         </div>
 
                         <div className="flex flex-col gap-1.5">
@@ -753,6 +792,35 @@ export default function CoordinadorEntregas() {
                                 }}
                                 error={editArchivosError ?? undefined}
                             />
+
+                            {/* Porcentaje de nota del par de fases (RF-ENT-03/05) */}
+                            <div className="flex flex-col gap-1.5">
+                                <label htmlFor="edit-grade-percentage" className="text-sm font-semibold text-[#1c1917]">
+                                    Porcentaje de nota (%)
+                                    <span className="ml-1 text-xs font-normal text-[#a8a29e]">
+                                        Peso del par de fases (0-100)
+                                    </span>
+                                </label>
+                                <input
+                                    id="edit-grade-percentage"
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    step={0.01}
+                                    value={editGradePercentage}
+                                    onChange={(e) => setEditGradePercentage(e.target.value)}
+                                    placeholder="Ej: 60"
+                                    className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] tabular-nums"
+                                />
+                                {editGrupoId != null && (
+                                    <IndicadorSumaPar
+                                        entregas={entregas}
+                                        fase={editFase as Fase}
+                                        valorForm={editGradePercentage}
+                                        excluirId={editingEntrega?.id}
+                                    />
+                                )}
+                            </div>
 
                             {/* Fecha límite */}
                             <div className="flex flex-col gap-1.5">

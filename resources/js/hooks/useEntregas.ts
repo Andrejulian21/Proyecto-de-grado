@@ -1,6 +1,10 @@
 import { useEffect, useCallback, useReducer } from 'react';
 import { apiFetch } from '@/lib/utils';
-import type { EntregaEstadoResponse, ArchivoRequeridoConfig } from '@/types/entregas';
+import type {
+    EntregaEstadoResponse,
+    ArchivoRequeridoConfig,
+    EntregaPeso,
+} from '@/types/entregas';
 
 export const FASE_SEQUENCE = [
     'anteproyecto',
@@ -18,7 +22,7 @@ export interface ProyectoResumen {
     semester_id: number;
 }
 
-export interface Entrega {
+export interface Entrega extends EntregaPeso {
     id: number;
     proyecto_id: number | null;
     semester_id?: number | null;
@@ -51,6 +55,7 @@ export interface CreateEntregaPayload {
     hora_inicio?: string;
     criterios?: string;
     hora_maxima?: string;
+    grade_percentage?: number | null;
     archivos_requeridos?: ArchivoRequeridoConfig[];
 }
 
@@ -64,7 +69,36 @@ export interface UpdateEntregaPayload {
     start_time?: string | null;
     phase?: string;
     proyecto_id?: number;
+    grade_percentage?: number | null;
     archivos_requeridos?: ArchivoRequeridoConfig[];
+}
+
+/**
+ * Extract a user-facing Spanish message from Laravel error envelopes:
+ * `{"error":{"message":...}}` (spec), `{"error":"..."}` (legacy), the
+ * validation `{"errors":{"field":[...]}}` shape, or the generic
+ * `{"message":...}`. Falls back to the HTTP status.
+ */
+export function extraerMensajeError(body: unknown, status: number): string {
+    const b = body as Record<string, unknown> | null;
+
+    if (b?.error && typeof b.error === 'object') {
+        const message = (b.error as Record<string, unknown>)?.message;
+        if (typeof message === 'string' && message.trim()) return message;
+    }
+
+    if (typeof b?.error === 'string' && b.error.trim()) return b.error;
+
+    if (b?.errors && typeof b.errors === 'object') {
+        const mensajes = Object.values(b.errors as Record<string, unknown>)
+            .flatMap((v) => (Array.isArray(v) ? v : [v]))
+            .filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
+        if (mensajes.length > 0) return mensajes.join('. ');
+    }
+
+    if (typeof b?.message === 'string' && b.message.trim()) return b.message;
+
+    return `Error ${status}`;
 }
 
 export interface EntregasFilters {
@@ -155,7 +189,7 @@ export function useEntregas(filters?: EntregasFilters) {
             const res = await apiFetch(buildUrl());
             if (!res.ok) {
                 const body = await res.json().catch(() => null);
-                throw new Error(body?.message ?? `Error ${res.status}: ${res.statusText}`);
+                throw new Error(extraerMensajeError(body, res.status));
             }
             const json = await res.json();
             dispatch({ type: 'FETCH_SUCCESS', payload: json.data ?? json });
@@ -179,7 +213,7 @@ export function useEntregas(filters?: EntregasFilters) {
             });
             if (!res.ok) {
                 const body = await res.json().catch(() => null);
-                throw new Error(body?.message ?? `Error ${res.status}`);
+                throw new Error(extraerMensajeError(body, res.status));
             }
             // Refetch to get fresh data including the new entrega
             await fetchData();
@@ -201,7 +235,7 @@ export function useEntregas(filters?: EntregasFilters) {
             });
             if (!res.ok) {
                 const body = await res.json().catch(() => null);
-                throw new Error(body?.message ?? `Error ${res.status}`);
+                throw new Error(extraerMensajeError(body, res.status));
             }
             const json = await res.json();
             dispatch({ type: 'UPDATE_SUCCESS', payload: json.data ?? json });
@@ -220,7 +254,7 @@ export function useEntregas(filters?: EntregasFilters) {
             });
             if (!res.ok) {
                 const body = await res.json().catch(() => null);
-                throw new Error(body?.message ?? `Error ${res.status}`);
+                throw new Error(extraerMensajeError(body, res.status));
             }
             dispatch({ type: 'DELETE_SUCCESS', payload: id });
         } catch (err) {
@@ -241,7 +275,7 @@ export function useEntregas(filters?: EntregasFilters) {
 
         if (!res.ok) {
             const body = await res.json().catch(() => null);
-            throw new Error(body?.message ?? body?.error ?? `Error ${res.status}`);
+            throw new Error(extraerMensajeError(body, res.status));
         }
 
         return res.json();
@@ -251,7 +285,7 @@ export function useEntregas(filters?: EntregasFilters) {
         const res = await apiFetch(`/api/entregas/${entregaId}/estado`);
         if (!res.ok) {
             const body = await res.json().catch(() => null);
-            throw new Error(body?.message ?? `Error ${res.status}`);
+            throw new Error(extraerMensajeError(body, res.status));
         }
         const json = await res.json();
         return (json.data ?? json) as EntregaEstadoResponse;

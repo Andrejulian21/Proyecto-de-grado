@@ -55,17 +55,21 @@ class Entrega extends Model
 
     public function getGrupoIdAttribute(): ?int
     {
-        // Try direct proyecto FK first
+        // Canonical group: the entrega's own semester_id (semester FK).
+        // Project-derived values are only a legacy fallback when it is null.
+        if ($this->semester_id !== null) {
+            return $this->semester_id;
+        }
+
         if ($this->proyecto) {
             return $this->proyecto->semester_id;
         }
 
-        // Fall back to first pivot project's semester
         if ($this->relationLoaded('proyectos') && $this->proyectos->isNotEmpty()) {
             return $this->proyectos->first()->semester_id;
         }
 
-        return $this->semester_id;
+        return null;
     }
 
     public function proyecto(): BelongsTo

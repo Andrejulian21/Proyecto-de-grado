@@ -7,7 +7,9 @@ use App\Models\Entrega;
 use App\Models\Proyecto;
 use App\Models\Semestre;
 use App\Models\VersionDocumento;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 
 uses(RefreshDatabase::class);
 
@@ -24,8 +26,8 @@ beforeEach(function () {
 });
 
 test('Entrega model exists and extends Model', function () {
-    $entrega = new Entrega();
-    expect($entrega)->toBeInstanceOf(Illuminate\Database\Eloquent\Model::class);
+    $entrega = new Entrega;
+    expect($entrega)->toBeInstanceOf(Model::class);
 });
 
 test('Entrega fillable fields are guarded correctly', function () {
@@ -65,7 +67,7 @@ test('Entrega casts due_date to date', function () {
         'due_date' => '2026-03-15',
     ]);
 
-    expect($entrega->due_date)->toBeInstanceOf(Illuminate\Support\Carbon::class);
+    expect($entrega->due_date)->toBeInstanceOf(Carbon::class);
     expect($entrega->due_date->format('Y-m-d'))->toBe('2026-03-15');
 });
 
@@ -128,4 +130,38 @@ test('Entrega scope porEstado filters by status', function () {
     expect(Entrega::porEstado('pendiente')->count())->toBe(1);
     expect(Entrega::porEstado('aprobada')->count())->toBe(1);
     expect(Entrega::porEstado('rechazada')->count())->toBe(0);
+});
+
+test('grupo_id resolves to the canonical semester_id for pivot-linked entregas', function () {
+    $semestre = Semestre::create([
+        'name' => '2026-2',
+        'start_date' => '2026-07-01',
+        'end_date' => '2026-12-31',
+    ]);
+    $proyecto = Proyecto::create(['title' => 'Proyecto Pivot', 'semester_id' => $semestre->id]);
+
+    // StoreEntregaAction shape: pivot-linked (proyecto_id null), semester_id set.
+    $entrega = Entrega::create([
+        'semester_id' => $semestre->id,
+        'phase' => 'anteproyecto',
+        'title' => 'Pivot link',
+        'due_date' => '2026-08-01',
+        'archivos_requeridos' => [
+            ['slug' => 'documento-proyecto', 'nombre' => 'Documento del proyecto', 'versionamiento' => true],
+        ],
+    ]);
+    $entrega->proyectos()->attach($proyecto->id);
+
+    // Same eager-load shape as EntregaController@index (proyectos WITHOUT
+    // semester_id) — the accessor must not derive grupo_id from a column
+    // that was never selected; the canonical group is semester_id.
+    $cargada = Entrega::with([
+        'semestre:id,name',
+        'proyecto:id,code,title,semester_id',
+        'proyecto.semestre:id,name',
+        'proyectos:id,code,title',
+    ])->findOrFail($entrega->id);
+
+    expect($cargada->grupo_id)->toBe($semestre->id);
+    expect($cargada->toArray()['grupo_id'])->toBe($semestre->id);
 });

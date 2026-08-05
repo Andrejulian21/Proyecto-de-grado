@@ -25,6 +25,30 @@ class UpdateEntregaRequest extends FormRequest
     }
 
     /**
+     * Normalize `archivos_requeridos.*.slug` → `*.id` so the persisted JSON
+     * shape (slug-based) is accepted as an alias of the builder shape
+     * (id-based). The canonical identity is `id` (RF-ENT-01).
+     */
+    protected function prepareForValidation(): void
+    {
+        $archivos = $this->input('archivos_requeridos');
+
+        if (! is_array($archivos)) {
+            return;
+        }
+
+        $archivos = array_map(static function (array $item): array {
+            if (! isset($item['id']) && isset($item['slug']) && is_string($item['slug'])) {
+                $item['id'] = $item['slug'];
+            }
+
+            return $item;
+        }, $archivos);
+
+        $this->merge(['archivos_requeridos' => $archivos]);
+    }
+
+    /**
      * Same validation contract as StoreEntregaRequest (D4) with `sometimes`
      * semantics so partial updates are allowed.
      *

@@ -19,32 +19,32 @@ final class UpdateEntregaAction
      */
     public function handle(Entrega $entrega, array $data): Entrega
     {
-        if (isset($data['due_date'])) {
-            $entrega->due_date = $data['due_date'];
-        }
-
-        if (isset($data['description'])) {
-            $entrega->description = $data['description'];
-        }
-
         if (isset($data['titulo'])) {
             $entrega->title = $data['titulo'];
         }
 
-        if (array_key_exists('acceptance_criteria', $data)) {
-            $entrega->acceptance_criteria = $data['acceptance_criteria'];
+        if (array_key_exists('descripcion', $data)) {
+            $entrega->description = $data['descripcion'];
+        }
+
+        if (isset($data['fecha_limite'])) {
+            $entrega->due_date = $data['fecha_limite'];
+        }
+
+        if (array_key_exists('fecha_inicio', $data)) {
+            $entrega->start_date = $data['fecha_inicio'];
+        }
+
+        if (array_key_exists('hora_inicio', $data)) {
+            $entrega->start_time = $data['hora_inicio'];
+        }
+
+        if (array_key_exists('criterios', $data)) {
+            $entrega->acceptance_criteria = $data['criterios'];
         }
 
         if (array_key_exists('hora_maxima', $data)) {
             $entrega->hora_maxima = $data['hora_maxima'];
-        }
-
-        if (array_key_exists('start_date', $data)) {
-            $entrega->start_date = $data['start_date'];
-        }
-
-        if (array_key_exists('start_time', $data)) {
-            $entrega->start_time = $data['start_time'];
         }
 
         $phase = $data['fase'] ?? $data['phase'] ?? null;

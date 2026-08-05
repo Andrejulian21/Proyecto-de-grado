@@ -9,6 +9,7 @@ use App\Models\Notificacion;
 use App\Models\Proyecto;
 use App\Models\Semestre;
 use App\Models\User;
+use App\Models\VersionDocumento;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -135,6 +136,9 @@ it('al crear entrega NO se genera notificacion automatica (ahora es por grupo)',
             'titulo' => 'Entrega Test',
             'descripcion' => 'Descripción de la entrega',
             'fecha_limite' => '2026-03-01',
+            'archivos_requeridos' => [
+                ['id' => 'documento-proyecto', 'nombre' => 'Documento del proyecto', 'versionamiento' => true],
+            ],
         ]);
 
     $notificaciones = Notificacion::where('user_id', $this->director->id)->get();
@@ -156,7 +160,7 @@ it('al revisar entrega se genera notificacion para el estudiante', function () {
     // so the controller can persist consolidated_grade/director_notes against
     // the specific version. Create one directly here — the per-slug upload
     // path is covered separately by SubidaArchivoTest.
-    $version = \App\Models\VersionDocumento::create([
+    $version = VersionDocumento::create([
         'entrega_id' => $entrega->id,
         'version_number' => 1,
         'file_path' => 'entregas/test.pdf',

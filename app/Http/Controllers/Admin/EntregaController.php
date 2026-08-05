@@ -6,14 +6,15 @@ namespace App\Http\Controllers\Admin;
 
 use App\Enums\EstadoEntrega;
 use App\Enums\EstadoProyecto;
-use App\Enums\FaseProyecto;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreEntregaRequest;
+use App\Http\Requests\UpdateEntregaRequest;
 use App\Models\AuditLog;
 use App\Models\Entrega;
 use App\Models\Notificacion;
 use App\Models\Proyecto;
 use App\Models\VersionDocumento;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -50,12 +51,12 @@ class EntregaController extends Controller
         if ($user->role->value === 'Director') {
             $query->where(function ($q) use ($user) {
                 $q->whereHas('proyecto', fn ($sq) => $sq->where('director_id', $user->id))
-                  ->orWhereHas('proyectos', fn ($sq) => $sq->where('director_id', $user->id));
+                    ->orWhereHas('proyectos', fn ($sq) => $sq->where('director_id', $user->id));
             });
         } elseif ($user->role->value === 'Estudiante') {
             $query->where(function ($q) use ($user) {
                 $q->whereHas('proyecto.estudiantes', fn ($sq) => $sq->where('user_id', $user->id))
-                  ->orWhereHas('proyectos.estudiantes', fn ($sq) => $sq->where('user_id', $user->id));
+                    ->orWhereHas('proyectos.estudiantes', fn ($sq) => $sq->where('user_id', $user->id));
             });
         }
 
@@ -68,7 +69,7 @@ class EntregaController extends Controller
             $query->where(function ($q) use ($request) {
                 $pid = $request->integer('proyecto_id');
                 $q->where('proyecto_id', $pid)
-                  ->orWhereHas('proyectos', fn ($sq) => $sq->where('proyecto_id', $pid));
+                    ->orWhereHas('proyectos', fn ($sq) => $sq->where('proyecto_id', $pid));
             });
         }
 
@@ -84,6 +85,7 @@ class EntregaController extends Controller
             $arr['semestre_nombre'] = $e->semestre?->name ?? $e->proyecto?->semestre?->name ?? '—';
             $arr['proyectos_count'] = $e->proyectos->count();
             $arr['proyectos_list'] = $e->proyectos->map(fn ($p) => "{$p->code} - {$p->title}");
+
             return $arr;
         });
 
@@ -97,78 +99,73 @@ class EntregaController extends Controller
      *
      * Actualizar todos los campos editables de una entrega (coordinador).
      */
-    public function update(Request $request, int $id): JsonResponse
+    public function update(UpdateEntregaRequest $request, int $id): JsonResponse
     {
-        if ($request->user()->role->value !== 'Coordinador') {
-            return response()->json(['error' => 'No autorizado.'], 403);
-        }
-
-        $validator = Validator::make($request->all(), [
-            'due_date' => 'sometimes|required|date',
-            'description' => 'sometimes|required|string|max:500',
-            'titulo' => 'sometimes|required|string|max:255',
-            'acceptance_criteria' => 'sometimes|nullable|string',
-            'hora_maxima' => 'sometimes|nullable|string|max:10',
-            'start_date' => 'sometimes|nullable|date|before_or_equal:due_date',
-            'start_time' => 'sometimes|nullable|string|max:10',
-            'phase' => 'sometimes|required|string|max:50',
-            'proyecto_id' => 'sometimes|required|exists:proyectos,id',
-            'archivos_requeridos' => 'sometimes|required|array|min:1|max:6',
-            'archivos_requeridos.*.id' => 'required_with:archivos_requeridos|string|max:50|regex:/^[a-z0-9_]+$/',
-            'archivos_requeridos.*.nombre' => 'required_with:archivos_requeridos|string|max:255',
-            'archivos_requeridos.*.versionamiento' => 'required_with:archivos_requeridos|boolean',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
-        }
-
         $entrega = Entrega::findOrFail($id);
-        $data = $validator->validated();
+        $data = $request->validated();
 
         if (isset($data['due_date'])) {
             $entrega->due_date = $data['due_date'];
         }
+
         if (isset($data['description'])) {
             $entrega->description = $data['description'];
         }
+
         if (isset($data['titulo'])) {
             $entrega->title = $data['titulo'];
         }
+
         if (array_key_exists('acceptance_criteria', $data)) {
             $entrega->acceptance_criteria = $data['acceptance_criteria'];
         }
+
         if (array_key_exists('hora_maxima', $data)) {
             $entrega->hora_maxima = $data['hora_maxima'];
         }
+
         if (array_key_exists('start_date', $data)) {
             $entrega->start_date = $data['start_date'];
         }
+
         if (array_key_exists('start_time', $data)) {
             $entrega->start_time = $data['start_time'];
         }
-        if (isset($data['phase'])) {
-            $entrega->phase = $data['phase'];
+        $phase = $data['fase'] ?? $data['phase'] ?? null;
+
+        if ($phase !== null) {
+            $entrega->phase = $phase;
         }
+
         if (isset($data['proyecto_id'])) {
             $entrega->proyecto_id = $data['proyecto_id'];
         }
 
+        if (array_key_exists('grade_percentage', $data)) {
+            $entrega->grade_percentage = $data['grade_percentage'];
+        }
+
         // Handle archivos_requeridos update with versioning validation
         if (isset($data['archivos_requeridos'])) {
-            $nuevosArchivos = collect($data['archivos_requeridos'])->map(function (array $item) {
+            $actuales = $entrega->archivos_requeridos ?? [];
+            $nuevosArchivos = collect($data['archivos_requeridos'])->map(function (array $item) use ($actuales) {
+                $actual = collect($actuales)->firstWhere('slug', $item['id'] ?? $item['slug'] ?? null);
+
                 return [
                     'slug' => $item['id'],
                     'nombre' => $item['nombre'],
                     'versionamiento' => (bool) $item['versionamiento'],
+                    'analizable_ia' => (bool) ($item['analizable_ia'] ?? ($actual['analizable_ia'] ?? false)),
                 ];
             });
 
             // Validate: if a file had versionamiento=true and has existing versions,
             // don't allow changing versionamiento to false
             $actuales = $entrega->archivos_requeridos ?? [];
+
             foreach ($actuales as $actual) {
                 $nuevo = $nuevosArchivos->firstWhere('slug', $actual['slug'] ?? $actual['id'] ?? null);
+
                 if ($nuevo && ($actual['versionamiento'] ?? false) === true && $nuevo['versionamiento'] === false) {
                     // Check if there are existing versions for this archivo_requerido
                     $tieneVersiones = $entrega->versiones()
@@ -185,6 +182,7 @@ class EntregaController extends Controller
 
             // Check unique IDs
             $ids = $nuevosArchivos->pluck('slug')->toArray();
+
             if (count($ids) !== count(array_unique($ids))) {
                 return response()->json([
                     'error' => 'Los IDs de los archivos requeridos deben ser únicos.',
@@ -237,6 +235,7 @@ class EntregaController extends Controller
                 'slug' => $item['id'],
                 'nombre' => $item['nombre'],
                 'versionamiento' => (bool) $item['versionamiento'],
+                'analizable_ia' => (bool) ($item['analizable_ia'] ?? false),
             ];
         })->toArray();
 
@@ -253,6 +252,7 @@ class EntregaController extends Controller
             'hora_maxima' => $data['hora_maxima'] ?? null,
             'acceptance_criteria' => $data['criterios'] ?? null,
             'status' => 'pendiente',
+            'grade_percentage' => $data['grade_percentage'] ?? null,
             'archivos_requeridos' => $archivos,
         ]);
 
@@ -288,39 +288,39 @@ class EntregaController extends Controller
 
         // Check start date constraint
         if ($entrega->start_date) {
-            $startDate = $entrega->start_date instanceof \Carbon\Carbon
+            $startDate = $entrega->start_date instanceof Carbon
                 ? $entrega->start_date->format('Y-m-d')
                 : $entrega->start_date;
 
             if ($today < $startDate) {
                 return response()->json([
-                    'error' => 'La entrega aún no está disponible. La fecha de inicio es ' . $startDate . '.',
+                    'error' => 'La entrega aún no está disponible. La fecha de inicio es '.$startDate.'.',
                 ], 422);
             }
 
             // If today is the start date and there's a start time, check time
             if ($today === $startDate && $entrega->start_time && $currentTime < $entrega->start_time) {
                 return response()->json([
-                    'error' => 'La entrega aún no está disponible. La hora de inicio es las ' . $entrega->start_time . '.',
+                    'error' => 'La entrega aún no está disponible. La hora de inicio es las '.$entrega->start_time.'.',
                 ], 422);
             }
         }
 
         // Check due date constraint
-        $dueDate = $entrega->due_date instanceof \Carbon\Carbon
+        $dueDate = $entrega->due_date instanceof Carbon
             ? $entrega->due_date->format('Y-m-d')
             : $entrega->due_date;
 
         if ($today > $dueDate) {
             return response()->json([
-                'error' => 'La fecha límite de la entrega ya pasó (' . $dueDate . ').',
+                'error' => 'La fecha límite de la entrega ya pasó ('.$dueDate.').',
             ], 422);
         }
 
         // If today is the due date and there's a hora_maxima, check time
         if ($today === $dueDate && $entrega->hora_maxima && $currentTime > $entrega->hora_maxima) {
             return response()->json([
-                'error' => 'La hora máxima para esta entrega era las ' . $entrega->hora_maxima . '.',
+                'error' => 'La hora máxima para esta entrega era las '.$entrega->hora_maxima.'.',
             ], 422);
         }
 
@@ -334,9 +334,10 @@ class EntregaController extends Controller
 
         // Max 4 versions
         $currentCount = VersionDocumento::where('entrega_id', $id)->count();
+
         if ($currentCount >= self::MAX_VERSIONS) {
             return response()->json([
-                'error' => 'Máximo ' . self::MAX_VERSIONS . ' versiones por entrega.',
+                'error' => 'Máximo '.self::MAX_VERSIONS.' versiones por entrega.',
             ], 422);
         }
 
@@ -344,8 +345,8 @@ class EntregaController extends Controller
             'file' => [
                 'required',
                 'file',
-                'mimetypes:' . implode(',', self::ALLOWED_MIME_TYPES),
-                'max:' . (self::MAX_FILE_SIZE / 1024),
+                'mimetypes:'.implode(',', self::ALLOWED_MIME_TYPES),
+                'max:'.(self::MAX_FILE_SIZE / 1024),
             ],
         ]);
 
@@ -401,37 +402,37 @@ class EntregaController extends Controller
 
         // Check start date constraint
         if ($entrega->start_date) {
-            $startDate = $entrega->start_date instanceof \Carbon\Carbon
+            $startDate = $entrega->start_date instanceof Carbon
                 ? $entrega->start_date->format('Y-m-d')
                 : $entrega->start_date;
 
             if ($today < $startDate) {
                 return response()->json([
-                    'error' => 'La entrega aún no está disponible. La fecha de inicio es ' . $startDate . '.',
+                    'error' => 'La entrega aún no está disponible. La fecha de inicio es '.$startDate.'.',
                 ], 422);
             }
 
             if ($today === $startDate && $entrega->start_time && $currentTime < $entrega->start_time) {
                 return response()->json([
-                    'error' => 'La entrega aún no está disponible. La hora de inicio es las ' . $entrega->start_time . '.',
+                    'error' => 'La entrega aún no está disponible. La hora de inicio es las '.$entrega->start_time.'.',
                 ], 422);
             }
         }
 
         // Check due date constraint
-        $dueDate = $entrega->due_date instanceof \Carbon\Carbon
+        $dueDate = $entrega->due_date instanceof Carbon
             ? $entrega->due_date->format('Y-m-d')
             : $entrega->due_date;
 
         if ($today > $dueDate) {
             return response()->json([
-                'error' => 'La fecha límite de la entrega ya pasó (' . $dueDate . ').',
+                'error' => 'La fecha límite de la entrega ya pasó ('.$dueDate.').',
             ], 422);
         }
 
         if ($today === $dueDate && $entrega->hora_maxima && $currentTime > $entrega->hora_maxima) {
             return response()->json([
-                'error' => 'La hora máxima para esta entrega era las ' . $entrega->hora_maxima . '.',
+                'error' => 'La hora máxima para esta entrega era las '.$entrega->hora_maxima.'.',
             ], 422);
         }
 
@@ -518,6 +519,7 @@ class EntregaController extends Controller
         $entrega = Entrega::findOrFail($id);
 
         $user = $request->user();
+
         if (! $this->esDirectorDeEntrega($entrega, $user->id)) {
             return response()->json(['error' => 'No eres el director de este proyecto.'], 403);
         }
@@ -558,6 +560,7 @@ class EntregaController extends Controller
 
         // Scope by role
         $user = $request->user();
+
         if ($user->role->value === 'Estudiante') {
             $esEstudiante = $this->esEstudianteDeEntrega($entrega, $user->id);
 
@@ -585,6 +588,7 @@ class EntregaController extends Controller
 
         // Only the student of the linked project can delete
         $esEstudiante = $this->esEstudianteDeEntrega($entrega, $user->id);
+
         if (! $esEstudiante) {
             return response()->json(['error' => 'No autorizado.'], 403);
         }
@@ -621,6 +625,7 @@ class EntregaController extends Controller
 
         // Verify the user is the director of any linked project
         $user = $request->user();
+
         if (! $this->esDirectorDeEntrega($entrega, $user->id)) {
             return response()->json(['error' => 'No eres el director de este proyecto.'], 403);
         }
@@ -663,8 +668,10 @@ class EntregaController extends Controller
         // T-022: Notificar a los estudiantes de todos los proyectos vinculados
         $proyectos = $entrega->proyectos->isNotEmpty() ? $entrega->proyectos : collect([$entrega->proyecto])->filter();
         $notifiedUserIds = collect();
+
         foreach ($proyectos as $proyecto) {
             $estudiantes = $proyecto->estudiantes()->pluck('user_id');
+
             foreach ($estudiantes as $estudianteId) {
                 if ($notifiedUserIds->has($estudianteId)) {
                     continue;
@@ -706,7 +713,7 @@ class EntregaController extends Controller
             $query->where(function ($q) use ($request) {
                 $pid = $request->integer('proyecto_id');
                 $q->where('proyecto_id', $pid)
-                  ->orWhereHas('proyectos', fn ($sq) => $sq->where('proyecto_id', $pid));
+                    ->orWhereHas('proyectos', fn ($sq) => $sq->where('proyecto_id', $pid));
             });
         }
 
@@ -754,6 +761,7 @@ class EntregaController extends Controller
 
                 if ($currentPhase->value === $entrega->phase) {
                     $nextPhase = $currentPhase->next();
+
                     if ($nextPhase !== null) {
                         $proyecto->current_phase = $nextPhase;
                         $proyecto->save();
@@ -770,10 +778,12 @@ class EntregaController extends Controller
     {
         // Check via pivot projects
         $proyectos = $entrega->proyectos()->get();
+
         foreach ($proyectos as $proyecto) {
             $esEstudiante = $proyecto->estudiantes()
                 ->where('user_id', $userId)
                 ->exists();
+
             if ($esEstudiante) {
                 return true;
             }
@@ -796,6 +806,7 @@ class EntregaController extends Controller
     {
         // Check via pivot projects
         $proyectos = $entrega->proyectos()->get();
+
         foreach ($proyectos as $proyecto) {
             if ($proyecto->director_id === $userId) {
                 return true;

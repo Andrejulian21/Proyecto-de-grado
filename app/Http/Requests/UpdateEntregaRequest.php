@@ -5,16 +5,17 @@ declare(strict_types=1);
 namespace App\Http\Requests;
 
 use App\Enums\UserRole;
+use App\Models\Entrega;
 use App\Models\User;
 use App\Services\EntregaPesoService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\App;
 use Illuminate\Validation\ValidationException;
 
-class StoreEntregaRequest extends FormRequest
+class UpdateEntregaRequest extends FormRequest
 {
     /**
-     * Only Coordinador can create entregas.
+     * Only Coordinador can update entregas.
      */
     public function authorize(): bool
     {
@@ -24,58 +25,51 @@ class StoreEntregaRequest extends FormRequest
     }
 
     /**
+     * Same validation contract as StoreEntregaRequest (D4) with `sometimes`
+     * semantics so partial updates are allowed.
+     *
      * @return array<string, array<int, string>>
      */
     public function rules(): array
     {
         return [
-            'grupo_id' => ['required', 'exists:semestres,id'],
-            'fase' => ['required', 'string', 'max:50'],
-            'titulo' => ['required', 'string', 'max:255'],
-            'descripcion' => ['required', 'string', 'max:500'],
-            'fecha_limite' => ['required', 'date'],
-            'fecha_inicio' => ['nullable', 'date', 'before_or_equal:fecha_limite'],
-            'hora_inicio' => ['nullable', 'string', 'max:10'],
-            'criterios' => ['nullable', 'string'],
-            'hora_maxima' => ['nullable', 'string', 'max:10'],
-            'grade_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
-            'archivos_requeridos' => ['required', 'array', 'min:1', 'max:6'],
+            'grupo_id' => ['sometimes', 'required', 'exists:semestres,id'],
+            'fase' => ['sometimes', 'required', 'string', 'max:50'],
+            'phase' => ['sometimes', 'required', 'string', 'max:50'],
+            'titulo' => ['sometimes', 'required', 'string', 'max:255'],
+            'descripcion' => ['sometimes', 'required', 'string', 'max:500'],
+            'fecha_limite' => ['sometimes', 'required', 'date'],
+            'fecha_inicio' => ['sometimes', 'nullable', 'date', 'before_or_equal:fecha_limite'],
+            'hora_inicio' => ['sometimes', 'nullable', 'string', 'max:10'],
+            'criterios' => ['sometimes', 'nullable', 'string'],
+            'hora_maxima' => ['sometimes', 'nullable', 'string', 'max:10'],
+            'grade_percentage' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100'],
+            'proyecto_id' => ['sometimes', 'required', 'exists:proyectos,id'],
+            'archivos_requeridos' => ['sometimes', 'required', 'array', 'min:1', 'max:6'],
             'archivos_requeridos.*.id' => [
-                'required',
+                'required_with:archivos_requeridos',
                 'string',
                 'max:50',
                 'regex:/^[a-z0-9_-]+$/',
             ],
-            'archivos_requeridos.*.nombre' => ['required', 'string', 'max:255'],
-            'archivos_requeridos.*.versionamiento' => ['required', 'boolean'],
+            'archivos_requeridos.*.nombre' => ['required_with:archivos_requeridos', 'string', 'max:255'],
+            'archivos_requeridos.*.versionamiento' => ['required_with:archivos_requeridos', 'boolean'],
             'archivos_requeridos.*.analizable_ia' => ['sometimes', 'boolean'],
         ];
     }
 
     /**
-     * Cross-field rules: main file default (RF-ENT-01), analizable_ia only
-     * on the main file (RF-ENT-02), unique ids and the 100% pair rule
-     * (RF-ENT-04) enforced through EntregaPesoService.
+     * Cross-field rules mirroring StoreEntregaRequest (RF-ENT-01/02, D4)
+     * plus the 100% pair rule excluding the entrega's own current value.
      */
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
             $archivos = $this->input('archivos_requeridos');
 
-            if (! is_array($archivos)) {
-                return;
-            }
-
-            $this->validarArchivoPrincipal($validator, $archivos);
-            $this->validarAnalizableIa($validator, $archivos);
-
-            $ids = array_column($archivos, 'id');
-
-            if (count($ids) !== count(array_unique($ids))) {
-                $validator->errors()->add(
-                    'archivos_requeridos',
-                    'Los IDs de los archivos requeridos deben ser únicos.'
-                );
+            if (is_array($archivos)) {
+                $this->validarArchivoPrincipal($validator, $archivos);
+                $this->validarAnalizableIa($validator, $archivos);
             }
 
             $this->validarPesos($validator);
@@ -120,7 +114,8 @@ class StoreEntregaRequest extends FormRequest
     }
 
     /**
-     * RF-ENT-04: enforce the 100% pair rule through EntregaPesoService.
+     * RF-ENT-04: enforce the 100% pair rule, excluding this entrega's own
+     * current value so the update replaces instead of double-counting.
      */
     private function validarPesos($validator): void
     {
@@ -130,8 +125,11 @@ class StoreEntregaRequest extends FormRequest
             return;
         }
 
-        $semestreId = $this->input('grupo_id');
-        $fase = $this->input('fase');
+        $entregaId = (int) $this->route('id');
+        $entrega = Entrega::find($entregaId);
+
+        $semestreId = $this->input('grupo_id') ?? $entrega?->semester_id;
+        $fase = $this->input('fase') ?? $this->input('phase') ?? $entrega?->phase;
 
         if ($semestreId === null || $fase === null) {
             return;
@@ -139,7 +137,7 @@ class StoreEntregaRequest extends FormRequest
 
         try {
             App::make(EntregaPesoService::class)
-                ->validarSumaPar((int) $semestreId, (string) $fase, (float) $peso);
+                ->validarSumaPar((int) $semestreId, (string) $fase, (float) $peso, $entregaId);
         } catch (ValidationException $e) {
             foreach ($e->errors() as $campo => $mensajes) {
                 foreach ($mensajes as $mensaje) {
@@ -167,6 +165,7 @@ class StoreEntregaRequest extends FormRequest
         return [
             'grupo_id' => 'semestre',
             'fase' => 'fase',
+            'phase' => 'fase',
             'titulo' => 'título',
             'descripcion' => 'descripción',
             'fecha_limite' => 'fecha límite',
@@ -175,6 +174,7 @@ class StoreEntregaRequest extends FormRequest
             'criterios' => 'criterios de aceptación',
             'hora_maxima' => 'hora máxima',
             'grade_percentage' => 'porcentaje de nota',
+            'proyecto_id' => 'proyecto',
             'archivos_requeridos' => 'archivos requeridos',
             'archivos_requeridos.*.id' => 'identificador del archivo',
             'archivos_requeridos.*.nombre' => 'nombre del archivo',

@@ -46,7 +46,7 @@ it('listar entregas filtra por proyecto_id', function () {
     Entrega::create(['proyecto_id' => $this->proyecto->id, 'phase' => 'anteproyecto', 'title' => 'A', 'due_date' => '2026-03-01']);
 
     $response = $this->actingAs($this->coordinador)
-        ->getJson('/api/admin/entregas?proyecto_id=' . $this->proyecto->id);
+        ->getJson('/api/admin/entregas?proyecto_id='.$this->proyecto->id);
 
     $response->assertOk();
     expect($response->json('data'))->toHaveCount(1);
@@ -86,7 +86,7 @@ it('coordinador puede crear entrega', function () {
         'descripcion' => 'Descripción detallada del anteproyecto',
         'fecha_limite' => '2026-09-15',
         'archivos_requeridos' => [
-            ['id' => 'documento_principal', 'nombre' => 'Documento Principal', 'versionamiento' => true],
+            ['id' => 'documento-proyecto', 'nombre' => 'Documento del proyecto', 'versionamiento' => true],
             ['id' => 'anexos', 'nombre' => 'Anexos', 'versionamiento' => false],
         ],
     ];
@@ -167,7 +167,7 @@ it('director puede aprobar entrega con nota y feedback', function () {
         'status' => 'enviada',
     ]);
 
-    $version = \App\Models\VersionDocumento::create([
+    $version = VersionDocumento::create([
         'entrega_id' => $entrega->id,
         'version_number' => 1,
         'file_path' => 'entregas/test.pdf',
@@ -200,7 +200,7 @@ it('estudiante NO puede revisar entrega (403)', function () {
         'status' => 'enviada',
     ]);
 
-    $version = \App\Models\VersionDocumento::create([
+    $version = VersionDocumento::create([
         'entrega_id' => $entrega->id,
         'version_number' => 1,
         'file_path' => 'entregas/test.pdf',
@@ -244,7 +244,7 @@ it('al aprobar ultima entrega de fase avanza proyecto a siguiente fase', functio
         'status' => 'enviada',
     ]);
 
-    $version = \App\Models\VersionDocumento::create([
+    $version = VersionDocumento::create([
         'entrega_id' => $entrega->id,
         'version_number' => 1,
         'file_path' => 'entregas/test.pdf',

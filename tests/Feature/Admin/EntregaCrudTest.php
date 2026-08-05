@@ -163,7 +163,7 @@ it('director puede aprobar entrega con nota y feedback', function () {
         'proyecto_id' => $this->proyecto->id,
         'phase' => 'anteproyecto',
         'title' => 'Entrega',
-        'due_date' => '2026-03-01',
+        'due_date' => now()->addMonths(2)->toDateString(),
         'status' => 'enviada',
     ]);
 
@@ -196,7 +196,7 @@ it('estudiante NO puede revisar entrega (403)', function () {
         'proyecto_id' => $this->proyecto->id,
         'phase' => 'anteproyecto',
         'title' => 'Entrega',
-        'due_date' => '2026-03-01',
+        'due_date' => now()->addMonths(2)->toDateString(),
         'status' => 'enviada',
     ]);
 
@@ -240,7 +240,7 @@ it('al aprobar ultima entrega de fase avanza proyecto a siguiente fase', functio
         'proyecto_id' => $this->proyecto->id,
         'phase' => 'anteproyecto',
         'title' => 'Única entrega anteproyecto',
-        'due_date' => '2026-03-01',
+        'due_date' => now()->addMonths(2)->toDateString(),
         'status' => 'enviada',
     ]);
 

@@ -316,13 +316,34 @@ class EntregaController extends Controller
             'consolidated_grade' => 'nullable|numeric|min:0|max:5',
             'director_notes' => 'nullable|string',
             'version_id' => 'required|integer|exists:versiones_documento,id',
+            'director_grade' => 'nullable|numeric',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $entrega = $this->reviewEntregaAction->handle($entrega, $validator->validated(), $user->id);
+        $data = $validator->validated();
+
+        // RF-NOT-01 / D7: director_grade range (0-5) and max 2 decimals,
+        // validated only when the review approves (RF-NOT-02).
+        if (($data['status'] ?? null) === 'aprobada' && isset($data['director_grade'])) {
+            $grade = (float) $data['director_grade'];
+
+            if ($grade < 0 || $grade > 5) {
+                return $this->errorEnvelope(422, 'La nota del director debe estar entre 0 y 5');
+            }
+
+            if (round($grade, 2) !== $grade) {
+                return $this->errorEnvelope(422, 'La nota del director debe tener máximo 2 decimales');
+            }
+        }
+
+        try {
+            $entrega = $this->reviewEntregaAction->handle($entrega, $data, $user->id);
+        } catch (EntregaActionException $e) {
+            return $this->errorEnvelope($e->status, $e->getMessage());
+        }
 
         return response()->json(['data' => $entrega]);
     }
@@ -369,6 +390,14 @@ class EntregaController extends Controller
             ->paginate($request->integer('per_page', 15));
 
         return response()->json($entregas);
+    }
+
+    /**
+     * Spec-compliant error envelope: {"error": {"message": "..."}} (RF-NOT-01/03).
+     */
+    private function errorEnvelope(int $status, string $message): JsonResponse
+    {
+        return response()->json(['error' => ['message' => $message]], $status);
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Entrega;
 
+use App\Actions\Entrega\Exceptions\EntregaActionException;
 use App\Models\Entrega;
 use App\Models\Notificacion;
 use App\Models\VersionDocumento;
@@ -20,11 +21,25 @@ final class ReviewEntregaAction
      */
     public function handle(Entrega $entrega, array $data, int $senderId): Entrega
     {
-        $entrega->update([
+        // RF-NOT-03: the director may only review/edit an entrega that is
+        // still open (non-terminal status and due date not passed).
+        if (! $this->esEditable($entrega)) {
+            throw new EntregaActionException('La entrega está cerrada; la nota y las observaciones no pueden modificarse', 422);
+        }
+
+        $updateData = [
             'status' => $data['status'],
             'consolidated_grade' => $data['consolidated_grade'] ?? null,
             'evaluation_complete' => true,
-        ]);
+        ];
+
+        // RF-NOT-02: the director grade is captured when the observation is
+        // approved; it is never persisted on a non-approval review.
+        if ($data['status'] === 'aprobada' && isset($data['director_grade'])) {
+            $updateData['director_grade'] = $data['director_grade'];
+        }
+
+        $entrega->update($updateData);
 
         // Save director notes to the specific version sent by the frontend
         if (! empty($data['director_notes'])) {
@@ -66,6 +81,21 @@ final class ReviewEntregaAction
         }
 
         return $entrega->fresh();
+    }
+
+    /**
+     * RF-NOT-03 / design TBD-6: an entrega is editable while it is not in a
+     * terminal status (aprobada/rechazada) and its due date has not passed.
+     * There is no literal 'activa' state in the enum; openness is derived
+     * from the negation of the terminal states.
+     */
+    private function esEditable(Entrega $entrega): bool
+    {
+        $terminal = ['aprobada', 'rechazada'];
+
+        return ! in_array($entrega->status?->value, $terminal, true)
+            && $entrega->due_date !== null
+            && $entrega->due_date->startOfDay()->gte(now()->startOfDay());
     }
 
     /**

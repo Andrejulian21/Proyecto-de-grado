@@ -108,10 +108,13 @@ class EntregaController extends Controller
             return $this->actionError($e);
         }
 
-        $entrega->load('proyecto:id,code,title,semester_id', 'proyecto.semestre:id,name', 'proyectos:id,code,title');
+        $entrega->load('semestre:id,name', 'proyecto:id,code,title,semester_id', 'proyecto.semestre:id,name', 'proyectos:id,code,title');
 
         $arr = $entrega->toArray();
-        $arr['semestre_nombre'] = $entrega->proyecto?->semestre?->name ?? '—';
+        // Canonical: the entrega's own semester_id (entrega_proyecto pivot
+        // links projects, not proyecto_id). Fallback to project-derived
+        // values only for legacy rows where semester_id is null.
+        $arr['semestre_nombre'] = $entrega->semestre?->name ?? ($entrega->proyecto?->semestre?->name ?? '—');
         $arr['proyectos_count'] = $entrega->proyectos->count();
         $arr['proyectos_list'] = $entrega->proyectos->map(fn ($p) => "{$p->code} - {$p->title}");
 

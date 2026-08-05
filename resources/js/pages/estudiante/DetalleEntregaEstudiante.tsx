@@ -172,16 +172,20 @@ export default function DetalleEntregaEstudiante() {
     /* ── Group versions by archivo_requerido_id ── */
     const allVersions = entrega?.versiones ?? [];
     const hasArchivoIds = allVersions.some((v) => v.archivo_requerido_id);
-    const archivosConVersiones: ArchivoConVersiones[] = (entrega?.archivos_requeridos ?? []).map((config, idx) => ({
-        config,
-        versiones: allVersions
-            .filter((v) => {
-                if (hasArchivoIds) return v.archivo_requerido_id === config.id;
-                // Fallback: first config gets all versions (legacy data)
-                return idx === 0;
-            })
-            .sort((a, b) => b.version_number - a.version_number),
-    }));
+    const archivosConVersiones: ArchivoConVersiones[] = (entrega?.archivos_requeridos ?? []).map((raw, idx) => {
+        // Persisted items use `slug`; normalize to the builder identity (`id`).
+        const config = { ...raw, id: raw.id || (raw as unknown as { slug?: string }).slug || '' };
+        return {
+            config,
+            versiones: allVersions
+                .filter((v) => {
+                    if (hasArchivoIds) return v.archivo_requerido_id === config.id;
+                    // Fallback: first config gets all versions (legacy data)
+                    return idx === 0;
+                })
+                .sort((a, b) => b.version_number - a.version_number),
+        };
+    });
 
     /* ── Upload handler per slug ── */
     async function handleFileUpload(slug: string, file: File) {
@@ -257,6 +261,44 @@ export default function DetalleEntregaEstudiante() {
         }
     }
 
+    /* Business window (mirrors EntregaEstudianteController::verificarVentanaTiempo):
+       - before start_date (+ start_time): locked — cannot view/upload.
+       - after due_date (+ hora_maxima): can view, cannot upload. */
+    function fechaLocalISO(date: Date): string {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    function parsearFechaLocal(fecha: string, hora?: string | null): Date {
+        const [y, m, d] = fecha.slice(0, 10).split('-').map(Number);
+        const date = new Date(y, (m || 1) - 1, d || 1);
+        if (hora) {
+            const [hh, mm] = hora.split(':').map(Number);
+            date.setHours(hh || 0, mm || 0, 0, 0);
+        }
+        return date;
+    }
+
+    const isLocked = useMemo(() => {
+        if (!entrega?.start_date) return false;
+        return new Date() < parsearFechaLocal(entrega.start_date, entrega.start_time);
+    }, [entrega]);
+
+    const vencida = useMemo(() => {
+        if (!entrega?.due_date) return false;
+        const now = new Date();
+        const hoy = fechaLocalISO(now);
+        const dueDia = String(entrega.due_date).slice(0, 10);
+        if (hoy > dueDia) return true;
+        if (hoy === dueDia && entrega.hora_maxima) {
+            const horaActual = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+            if (horaActual > entrega.hora_maxima) return true;
+        }
+        return false;
+    }, [entrega]);
+
     /* ── Loading state ── */
     if (loading) {
         return (
@@ -295,44 +337,6 @@ export default function DetalleEntregaEstudiante() {
         desarrollo: 'Desarrollo del proyecto',
         presentacion_final: 'Presentación Final',
     };
-
-    /* Business window (mirrors EntregaEstudianteController::verificarVentanaTiempo):
-       - before start_date (+ start_time): locked — cannot view/upload.
-       - after due_date (+ hora_maxima): can view, cannot upload. */
-    function fechaLocalISO(date: Date): string {
-        const y = date.getFullYear();
-        const m = String(date.getMonth() + 1).padStart(2, '0');
-        const d = String(date.getDate()).padStart(2, '0');
-        return `${y}-${m}-${d}`;
-    }
-
-    function parsearFechaLocal(fecha: string, hora?: string | null): Date {
-        const [y, m, d] = fecha.slice(0, 10).split('-').map(Number);
-        const date = new Date(y, (m || 1) - 1, d || 1);
-        if (hora) {
-            const [hh, mm] = hora.split(':').map(Number);
-            date.setHours(hh || 0, mm || 0, 0, 0);
-        }
-        return date;
-    }
-
-    const isLocked = useMemo(() => {
-        if (!entrega?.start_date) return false;
-        return new Date() < parsearFechaLocal(entrega.start_date, entrega.start_time);
-    }, [entrega]);
-
-    const vencida = useMemo(() => {
-        if (!entrega?.due_date) return false;
-        const now = new Date();
-        const hoy = fechaLocalISO(now);
-        const dueDia = String(entrega.due_date).slice(0, 10);
-        if (hoy > dueDia) return true;
-        if (hoy === dueDia && entrega.hora_maxima) {
-            const horaActual = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-            if (horaActual > entrega.hora_maxima) return true;
-        }
-        return false;
-    }, [entrega]);
 
     function canDeleteVersion(v: Version): boolean {
         return !v.director_notes || v.director_notes.trim().length === 0;

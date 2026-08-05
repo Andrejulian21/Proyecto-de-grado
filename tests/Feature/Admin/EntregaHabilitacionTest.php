@@ -9,7 +9,6 @@ use App\Models\Proyecto;
 use App\Models\Semestre;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\UploadedFile;
 
 uses(RefreshDatabase::class);
 
@@ -39,7 +38,9 @@ it('estudiante puede solicitar habilitación de entrega', function () {
         'proyecto_id' => $this->proyecto->id,
         'phase' => 'anteproyecto',
         'title' => 'Entrega',
-        'due_date' => '2026-03-01',
+        // Future-dated so the controller's due_date check does not reject
+        // the request with 422 "fecha límite ya pasó".
+        'due_date' => now()->addMonths(2)->toDateString(),
         'status' => 'creacion',
     ]);
 
@@ -56,7 +57,7 @@ it('solicitar registra en auditoría', function () {
         'proyecto_id' => $this->proyecto->id,
         'phase' => 'anteproyecto',
         'title' => 'Entrega',
-        'due_date' => '2026-03-01',
+        'due_date' => now()->addMonths(2)->toDateString(),
         'status' => 'creacion',
     ]);
 
@@ -71,7 +72,7 @@ it('solicitar falla si entrega no está en creación (422)', function () {
         'proyecto_id' => $this->proyecto->id,
         'phase' => 'anteproyecto',
         'title' => 'Entrega',
-        'due_date' => '2026-03-01',
+        'due_date' => now()->addMonths(2)->toDateString(),
         'status' => 'pendiente',
     ]);
 
@@ -88,7 +89,7 @@ it('director puede habilitar entrega solicitada', function () {
         'proyecto_id' => $this->proyecto->id,
         'phase' => 'anteproyecto',
         'title' => 'Entrega',
-        'due_date' => '2026-03-01',
+        'due_date' => now()->addMonths(2)->toDateString(),
         'status' => 'solicitada',
     ]);
 
@@ -106,7 +107,7 @@ it('no coordinador no puede habilitar entrega (403)', function () {
         'proyecto_id' => $this->proyecto->id,
         'phase' => 'anteproyecto',
         'title' => 'Entrega',
-        'due_date' => '2026-03-01',
+        'due_date' => now()->addMonths(2)->toDateString(),
         'status' => 'solicitada',
     ]);
 
@@ -116,36 +117,8 @@ it('no coordinador no puede habilitar entrega (403)', function () {
     $response->assertStatus(403);
 });
 
-// -- Subir versiones con habilitación -----------------------------------------
-
-it('estudiante NO puede subir versión sin habilitación (422)', function () {
-    $entrega = Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
-        'phase' => 'anteproyecto',
-        'title' => 'Entrega',
-        'due_date' => '2026-03-01',
-        'status' => 'solicitada', // no habilitada aún
-    ]);
-
-    $file = UploadedFile::fake()->create('documento.pdf', 100);
-    $response = $this->actingAs($this->estudiante)
-        ->postJson("/api/entregas/{$entrega->id}/versiones", ['file' => $file]);
-
-    $response->assertStatus(422);
-});
-
-it('estudiante puede subir versión después de habilitación', function () {
-    $entrega = Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
-        'phase' => 'anteproyecto',
-        'title' => 'Entrega',
-        'due_date' => '2026-03-01',
-        'status' => 'pendiente', // habilitada por director
-    ]);
-
-    $file = UploadedFile::fake()->create('documento.pdf', 100);
-    $response = $this->actingAs($this->estudiante)
-        ->postJson("/api/entregas/{$entrega->id}/versiones", ['file' => $file]);
-
-    $response->assertCreated();
-});
+// REMOVED 2026-08-04: the 2 tests below referenced
+// POST /api/entregas/{id}/versiones which was eliminated in PR 2
+// (replaced by per-slug POST /api/entregas/{entrega}/archivos/{slug}).
+// Upload flow + RBAC + max-versions are covered by SubidaArchivoTest
+// and EstadoCompletitudTest.

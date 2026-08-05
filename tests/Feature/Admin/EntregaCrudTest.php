@@ -10,7 +10,6 @@ use App\Models\Semestre;
 use App\Models\User;
 use App\Models\VersionDocumento;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\UploadedFile;
 
 uses(RefreshDatabase::class);
 
@@ -123,116 +122,16 @@ it('estudiante NO puede crear entrega (403)', function () {
 });
 
 // -- Subir versiones --------------------------------------------------------
-
-it('estudiante puede subir version a entrega', function () {
-    $entrega = Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
-        'phase' => 'anteproyecto',
-        'title' => 'Entrega',
-        'due_date' => '2026-03-01',
-    ]);
-
-    $file = UploadedFile::fake()->create('documento.pdf', 100);
-
-    $response = $this->actingAs($this->estudiante)
-        ->postJson("/api/entregas/{$entrega->id}/versiones", [
-            'file' => $file,
-        ]);
-
-    $response->assertCreated();
-    expect(VersionDocumento::count())->toBe(1);
-});
-
-it('version numero se auto-incrementa por entrega', function () {
-    $entrega = Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
-        'phase' => 'anteproyecto',
-        'title' => 'Entrega',
-        'due_date' => '2026-03-01',
-    ]);
-
-    $file1 = UploadedFile::fake()->create('v1.pdf', 100);
-    $this->actingAs($this->estudiante)->postJson("/api/entregas/{$entrega->id}/versiones", ['file' => $file1]);
-
-    $file2 = UploadedFile::fake()->create('v2.pdf', 100);
-    $this->actingAs($this->estudiante)->postJson("/api/entregas/{$entrega->id}/versiones", ['file' => $file2]);
-
-    $versiones = VersionDocumento::where('entrega_id', $entrega->id)->orderBy('version_number')->get();
-    expect($versiones[0]->version_number)->toBe(1);
-    expect($versiones[1]->version_number)->toBe(2);
-});
-
-it('maximo 4 versiones por entrega (422)', function () {
-    $entrega = Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
-        'phase' => 'anteproyecto',
-        'title' => 'Entrega',
-        'due_date' => '2026-03-01',
-    ]);
-
-    for ($i = 0; $i < 4; $i++) {
-        $file = UploadedFile::fake()->create("v{$i}.pdf", 100);
-        $this->actingAs($this->estudiante)->postJson("/api/entregas/{$entrega->id}/versiones", ['file' => $file]);
-    }
-
-    $response = $this->actingAs($this->estudiante)
-        ->postJson("/api/entregas/{$entrega->id}/versiones", [
-            'file' => UploadedFile::fake()->create('v5.pdf', 100),
-        ]);
-
-    $response->assertStatus(422);
-});
-
-it('subir version valida tipo de archivo PDF/DOCX', function () {
-    $entrega = Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
-        'phase' => 'anteproyecto',
-        'title' => 'Entrega',
-        'due_date' => '2026-03-01',
-    ]);
-
-    $file = UploadedFile::fake()->create('malo.exe', 100);
-
-    $response = $this->actingAs($this->estudiante)
-        ->postJson("/api/entregas/{$entrega->id}/versiones", [
-            'file' => $file,
-        ]);
-
-    $response->assertStatus(422);
-});
-
-it('subir version valida tamaño máximo 50MB', function () {
-    $entrega = Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
-        'phase' => 'anteproyecto',
-        'title' => 'Entrega',
-        'due_date' => '2026-03-01',
-    ]);
-
-    $file = UploadedFile::fake()->create('grande.pdf', 60000);
-
-    $response = $this->actingAs($this->estudiante)
-        ->postJson("/api/entregas/{$entrega->id}/versiones", [
-            'file' => $file,
-        ]);
-
-    $response->assertStatus(422);
-});
-
-it('coordinador NO puede subir version (403)', function () {
-    $entrega = Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
-        'phase' => 'anteproyecto',
-        'title' => 'Entrega',
-        'due_date' => '2026-03-01',
-    ]);
-
-    $file = UploadedFile::fake()->create('doc.pdf', 100);
-    $response = $this->actingAs($this->coordinador)
-        ->postJson("/api/entregas/{$entrega->id}/versiones", ['file' => $file]);
-
-    $response->assertStatus(403);
-});
+//
+// REMOVED 2026-08-04: these 6 tests referenced POST /api/entregas/{id}/versiones
+// which was eliminated in PR 2 (replaced by the per-slug upload endpoint
+// POST /api/entregas/{entrega}/archivos/{slug}). The new path is exercised by
+// SubidaArchivoTest and EstadoCompletitudTest, which already cover the upload
+// flow, max-versions, file-type, file-size and RBAC scenarios.
+//
+// The 'revisar' tests below still depend on a VersionDocumento row existing
+// to satisfy the controller's version_id contract — they create the version
+// directly via the model instead of through the (now-removed) upload route.
 
 // -- Historial de versiones -------------------------------------------------
 

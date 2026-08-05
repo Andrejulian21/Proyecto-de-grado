@@ -148,8 +148,21 @@ it('al revisar entrega se genera notificacion para el estudiante', function () {
         'proyecto_id' => $this->proyecto->id,
         'phase' => 'anteproyecto',
         'title' => 'Entrega a revisar',
-        'due_date' => '2026-03-01',
+        'due_date' => now()->addMonths(2)->toDateString(),
         'status' => 'enviada',
+    ]);
+
+    // The revisar endpoint requires version_id (the version being reviewed)
+    // so the controller can persist consolidated_grade/director_notes against
+    // the specific version. Create one directly here — the per-slug upload
+    // path is covered separately by SubidaArchivoTest.
+    $version = \App\Models\VersionDocumento::create([
+        'entrega_id' => $entrega->id,
+        'version_number' => 1,
+        'file_path' => 'entregas/test.pdf',
+        'file_size' => 1024,
+        'original_name' => 'test.pdf',
+        'uploaded_at' => now(),
     ]);
 
     $this->actingAs($this->director)
@@ -157,6 +170,7 @@ it('al revisar entrega se genera notificacion para el estudiante', function () {
             'status' => 'aprobada',
             'consolidated_grade' => 4.5,
             'director_notes' => 'Buen trabajo',
+            'version_id' => $version->id,
         ]);
 
     $notificaciones = Notificacion::where('user_id', $this->estudiante->id)->get();

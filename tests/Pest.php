@@ -55,3 +55,57 @@ expect()->extend('toBeOne', function () {
 | global functions to help you to reduce the number of lines of code in your test files.
 |
 */
+
+/**
+ * Check if a column has decimal/numeric type. SQLite reports "numeric" and
+ * PostgreSQL reports "decimal" / "numeric" depending on the variant.
+ *
+ * Used by the database schema tests so they can stay DB-agnostic across
+ * the in-memory SQLite test env (phpunit.xml) and the production
+ * PostgreSQL driver.
+ */
+function columnIsDecimalLike(?array $col): bool
+{
+    if ($col === null) {
+        return false;
+    }
+
+    $type = strtolower((string) ($col['type'] ?? $col['type_name'] ?? ''));
+
+    return str_contains($type, 'numeric') || str_contains($type, 'decimal');
+}
+
+/**
+ * Check if a column has boolean type. SQLite reports "tinyint(1)" (Laravel's
+ * boolean translation) and PostgreSQL reports "bool".
+ */
+function columnIsBooleanLike(?array $col): bool
+{
+    if ($col === null) {
+        return false;
+    }
+
+    $type = strtolower((string) ($col['type'] ?? $col['type_name'] ?? ''));
+
+    return str_contains($type, 'bool')
+        || str_contains($type, 'tinyint');
+}
+
+/**
+ * Normalize a column default value for comparison. SQLite wraps string/char
+ * defaults in single quotes; we strip them. PHP booleans pass through.
+ */
+function normalizeColumnDefault(mixed $value): string
+{
+    if ($value === null) {
+        return '';
+    }
+
+    $s = (string) $value;
+
+    if (strlen($s) >= 2 && $s[0] === "'" && substr($s, -1) === "'") {
+        $s = substr($s, 1, -1);
+    }
+
+    return trim($s);
+}

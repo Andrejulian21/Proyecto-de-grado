@@ -182,7 +182,16 @@ export default function CoordinadorEntregas() {
         setEditGradePercentage(entrega.grade_percentage != null ? String(entrega.grade_percentage) : '');
         setEditFase(entrega.phase);
         setEditGrupoId(entrega.grupo_id);
-        setEditArchivos(entrega.archivos_requeridos ?? archivosPorDefecto());
+        // Persisted items use `slug`; normalize to the builder shape
+        // (`id`) so the main-file detection (RF-ENT-01) and the outgoing
+        // update payload both carry the canonical identity.
+        const persistidos = (entrega.archivos_requeridos ?? []).map((a) => ({
+            id: a.id ?? a.slug ?? '',
+            nombre: a.nombre,
+            versionamiento: a.versionamiento,
+            analizable_ia: a.analizable_ia,
+        }));
+        setEditArchivos(persistidos.length > 0 ? persistidos : archivosPorDefecto());
         setEditArchivosError(null);
         setEditError(null);
     }, []);
@@ -208,14 +217,14 @@ export default function CoordinadorEntregas() {
         setEditError(null);
         try {
             const payload: UpdateEntregaPayload = {
-                due_date: editFecha,
                 titulo: editTitulo.trim(),
-                description: editDesc.trim(),
-                acceptance_criteria: editCriterios.trim() || null,
+                descripcion: editDesc.trim(),
+                fecha_limite: editFecha,
+                criterios: editCriterios.trim() || null,
                 hora_maxima: editHora || null,
-                start_date: editFechaInicio || null,
-                start_time: editHoraInicio || null,
-                phase: editFase,
+                fecha_inicio: editFechaInicio || null,
+                hora_inicio: editHoraInicio || null,
+                fase: editFase,
                 grade_percentage: editGradePercentage === '' ? null : Number(editGradePercentage),
                 archivos_requeridos: validArchivos,
             };

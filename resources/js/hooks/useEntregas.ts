@@ -3,6 +3,7 @@ import { apiFetch } from '@/lib/utils';
 import type {
     EntregaEstadoResponse,
     ArchivoRequeridoConfig,
+    ArchivoRequeridoPersistido,
     EntregaPeso,
 } from '@/types/entregas';
 
@@ -42,7 +43,8 @@ export interface Entrega extends EntregaPeso {
     proyectos?: ProyectoResumen[];
     proyectos_count?: number;
     proyectos_list?: string[];
-    archivos_requeridos?: ArchivoRequeridoConfig[];
+    /** Items as persisted in the JSON column (key `slug`, not `id`). */
+    archivos_requeridos?: ArchivoRequeridoPersistido[];
 }
 
 export interface CreateEntregaPayload {
@@ -60,14 +62,14 @@ export interface CreateEntregaPayload {
 }
 
 export interface UpdateEntregaPayload {
-    due_date?: string;
-    description?: string;
     titulo?: string;
-    acceptance_criteria?: string | null;
+    descripcion?: string;
+    fecha_limite?: string;
+    fecha_inicio?: string | null;
+    hora_inicio?: string | null;
+    criterios?: string | null;
     hora_maxima?: string | null;
-    start_date?: string | null;
-    start_time?: string | null;
-    phase?: string;
+    fase?: string;
     proyecto_id?: number;
     grade_percentage?: number | null;
     archivos_requeridos?: ArchivoRequeridoConfig[];

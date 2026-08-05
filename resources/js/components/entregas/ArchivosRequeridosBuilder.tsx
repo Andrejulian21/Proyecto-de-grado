@@ -26,6 +26,15 @@ function generarSlug(nombre: string): string {
         .replace(/^_|_$/g, '');
 }
 
+/**
+ * Canonical identity of an archivo: `id` (builder form) or `slug`
+ * (persisted JSON inside `entregas.archivos_requeridos`). Used for the
+ * main-file detection (RF-ENT-01), rename/delete guards and labels.
+ */
+function obtenerIdArchivo(archivo: ArchivoRequeridoConfig): string {
+    return archivo.id ?? archivo.slug ?? '';
+}
+
 export default function ArchivosRequeridosBuilder({ value, onChange, error, disabled }: Props) {
     const archivos = value ?? [];
 
@@ -34,7 +43,7 @@ export default function ArchivosRequeridosBuilder({ value, onChange, error, disa
         const base = 'nuevo_archivo';
         let idx = 1;
         let slug = base;
-        while (archivos.some((a) => a.id === slug)) {
+        while (archivos.some((a) => obtenerIdArchivo(a) === slug)) {
             idx++;
             slug = `${base}_${idx}`;
         }
@@ -48,7 +57,7 @@ export default function ArchivosRequeridosBuilder({ value, onChange, error, disa
         (index: number) => {
             const archivo = archivos[index];
             // The main project file must always exist (RF-ENT-01).
-            if (!archivo || archivo.id === SLUG_DOCUMENTO_PROYECTO) return;
+            if (!archivo || obtenerIdArchivo(archivo) === SLUG_DOCUMENTO_PROYECTO) return;
             onChange(archivos.filter((_, i) => i !== index));
         },
         [archivos, onChange],
@@ -60,16 +69,16 @@ export default function ArchivosRequeridosBuilder({ value, onChange, error, disa
                 if (i !== index) return a;
                 if (campo === 'nombre') {
                     const nuevoNombre = valor as string;
-                    const esPrincipal = a.id === SLUG_DOCUMENTO_PROYECTO;
+                    const esPrincipal = obtenerIdArchivo(a) === SLUG_DOCUMENTO_PROYECTO;
                     return {
                         ...a,
                         nombre: nuevoNombre,
                         // The main file keeps its canonical slug even if renamed.
-                        id: esPrincipal ? a.id : generarSlug(nuevoNombre) || a.id,
+                        id: esPrincipal ? obtenerIdArchivo(a) : generarSlug(nuevoNombre) || obtenerIdArchivo(a),
                     };
                 }
                 if (campo === 'analizable_ia') {
-                    const esPrincipal = a.id === SLUG_DOCUMENTO_PROYECTO;
+                    const esPrincipal = obtenerIdArchivo(a) === SLUG_DOCUMENTO_PROYECTO;
                     // Backend rejects analizable_ia=true on secondary files (RF-ENT-02).
                     return { ...a, analizable_ia: esPrincipal ? (valor as boolean) : false };
                 }
@@ -94,7 +103,10 @@ export default function ArchivosRequeridosBuilder({ value, onChange, error, disa
 
             <div className="flex flex-col gap-2">
                 {archivos.map((archivo, index) => {
-                    const esPrincipal = archivo.id === SLUG_DOCUMENTO_PROYECTO;
+                    // Index key is stable: the list is append-only (no
+                    // reordering) and an identity key would remount the row
+                    // mid-rename, losing input focus.
+                    const esPrincipal = obtenerIdArchivo(archivo) === SLUG_DOCUMENTO_PROYECTO;
                     return (
                         <div
                             key={index}
@@ -121,7 +133,7 @@ export default function ArchivosRequeridosBuilder({ value, onChange, error, disa
                                                 Principal
                                             </span>
                                         )}
-                                        ID: {archivo.id}
+                                        ID: {obtenerIdArchivo(archivo) || '—'}
                                     </span>
                                 </div>
 
@@ -135,26 +147,27 @@ export default function ArchivosRequeridosBuilder({ value, onChange, error, disa
                                     />
                                     Versiones
                                 </label>
-                            </div>
 
-                            {/* Analizable con IA — only the main file (RF-ENT-02). */}
-                            <label className="flex shrink-0 items-center gap-1.5 text-sm text-[#57534e] whitespace-nowrap">
-                                <Cpu className="h-4 w-4 text-[#78716c]" aria-hidden="true" />
-                                <input
-                                    type="checkbox"
-                                    checked={esPrincipal ? Boolean(archivo.analizable_ia) : false}
-                                    onChange={(e) => actualizar(index, 'analizable_ia', e.target.checked)}
-                                    aria-label={`Analizable con IA para ${archivo.nombre || 'el archivo'}`}
-                                    title={
-                                        esPrincipal
-                                            ? 'Permite el análisis automático con IA del documento del proyecto'
-                                            : 'Solo el documento del proyecto puede ser analizable con IA'
-                                    }
-                                    className="h-4 w-4 rounded border-[#d6d3d1] text-[#c2410c] focus:ring-[#c2410c] focus:ring-offset-0 disabled:opacity-40"
-                                    disabled={disabled || !esPrincipal}
-                                />
-                                Analizable con IA
-                            </label>
+                                {/* Analizable con IA — same checkbox column as
+                                    Versiones (RF-ENT-02), only the main file. */}
+                                <label className="flex shrink-0 items-center gap-1.5 text-sm text-[#57534e] whitespace-nowrap">
+                                    <Cpu className="h-4 w-4 text-[#78716c]" aria-hidden="true" />
+                                    <input
+                                        type="checkbox"
+                                        checked={esPrincipal ? Boolean(archivo.analizable_ia) : false}
+                                        onChange={(e) => actualizar(index, 'analizable_ia', e.target.checked)}
+                                        aria-label={`Analizable con IA para ${archivo.nombre || 'el archivo'}`}
+                                        title={
+                                            esPrincipal
+                                                ? 'Permite el análisis automático con IA del documento del proyecto'
+                                                : 'Solo el documento del proyecto puede ser analizable con IA'
+                                        }
+                                        className="h-4 w-4 rounded border-[#d6d3d1] text-[#c2410c] focus:ring-[#c2410c] focus:ring-offset-0 disabled:opacity-40"
+                                        disabled={disabled || !esPrincipal}
+                                    />
+                                    Analizable con IA
+                                </label>
+                            </div>
 
                             <button
                                 type="button"

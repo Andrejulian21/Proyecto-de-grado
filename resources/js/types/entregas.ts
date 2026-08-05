@@ -1,5 +1,14 @@
 export interface ArchivoRequeridoConfig {
+    /**
+     * Canonical identity of the file (RF-ENT-01). The persisted JSON uses
+     * `slug`; the builder tolerates both via `obtenerIdArchivo`.
+     */
     id: string;
+    /**
+     * Alias of `id` for items loaded from the persisted JSON shape
+     * (entregas.archivos_requeridos stores `slug`).
+     */
+    slug?: string;
     nombre: string;
     versionamiento: boolean;
     /**

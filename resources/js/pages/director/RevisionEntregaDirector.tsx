@@ -9,6 +9,12 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
 import type { ArchivoRequeridoConfig } from '@/types/entregas';
+import {
+    agruparVersionesPorArchivo,
+    archivoAceptaObservaciones,
+    esDocumentoProyecto,
+    type ArchivoConVersiones,
+} from '@/lib/entregas';
 
 /* ── Types ── */
 
@@ -27,11 +33,6 @@ interface Version {
      * (D3-rev). The general delivery template never stores the note.
      */
     director_grade?: number | null;
-}
-
-interface ArchivoConVersiones {
-    config: ArchivoRequeridoConfig;
-    versiones: Version[];
 }
 
 interface EntregaDetail {
@@ -210,7 +211,10 @@ export default function RevisionEntregaDirector() {
                 body: JSON.stringify({
                     status: decision,
                     consolidated_grade: null,
-                    director_notes: directorNotes || null,
+                    // RF-SUP-01/02: observations are only persisted on the
+                    // degree project document (versioned); other files never
+                    // carry them, so never send notes for them.
+                    director_notes: aceptaObservaciones ? (directorNotes || null) : null,
                     version_id: selectedVersion?.id,
                     archivo_requerido_id: activeArchivo?.config.id ?? null,
                     ...(directorGradePayload !== undefined
@@ -240,25 +244,22 @@ export default function RevisionEntregaDirector() {
     const projectTitle = mainProyecto?.title ?? '';
     const backPath = proyectoId ? `/supervision/${proyectoId}` : '/supervision';
 
-    /* ── Group versions by archivo_requerido_id ── */
-    const allVersions = entrega?.versiones ?? [];
-    const hasArchivoIds = allVersions.some((v) => v.archivo_requerido_id);
-    const archivosConVersiones: ArchivoConVersiones[] = (entrega?.archivos_requeridos ?? []).map((config, idx) => ({
-        config,
-        versiones: allVersions
-            .filter((v) => {
-                if (hasArchivoIds) return v.archivo_requerido_id === config.id;
-                // Fallback: first config gets all versions (legacy data)
-                return idx === 0;
-            })
-            .sort((a, b) => b.version_number - a.version_number),
-    }));
+    /* ── Group versions by archivo_requerido_id (slug→id normalization) ── */
+    const archivosConVersiones: ArchivoConVersiones<Version>[] = agruparVersionesPorArchivo(
+        entrega?.archivos_requeridos ?? [],
+        entrega?.versiones ?? [],
+    );
     const safeArchivoIdx = Math.min(selectedArchivoIdx, Math.max(0, archivosConVersiones.length - 1));
     const activeArchivo = archivosConVersiones[safeArchivoIdx] ?? null;
 
     const sortedVersions = activeArchivo?.versiones ?? [];
     const safeVersionIdx = Math.min(selectedVersionIdx, Math.max(0, sortedVersions.length - 1));
     const selectedVersion: Version | null = sortedVersions[safeVersionIdx] ?? null;
+
+    /* RF-SUP-01/02: only the versioned degree project document shows and
+       accepts director observations. */
+    const esProyecto = activeArchivo ? esDocumentoProyecto(activeArchivo.config) : false;
+    const aceptaObservaciones = activeArchivo ? archivoAceptaObservaciones(activeArchivo.config) : false;
 
     /* ── D3-rev: the grade input follows the selected version's project
        delivery (entrega_proyecto), never the shared template grade. ── */
@@ -549,34 +550,52 @@ export default function RevisionEntregaDirector() {
                                         )}
                                     </div>
 
-                                    {/* Observaciones existentes de esta versión */}
-                                    <div className="rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-4">
-                                        <div className="mb-3 flex items-center justify-between gap-2">
-                                            <span className="text-sm font-bold text-[#1c1917]">
-                                                {activeArchivo.config.nombre} · Versión {selectedVersion.version_number}
-                                            </span>
-                                            <StatusBadge variant={getReviewStatus(selectedVersion, entrega.status).variant}>
-                                                {getReviewStatus(selectedVersion, entrega.status).label}
-                                            </StatusBadge>
-                                        </div>
-                                        <div className="mb-3 space-y-1">
-                                            <p className="flex items-center gap-1 text-xs text-[#78716c]">
-                                                <Calendar className="h-3 w-3" />
-                                                {formatDate(selectedVersion.uploaded_at || selectedVersion.created_at)}
-                                            </p>
-                                        </div>
-                                        {selectedVersion.director_notes ? (
-                                            <div className="rounded-md bg-white p-3">
-                                                <p className="whitespace-pre-wrap text-xs leading-relaxed text-[#1c1917]">
-                                                    {selectedVersion.director_notes}
+                                    {/* Observaciones existentes de esta versión (solo documento-proyecto) */}
+                                    {aceptaObservaciones ? (
+                                        <div className="rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-4">
+                                            <div className="mb-3 flex items-center justify-between gap-2">
+                                                <span className="text-sm font-bold text-[#1c1917]">
+                                                    {activeArchivo.config.nombre} · Versión {selectedVersion.version_number}
+                                                </span>
+                                                <StatusBadge variant={getReviewStatus(selectedVersion, entrega.status).variant}>
+                                                    {getReviewStatus(selectedVersion, entrega.status).label}
+                                                </StatusBadge>
+                                            </div>
+                                            <div className="mb-3 space-y-1">
+                                                <p className="flex items-center gap-1 text-xs text-[#78716c]">
+                                                    <Calendar className="h-3 w-3" />
+                                                    {formatDate(selectedVersion.uploaded_at || selectedVersion.created_at)}
                                                 </p>
                                             </div>
-                                        ) : (
+                                            {selectedVersion.director_notes ? (
+                                                <div className="rounded-md bg-white p-3">
+                                                    <p className="whitespace-pre-wrap text-xs leading-relaxed text-[#1c1917]">
+                                                        {selectedVersion.director_notes}
+                                                    </p>
+                                                </div>
+                                            ) : (
+                                                <p className="text-xs text-[#a8a29e] italic">
+                                                    Sin observaciones previas del director.
+                                                </p>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-4">
+                                            <div className="mb-3 flex items-center justify-between gap-2">
+                                                <span className="text-sm font-bold text-[#1c1917]">
+                                                    {activeArchivo.config.nombre} · Versión {selectedVersion.version_number}
+                                                </span>
+                                                <StatusBadge variant={getReviewStatus(selectedVersion, entrega.status).variant}>
+                                                    {getReviewStatus(selectedVersion, entrega.status).label}
+                                                </StatusBadge>
+                                            </div>
                                             <p className="text-xs text-[#a8a29e] italic">
-                                                Sin observaciones previas del director.
+                                                {esProyecto
+                                                    ? 'Este documento no tiene observaciones del director.'
+                                                    : 'Las observaciones del director se guardan únicamente en el documento del proyecto de grado.'}
                                             </p>
-                                        )}
-                                    </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         ) : (
@@ -609,7 +628,7 @@ export default function RevisionEntregaDirector() {
                     )}
 
                     <div className="flex flex-col gap-6">
-                        {/* 1. Observaciones */}
+                        {/* 1. Observaciones (solo documento-proyecto con versionamiento) */}
                         <div>
                             <label
                                 htmlFor="director-notes"
@@ -622,10 +641,19 @@ export default function RevisionEntregaDirector() {
                                 rows={5}
                                 value={directorNotes}
                                 onChange={(e) => setDirectorNotes(e.target.value)}
-                                disabled={cerrada}
-                                placeholder="Escriba sus observaciones sobre la entrega..."
+                                disabled={cerrada || !aceptaObservaciones}
+                                placeholder={
+                                    aceptaObservaciones
+                                        ? 'Escriba sus observaciones sobre la entrega...'
+                                        : 'Las observaciones solo se guardan en el documento del proyecto de grado'
+                                }
                                 className="w-full min-h-[100px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] disabled:bg-[#f5f5f4] disabled:opacity-70 resize-y"
                             />
+                            {!aceptaObservaciones && (
+                                <p className="mt-1.5 text-xs text-[#a8a29e]">
+                                    Las observaciones del director se guardan únicamente en el documento del proyecto de grado (con versionamiento).
+                                </p>
+                            )}
                         </div>
 
                         {/* 2. Decisión */}

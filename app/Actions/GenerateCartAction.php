@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions;
 
+use PhpOffice\PhpWord\Settings;
 use PhpOffice\PhpWord\TemplateProcessor;
 use RuntimeException;
 
@@ -28,6 +29,11 @@ final class GenerateCartAction
         if (! is_file($templatePath)) {
             throw new RuntimeException(self::MENSAJE_SIN_TEMPLATE);
         }
+
+        // RF-CA-06: TemplateProcessor only escapes values when output escaping
+        // is enabled; otherwise a value with `&`, `<`, `>` or quotes corrupts
+        // word/document.xml and Word reports "error al abrir" on download.
+        Settings::setOutputEscapingEnabled(true);
 
         $processor = new TemplateProcessor($templatePath);
 

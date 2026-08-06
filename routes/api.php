@@ -306,6 +306,9 @@ Route::middleware(['auth:sanctum', 'single_session', 'activity', 'role:Coordinad
         Route::get('/seguimiento/semestre/{semestre}', [SeguimientoController::class, 'porSemestre'])
             ->whereNumber('semestre')
             ->name('seguimiento.por-semestre');
+        Route::get('/seguimiento/semestre/{semestre}/export', [SeguimientoController::class, 'exportar'])
+            ->whereNumber('semestre')
+            ->name('seguimiento.export');
         Route::put('/seguimiento/observaciones', [SeguimientoController::class, 'guardarObservacion'])
             ->name('seguimiento.guardar-observacion');
     });

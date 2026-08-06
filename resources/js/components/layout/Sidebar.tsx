@@ -12,6 +12,7 @@ import {
     UserCheck,
     Bell,
     BarChart3,
+    FileText,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -38,6 +39,7 @@ const navConfig: Record<string, { to: string; icon: typeof LayoutDashboard; labe
         { to: '/dashboard/director', label: 'Panel', icon: LayoutDashboard },
         { to: '/supervision', label: 'Supervisión', icon: FolderKanban },
         { to: '/evaluador/mis-asignaciones', label: 'Evaluaciones', icon: ClipboardCheck },
+        { to: '/dashboard/director/cartas', label: 'Cartas de Aval', icon: FileText },
         { to: '/anuncios', label: 'Anuncios', icon: Megaphone },
         { to: '/recursos', label: 'Recursos', icon: FolderKanban },
     ],

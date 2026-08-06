@@ -47,6 +47,7 @@ const MisAsignaciones = lazy(() => import('@/pages/evaluador/MisAsignaciones'));
 const AnalisisAutomaticoEntregas = lazy(() => import('@/pages/estudiante/AnalisisAutomaticoEntregas'));
 const AsistenteOrientacion = lazy(() => import('@/pages/estudiante/AsistenteOrientacion'));
 const EvaluacionesDirector = lazy(() => import('@/pages/director/EvaluacionesDirector'));
+const CartasAvalDirector = lazy(() => import('@/pages/director/CartasAval'));
 const DetalleEntregaCoordinador = lazy(() => import('@/pages/coordinador/DetalleEntregaCoordinador'));
 
 function SuspenseWrapper({ children }: { children: React.ReactNode }) {
@@ -134,6 +135,8 @@ function App() {
                                 <Route path="/entregas/:id/revisar" element={<ProtectedRoute allowedRoles={['Director']}><SuspenseWrapper><RevisionEntregaDirector /></SuspenseWrapper></ProtectedRoute>} />
                                 {/* PR3: Director evaluaciones */}
                                 <Route path="/evaluaciones" element={<ProtectedRoute allowedRoles={['Director']}><SuspenseWrapper><EvaluacionesDirector /></SuspenseWrapper></ProtectedRoute>} />
+                                {/* PR2 (cartas-avales): Cartas de aval del director */}
+                                <Route path="/dashboard/director/cartas" element={<ProtectedRoute allowedRoles={['Director']}><SuspenseWrapper><CartasAvalDirector /></SuspenseWrapper></ProtectedRoute>} />
                                 {/* PR9: Coordinador proyectos */}
                                 <Route path="/proyectos" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><GestionProyectos /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/directores" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><DirectoresPage /></SuspenseWrapper></ProtectedRoute>} />

@@ -9,11 +9,17 @@ use App\Models\Bitacora;
 use App\Models\Entrega;
 use App\Models\EvaluadorProyecto;
 use App\Models\Proyecto;
+use App\Models\User;
+use App\Services\CartaAvalService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use RuntimeException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DirectorController extends Controller
 {
+    public function __construct(private readonly CartaAvalService $cartasService) {}
+
     /**
      * GET /api/director/proyectos
      *
@@ -52,12 +58,12 @@ class DirectorController extends Controller
         $proyectosSupervisando = $proyectoIds->count();
 
         $entregasPendientes = Entrega::where(function ($q) use ($proyectoIds) {
-                foreach ($proyectoIds as $pid) {
-                    $q->orWhere(function ($sq) use ($pid) {
-                        $sq->paraProyecto($pid);
-                    });
-                }
-            })
+            foreach ($proyectoIds as $pid) {
+                $q->orWhere(function ($sq) use ($pid) {
+                    $sq->paraProyecto($pid);
+                });
+            }
+        })
             ->where('status', 'enviada')
             ->count();
 
@@ -66,12 +72,12 @@ class DirectorController extends Controller
             ->count();
 
         $aprobadasMes = Entrega::where(function ($q) use ($proyectoIds) {
-                foreach ($proyectoIds as $pid) {
-                    $q->orWhere(function ($sq) use ($pid) {
-                        $sq->paraProyecto($pid);
-                    });
-                }
-            })
+            foreach ($proyectoIds as $pid) {
+                $q->orWhere(function ($sq) use ($pid) {
+                    $sq->paraProyecto($pid);
+                });
+            }
+        })
             ->where('status', 'aprobada')
             ->whereMonth('created_at', now()->month)
             ->whereYear('created_at', now()->year)
@@ -80,9 +86,9 @@ class DirectorController extends Controller
         return response()->json([
             'data' => [
                 'proyectos_supervisando' => $proyectosSupervisando,
-                'entregas_pendientes'    => $entregasPendientes,
-                'alertas'                => $alertas,
-                'aprobadas_mes'          => $aprobadasMes,
+                'entregas_pendientes' => $entregasPendientes,
+                'alertas' => $alertas,
+                'aprobadas_mes' => $aprobadasMes,
             ],
         ]);
     }
@@ -102,17 +108,17 @@ class DirectorController extends Controller
             ->pluck('id');
 
         $entregas = Entrega::where(function ($q) use ($proyectoIds) {
-                foreach ($proyectoIds as $pid) {
-                    $q->orWhere(function ($sq) use ($pid) {
-                        $sq->paraProyecto($pid);
-                    });
-                }
-            })
+            foreach ($proyectoIds as $pid) {
+                $q->orWhere(function ($sq) use ($pid) {
+                    $sq->paraProyecto($pid);
+                });
+            }
+        })
             ->where('status', 'enviada')
             ->with([
-                'proyecto:id,code,title,director_id',
-                'proyectos:id,code,title',
-            ])
+            'proyecto:id,code,title,director_id',
+            'proyectos:id,code,title',
+        ])
             ->orderBy('due_date', 'asc')
             ->take(20)
             ->get();
@@ -126,14 +132,14 @@ class DirectorController extends Controller
             $primerEstudiante = $primerProyecto?->estudiantes->first();
 
             return [
-                'id'          => $entrega->id,
+                'id' => $entrega->id,
                 'proyecto_id' => $primerProyecto?->id,
-                'codigo'      => $primerProyecto?->code,
-                'proyecto'    => $primerProyecto?->title,
-                'title'       => $entrega->title,
-                'estudiante'  => $primerEstudiante?->name ?? '—',
-                'due_date'    => $entrega->due_date?->toDateString(),
-                'status'      => $entrega->status?->value ?? $entrega->status,
+                'codigo' => $primerProyecto?->code,
+                'proyecto' => $primerProyecto?->title,
+                'title' => $entrega->title,
+                'estudiante' => $primerEstudiante?->name ?? '—',
+                'due_date' => $entrega->due_date?->toDateString(),
+                'status' => $entrega->status?->value ?? $entrega->status,
             ];
         });
 
@@ -154,14 +160,14 @@ class DirectorController extends Controller
             ->orderByDesc('created_at')
             ->get()
             ->map(fn ($b) => [
-                'id'               => $b->id,
-                'topic'            => $b->topic,
-                'notes'            => $b->notes,
-                'semana'           => $b->semana,
-                'meeting_date'     => $b->meeting_date?->toDateString(),
-                'duration_hours'   => $b->duration_hours,
+                'id' => $b->id,
+                'topic' => $b->topic,
+                'notes' => $b->notes,
+                'semana' => $b->semana,
+                'meeting_date' => $b->meeting_date?->toDateString(),
+                'duration_hours' => $b->duration_hours,
                 'signature_status' => $b->signature_status?->value,
-                'created_at'       => $b->created_at->toISO8601String(),
+                'created_at' => $b->created_at->toISO8601String(),
             ]);
 
         return response()->json(['data' => $bitacoras]);
@@ -207,7 +213,7 @@ class DirectorController extends Controller
         $asignaciones = EvaluadorProyecto::where('evaluador_id', $userId)
             ->whereHas('proyecto', function ($q) use ($userId) {
                 $q->where('director_id', '!=', $userId)
-                  ->enSemestresActivos();
+                    ->enSemestresActivos();
             })
             ->with([
                 'proyecto:id,code,title,director_id,semester_id,current_phase,status',
@@ -228,27 +234,27 @@ class DirectorController extends Controller
                     ->values();
 
                 return [
-                    'id'              => $proyecto->id,
-                    'code'            => $proyecto->code,
-                    'title'           => $proyecto->title,
-                    'current_phase'   => $proyecto->current_phase?->value,
-                    'status'          => $proyecto->status?->value,
-                    'fase_asignada'   => $ep->fase,
-                    'fecha'           => $ep->fecha?->toDateString(),
-                    'hora_inicio'     => $ep->hora_inicio,
-                    'hora_fin'        => $ep->hora_fin,
-                    'estudiantes'     => $proyecto->estudiantes->map(fn ($e) => [
-                        'id'   => $e->id,
+                    'id' => $proyecto->id,
+                    'code' => $proyecto->code,
+                    'title' => $proyecto->title,
+                    'current_phase' => $proyecto->current_phase?->value,
+                    'status' => $proyecto->status?->value,
+                    'fase_asignada' => $ep->fase,
+                    'fecha' => $ep->fecha?->toDateString(),
+                    'hora_inicio' => $ep->hora_inicio,
+                    'hora_fin' => $ep->hora_fin,
+                    'estudiantes' => $proyecto->estudiantes->map(fn ($e) => [
+                        'id' => $e->id,
                         'name' => $e->name,
                     ]),
-                    'co_evaluadores'  => $coEvaluadores->map(fn ($e) => [
-                        'id'    => $e->id,
-                        'name'  => $e->name,
+                    'co_evaluadores' => $coEvaluadores->map(fn ($e) => [
+                        'id' => $e->id,
+                        'name' => $e->name,
                         'email' => $e->email,
                     ]),
-                    'semestre'        => $proyecto->semestre ? [
-                        'id'        => $proyecto->semestre->id,
-                        'name'      => $proyecto->semestre->name,
+                    'semestre' => $proyecto->semestre ? [
+                        'id' => $proyecto->semestre->id,
+                        'name' => $proyecto->semestre->name,
                         'is_active' => $proyecto->semestre->is_active,
                     ] : null,
                 ];
@@ -274,11 +280,11 @@ class DirectorController extends Controller
 
         // Map phase aliases to actual Entrega phase values
         $phaseMap = [
-            'Anteproyecto'            => 'anteproyecto',
+            'Anteproyecto' => 'anteproyecto',
             'presentacion_anteproyecto' => 'presentacion_anteproyecto',
-            'Desarrollo'              => 'desarrollo',
-            'presentacion_final'      => 'presentacion_final',
-            'Final'                   => 'presentacion_final',
+            'Desarrollo' => 'desarrollo',
+            'presentacion_final' => 'presentacion_final',
+            'Final' => 'presentacion_final',
         ];
 
         $phase = $phaseMap[$fase] ?? $fase;
@@ -293,15 +299,15 @@ class DirectorController extends Controller
         }
 
         $entrega = Entrega::where(function ($q) use ($id) {
-                $q->where('proyecto_id', $id)
-                  ->orWhereHas('proyectos', fn ($sq) => $sq->where('proyectos.id', $id));
-            })
+            $q->where('proyecto_id', $id)
+                ->orWhereHas('proyectos', fn ($sq) => $sq->where('proyectos.id', $id));
+        })
             ->where('phase', $phase)
             ->where('status', 'aprobada')
             ->with([
-                'versiones' => fn ($q) => $q->orderByDesc('version_number'),
-                'proyecto:id,code,title',
-            ])
+            'versiones' => fn ($q) => $q->orderByDesc('version_number'),
+            'proyecto:id,code,title',
+        ])
             ->first();
 
         if (! $entrega) {
@@ -313,4 +319,68 @@ class DirectorController extends Controller
         return response()->json(['data' => $entrega]);
     }
 
+    /**
+     * GET /api/director/cartas/proyectos
+     *
+     * Proyectos del director en semestres activos con habilitación de
+     * cartas (D3), cierre efectivo, estudiantes con código y warnings.
+     */
+    public function cartasProyectos(Request $request): JsonResponse
+    {
+        $proyectos = $this->cartasService->listarProyectosConHabilitacion($request->user());
+
+        return response()->json(['data' => $proyectos]);
+    }
+
+    /**
+     * GET /api/director/cartas/{proyecto}/estudiante/{user}/aval-sustentacion
+     *
+     * Carta 1 — Aval Sustentación Pública (RF-CA-02/04, D4).
+     */
+    public function generarAvalSustentacion(Request $request, int $proyecto, int $user): StreamedResponse|JsonResponse
+    {
+        return $this->descargarCarta($request, $proyecto, $user, 'aval');
+    }
+
+    /**
+     * GET /api/director/cartas/{proyecto}/estudiante/{user}/carta-jurados
+     *
+     * Carta 2 — Aval Entrega a Jurados (RF-CA-03/04, D4).
+     */
+    public function generarCartaJurados(Request $request, int $proyecto, int $user): StreamedResponse|JsonResponse
+    {
+        return $this->descargarCarta($request, $proyecto, $user, 'jurados');
+    }
+
+    /**
+     * Valida que el proyecto sea del director y el estudiante le
+     * pertenezca, genera la carta y la descarga como DOCX (D4).
+     */
+    private function descargarCarta(Request $request, int $proyectoId, int $userId, string $carta): StreamedResponse|JsonResponse
+    {
+        $proyecto = Proyecto::query()
+            ->where('director_id', $request->user()->id)
+            ->findOrFail($proyectoId);
+
+        $estudiante = $proyecto->estudiantes()
+            ->where('users.id', $userId)
+            ->firstOrFail();
+
+        try {
+            $generada = $carta === 'aval'
+                ? $this->cartasService->generarAvalSustentacion($proyecto, $estudiante)
+                : $this->cartasService->generarCartaJurados($proyecto, $estudiante);
+        } catch (RuntimeException $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+
+        return response()->streamDownload(
+            function () use ($generada): void {
+                echo file_get_contents($generada['path']);
+                @unlink($generada['path']);
+            },
+            $generada['filename'],
+            ['Content-Type' => CartaAvalService::MIME_DOCX],
+        );
+    }
 }

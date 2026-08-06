@@ -60,10 +60,10 @@ Chain strategy: feature-branch-chain
 
 | ID | Tarea | Deps | Criterio de aceptación | Skills |
 |----|-------|------|-------------------------|--------|
-| T-013 | Documentar prerequisito `phpoffice/phpspreadsheet` (apply instala) | — | Nota visible con comando exacto | `C:\Users\Owner\.claude\skills\laravel-patterns\SKILL.md` |
-| T-014 | RED: `tests/Feature/ExportSeguimientoTest.php` — GET `/api/admin/seguimiento/semestre/{id}/export` con 5 proyectos → headers + 5 filas (RF-EX-01); semestre sin proyectos → headers + 0 filas; nombre `Seguimiento del [Grupo] [YYYY-MM-DD HHmm].xlsx` (D5); lib ausente → 500 "Error al generar el archivo Excel. Verifique que la librería esté instalada." | T-013 | Tests fallan (rojo) | `C:\Users\Owner\.claude\skills\laravel-tdd\SKILL.md`, `C:\Users\Owner\.claude\skills\strict-tdd\SKILL.md` |
-| T-015 | GREEN: `app/Http/Controllers/Admin/SeguimientoController.php::exportar()` — reutiliza `SeguimientoService::obtenerSeguimiento()`, PhpSpreadsheet → Worksheet con headers (estudiante, proyecto, director, estado por fase/entrega, bitácoras, observaciones), StreamedResponse mime xlsx + Content-Disposition D5; ruta en `routes/api.php` bajo `admin/seguimiento` | T-014 | Tests T-014 verdes; ruta registrada | `C:\Users\Owner\.claude\skills\laravel-patterns\SKILL.md`, `C:\Users\Owner\.claude\skills\strict-tdd\SKILL.md` |
-| T-016 | Commit unitario PR3 | T-015 | Commit único < 400 líneas, tests verdes | `C:\Users\Owner\.config\opencode\skills\work-unit-commits\SKILL.md` |
+| T-013 | ✅ Documentar prerequisito `phpoffice/phpspreadsheet` (apply instala) | — | Nota visible con comando exacto | `C:\Users\Owner\.claude\skills\laravel-patterns\SKILL.md` |
+| T-014 | ✅ RED: `tests/Feature/ExportSeguimientoTest.php` — GET `/api/admin/seguimiento/semestre/{id}/export` con 5 proyectos → headers + 5 filas (RF-EX-01); semestre sin proyectos → headers + 0 filas; nombre `Seguimiento del [Grupo] [YYYY-MM-DD HHmm].xlsx` (D5); lib ausente → 500 "Error al generar el archivo Excel. Verifique que la librería esté instalada." | T-013 | Tests fallan (rojo) | `C:\Users\Owner\.claude\skills\laravel-tdd\SKILL.md`, `C:\Users\Owner\.claude\skills\strict-tdd\SKILL.md` |
+| T-015 | ✅ GREEN: `app/Http/Controllers/Admin/SeguimientoController.php::exportar()` — reutiliza `SeguimientoService::obtenerSeguimiento()`, PhpSpreadsheet → Worksheet con headers (estudiante, proyecto, director, estado por fase/entrega, bitácoras, observaciones), StreamedResponse mime xlsx + Content-Disposition D5; ruta en `routes/api.php` bajo `admin/seguimiento` | T-014 | Tests T-014 verdes; ruta registrada | `C:\Users\Owner\.claude\skills\laravel-patterns\SKILL.md`, `C:\Users\Owner\.claude\skills\strict-tdd\SKILL.md` |
+| T-016 | ✅ Commit unitario PR3 | T-015 | Commit único < 400 líneas, tests verdes | `C:\Users\Owner\.config\opencode\skills\work-unit-commits\SKILL.md` |
 
 ## PR 4 — Frontend export (base: rama PR 3)
 

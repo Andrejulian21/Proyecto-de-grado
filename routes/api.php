@@ -5,13 +5,21 @@ declare(strict_types=1);
 use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\DirectorCupoController;
 use App\Http\Controllers\Admin\EntregaController;
+use App\Http\Controllers\Admin\EvaluadorProyectoController;
 use App\Http\Controllers\Admin\ProyectoController;
+use App\Http\Controllers\Admin\ReporteController;
 use App\Http\Controllers\Admin\SeguimientoController;
 use App\Http\Controllers\Admin\SemestreController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Api\AnuncioController;
+use App\Http\Controllers\Api\BitacoraController;
 use App\Http\Controllers\Api\DirectorController;
 use App\Http\Controllers\Api\EntregaEstudianteController;
+use App\Http\Controllers\Api\EstudianteController;
+use App\Http\Controllers\Api\EvaluacionController;
 use App\Http\Controllers\Api\EvaluadorAsignacionesController;
+use App\Http\Controllers\Api\NotificacionController;
+use App\Http\Controllers\Api\RecursoController;
 use App\Http\Controllers\Auth\AuthController;
 use Illuminate\Support\Facades\Route;
 
@@ -66,34 +74,34 @@ Route::middleware([
         ->name('auth.logout');
 
     // Bitácoras CRUD + firma (T-012, PR 1 firma por clave dinámica).
-    Route::get('/bitacoras', [\App\Http\Controllers\Api\BitacoraController::class, 'index'])
+    Route::get('/bitacoras', [BitacoraController::class, 'index'])
         ->name('bitacoras.index');
-    Route::post('/bitacoras', [\App\Http\Controllers\Api\BitacoraController::class, 'store'])
+    Route::post('/bitacoras', [BitacoraController::class, 'store'])
         ->name('bitacoras.store');
-    Route::get('/bitacoras/{id}', [\App\Http\Controllers\Api\BitacoraController::class, 'show'])
+    Route::get('/bitacoras/{id}', [BitacoraController::class, 'show'])
         ->whereNumber('id')
         ->name('bitacoras.show');
-    Route::put('/bitacoras/{id}', [\App\Http\Controllers\Api\BitacoraController::class, 'update'])
+    Route::put('/bitacoras/{id}', [BitacoraController::class, 'update'])
         ->whereNumber('id')
         ->name('bitacoras.update');
-    Route::post('/bitacoras/{id}/firmar', [\App\Http\Controllers\Api\BitacoraController::class, 'firmar'])
+    Route::post('/bitacoras/{id}/firmar', [BitacoraController::class, 'firmar'])
         ->whereNumber('id')
         ->name('bitacoras.firmar');
-    Route::post('/bitacoras/{id}/re-solicitar-codigo', [\App\Http\Controllers\Api\BitacoraController::class, 'reSolicitarCodigo'])
+    Route::post('/bitacoras/{id}/re-solicitar-codigo', [BitacoraController::class, 'reSolicitarCodigo'])
         ->whereNumber('id')
         ->name('bitacoras.re_solicitar_codigo');
 
     // T-014: Total bitácora hours per project (director/coordinador)
-    Route::get('/director/proyectos/{id}/horas', [\App\Http\Controllers\Api\BitacoraController::class, 'horas'])
+    Route::get('/director/proyectos/{id}/horas', [BitacoraController::class, 'horas'])
         ->whereNumber('id')
         ->name('director.proyectos.horas');
 
     // Estudiante — proyecto y entregas propias
-    Route::get('/estudiante/proyecto', [\App\Http\Controllers\Api\EstudianteController::class, 'proyecto'])
+    Route::get('/estudiante/proyecto', [EstudianteController::class, 'proyecto'])
         ->name('estudiante.proyecto');
-    Route::put('/estudiante/proyecto', [\App\Http\Controllers\Api\EstudianteController::class, 'actualizarProyecto'])
+    Route::put('/estudiante/proyecto', [EstudianteController::class, 'actualizarProyecto'])
         ->name('estudiante.proyecto.update');
-    Route::get('/estudiante/entregas', [\App\Http\Controllers\Api\EstudianteController::class, 'entregas'])
+    Route::get('/estudiante/entregas', [EstudianteController::class, 'entregas'])
         ->name('estudiante.entregas');
 
     // Estudiante — subir archivos por slug y consultar estado de completitud (PR 2)
@@ -122,35 +130,35 @@ Route::middleware([
         ->name('entregas.solicitar');
 
     // Evaluaciones (T-016).
-    Route::get('/evaluaciones', [\App\Http\Controllers\Api\EvaluacionController::class, 'index'])
+    Route::get('/evaluaciones', [EvaluacionController::class, 'index'])
         ->name('evaluaciones.index');
-    Route::post('/evaluaciones', [\App\Http\Controllers\Api\EvaluacionController::class, 'store'])
+    Route::post('/evaluaciones', [EvaluacionController::class, 'store'])
         ->name('evaluaciones.store');
 
     // Consolidado por entrega (T-017).
-    Route::get('/evaluaciones/{entrega_id}/consolidado', [\App\Http\Controllers\Api\EvaluacionController::class, 'consolidado'])
+    Route::get('/evaluaciones/{entrega_id}/consolidado', [EvaluacionController::class, 'consolidado'])
         ->whereNumber('entrega_id')
         ->name('evaluaciones.consolidado');
 
     // Anuncios — todos los roles pueden ver (T-020)
-    Route::get('/anuncios', [\App\Http\Controllers\Api\AnuncioController::class, 'index'])
+    Route::get('/anuncios', [AnuncioController::class, 'index'])
         ->name('anuncios.index');
-    Route::get('/anuncios/{anuncio}', [\App\Http\Controllers\Api\AnuncioController::class, 'show'])
+    Route::get('/anuncios/{anuncio}', [AnuncioController::class, 'show'])
         ->name('anuncios.show');
 
     // Recursos — todos los roles pueden ver (T-021)
-    Route::get('/recursos', [\App\Http\Controllers\Api\RecursoController::class, 'index'])
+    Route::get('/recursos', [RecursoController::class, 'index'])
         ->name('recursos.index');
-    Route::get('/recursos/{recurso}', [\App\Http\Controllers\Api\RecursoController::class, 'show'])
+    Route::get('/recursos/{recurso}', [RecursoController::class, 'show'])
         ->whereNumber('recurso')
         ->name('recursos.show');
 
     // Notificaciones (T-022)
-    Route::get('/notificaciones', [\App\Http\Controllers\Api\NotificacionController::class, 'index'])
+    Route::get('/notificaciones', [NotificacionController::class, 'index'])
         ->name('notificaciones.index');
-    Route::get('/notificaciones/no-leidas', [\App\Http\Controllers\Api\NotificacionController::class, 'noLeidas'])
+    Route::get('/notificaciones/no-leidas', [NotificacionController::class, 'noLeidas'])
         ->name('notificaciones.no-leidas');
-    Route::put('/notificaciones/{notificacion}/leer', [\App\Http\Controllers\Api\NotificacionController::class, 'marcarLeida'])
+    Route::put('/notificaciones/{notificacion}/leer', [NotificacionController::class, 'marcarLeida'])
         ->name('notificaciones.leer');
 
     // Director dashboard endpoints
@@ -166,6 +174,20 @@ Route::middleware([
         Route::get('/evaluaciones', [DirectorController::class, 'evaluaciones']);
         Route::get('/proyectos/{proyecto}/entrega-fase', [DirectorController::class, 'entregaFase'])
             ->whereNumber('proyecto');
+
+        // PR 1 — Cartas de aval (solo director)
+        Route::middleware('role:Director')->group(function () {
+            Route::get('/cartas/proyectos', [DirectorController::class, 'cartasProyectos'])
+                ->name('cartas.proyectos');
+            Route::get('/cartas/{proyecto}/estudiante/{user}/aval-sustentacion', [DirectorController::class, 'generarAvalSustentacion'])
+                ->whereNumber('proyecto')
+                ->whereNumber('user')
+                ->name('cartas.aval-sustentacion');
+            Route::get('/cartas/{proyecto}/estudiante/{user}/carta-jurados', [DirectorController::class, 'generarCartaJurados'])
+                ->whereNumber('proyecto')
+                ->whereNumber('user')
+                ->name('cartas.carta-jurados');
+        });
     });
 
     // Evaluador — asignaciones y evaluación (PR 3, T-017..T-019).
@@ -228,37 +250,37 @@ Route::middleware(['auth:sanctum', 'single_session', 'activity', 'role:Coordinad
             ->only(['index', 'store', 'update', 'destroy']);
 
         // Evaluador-proyecto asignación (T-016).
-        Route::get('/evaluador-proyecto', [\App\Http\Controllers\Admin\EvaluadorProyectoController::class, 'index'])
+        Route::get('/evaluador-proyecto', [EvaluadorProyectoController::class, 'index'])
             ->name('evaluador-proyecto.index');
-        Route::post('/evaluador-proyecto', [\App\Http\Controllers\Admin\EvaluadorProyectoController::class, 'store'])
+        Route::post('/evaluador-proyecto', [EvaluadorProyectoController::class, 'store'])
             ->name('evaluador-proyecto.store');
-        Route::put('/evaluador-proyecto/{id}', [\App\Http\Controllers\Admin\EvaluadorProyectoController::class, 'update'])
+        Route::put('/evaluador-proyecto/{id}', [EvaluadorProyectoController::class, 'update'])
             ->whereNumber('id')
             ->name('evaluador-proyecto.update');
-        Route::delete('/evaluador-proyecto/{id}', [\App\Http\Controllers\Admin\EvaluadorProyectoController::class, 'destroy'])
+        Route::delete('/evaluador-proyecto/{id}', [EvaluadorProyectoController::class, 'destroy'])
             ->whereNumber('id')
             ->name('evaluador-proyecto.destroy');
 
         // Reporte consolidado (T-018).
-        Route::get('/reportes/consolidado', [\App\Http\Controllers\Admin\ReporteController::class, 'consolidado'])
+        Route::get('/reportes/consolidado', [ReporteController::class, 'consolidado'])
             ->name('reportes.consolidado');
 
         // Anuncios CRUD (T-020) — solo coordinador
-        Route::post('/anuncios', [\App\Http\Controllers\Api\AnuncioController::class, 'store'])
+        Route::post('/anuncios', [AnuncioController::class, 'store'])
             ->name('anuncios.store');
-        Route::put('/anuncios/{anuncio}', [\App\Http\Controllers\Api\AnuncioController::class, 'update'])
+        Route::put('/anuncios/{anuncio}', [AnuncioController::class, 'update'])
             ->name('anuncios.update');
-        Route::delete('/anuncios/{anuncio}', [\App\Http\Controllers\Api\AnuncioController::class, 'destroy'])
+        Route::delete('/anuncios/{anuncio}', [AnuncioController::class, 'destroy'])
             ->name('anuncios.destroy');
 
         // Recursos CRUD (T-021) — solo coordinador
-        Route::get('/recursos', [\App\Http\Controllers\Api\RecursoController::class, 'index'])
+        Route::get('/recursos', [RecursoController::class, 'index'])
             ->name('recursos.admin');
-        Route::post('/recursos', [\App\Http\Controllers\Api\RecursoController::class, 'store'])
+        Route::post('/recursos', [RecursoController::class, 'store'])
             ->name('recursos.store');
-        Route::put('/recursos/{recurso}', [\App\Http\Controllers\Api\RecursoController::class, 'update'])
+        Route::put('/recursos/{recurso}', [RecursoController::class, 'update'])
             ->name('recursos.update');
-        Route::delete('/recursos/{recurso}', [\App\Http\Controllers\Api\RecursoController::class, 'destroy'])
+        Route::delete('/recursos/{recurso}', [RecursoController::class, 'destroy'])
             ->name('recursos.destroy');
 
         // Director quota management — cupos (Sprint 5).
@@ -276,7 +298,7 @@ Route::middleware(['auth:sanctum', 'single_session', 'activity', 'role:Coordinad
             ->name('directores.proyectos');
 
         // Bitácoras por proyecto (para la página /directores).
-        Route::get('/proyectos/{proyecto}/bitacoras', [\App\Http\Controllers\Api\BitacoraController::class, 'porProyecto'])
+        Route::get('/proyectos/{proyecto}/bitacoras', [BitacoraController::class, 'porProyecto'])
             ->whereNumber('proyecto')
             ->name('proyectos.bitacoras');
 

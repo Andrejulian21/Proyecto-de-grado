@@ -40,8 +40,13 @@ final class ReviewEntregaAction
             ->where('id', $data['version_id'])
             ->firstOrFail();
 
+        // RF-SUP-01/02: observations are ONLY persisted on versions of the
+        // degree project document (slug `documento-proyecto`) that have
+        // versioning enabled. Auxiliary files never carry observations.
+        $aceptaObservaciones = $this->versionAceptaObservaciones($entrega, $version);
+
         // Save director notes to the specific version sent by the frontend
-        if (! empty($data['director_notes'])) {
+        if ($aceptaObservaciones && ! empty($data['director_notes'])) {
             $version->update(['director_notes' => $data['director_notes']]);
         }
 
@@ -59,7 +64,7 @@ final class ReviewEntregaAction
                 $pivotData['director_grade'] = $data['director_grade'];
             }
 
-            if (! empty($data['director_notes'])) {
+            if ($aceptaObservaciones && ! empty($data['director_notes'])) {
                 $pivotData['observaciones_director'] = $data['director_notes'];
             }
 
@@ -99,6 +104,31 @@ final class ReviewEntregaAction
         }
 
         return $entrega->fresh();
+    }
+
+    /**
+     * RF-SUP-01/02: whether the reviewed version may carry director
+     * observations. Only versions of the degree project document (slug
+     * `documento-proyecto`) with versioning enabled qualify. Legacy versions
+     * without an archivo_requerido_id predate the per-file system and keep
+     * the historical behavior (they represent the project document).
+     */
+    private function versionAceptaObservaciones(Entrega $entrega, VersionDocumento $version): bool
+    {
+        $slug = $version->archivo_requerido_id ?? 'documento-proyecto';
+
+        if ($slug !== 'documento-proyecto') {
+            return false;
+        }
+
+        $archivo = $entrega->getArchivoRequerido($slug);
+
+        // Legacy entrega without a file configuration: keep historical behavior.
+        if ($archivo === null) {
+            return true;
+        }
+
+        return (bool) ($archivo['versionamiento'] ?? false);
     }
 
     /**

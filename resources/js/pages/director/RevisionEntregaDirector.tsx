@@ -225,7 +225,9 @@ export default function RevisionEntregaDirector() {
 
             if (!res.ok) {
                 const body = await res.json().catch(() => null);
-                throw new Error(body?.error ?? `Error ${res.status}`);
+                const raw = body?.error ?? body?.message ?? body?.errors ?? null;
+                const msg = typeof raw === 'string' ? raw : `Error ${res.status}`;
+                throw new Error(msg);
             }
 
             setSubmitted(true);

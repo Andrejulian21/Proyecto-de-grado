@@ -51,10 +51,10 @@ Chain strategy: feature-branch-chain
 
 | ID | Tarea | Deps | Criterio de aceptación | Skills |
 |----|-------|------|-------------------------|--------|
-| T-009 | Crear `resources/js/hooks/useDirectorCartas.ts` — fetch `GET /api/director/cartas/proyectos`, tipos TS del contrato JSON (proyectos, `cartas_habilitadas`, `cierre_efectivo`, estudiantes, `warnings[]`) | T-007 | `npm run build` sin errores | `C:\Users\Owner\.claude\skills\react-patterns\SKILL.md`, `C:\Users\Owner\.claude\skills\typescript-pro\SKILL.md` |
-| T-010 | Crear `resources/js/pages/director/CartasAval.tsx` — tabla proyectos, botón "Generar cartas" habilitado/deshabilitado + tooltips (RF-CA-01 textos en español), expandir estudiantes, banners de `warnings[]` (D4), botones "Descargar Carta 1"/"Carta 2" (descarga blob), EmptyState sin estudiantes | T-009 | `npm run build` sin errores; flujo manual con rol DIRECTOR | `C:\Users\Owner\.claude\skills\react-patterns\SKILL.md`, `C:\Users\Owner\.claude\skills\shadcn-ui\SKILL.md`, `C:\Users\Owner\.claude\skills\tailwind-patterns\SKILL.md` |
-| T-011 | Registrar ruta `/dashboard/director/cartas` en `resources/js/pages/DashboardRouter.tsx` + enlace en `Sidebar.tsx` | T-010 | `npm run build` sin errores; navegación desde dashboard director | `C:\Users\Owner\.claude\skills\react-patterns\SKILL.md` |
-| T-012 | Commit unitario PR2 | T-011 | Commit único < 400 líneas, build OK | `C:\Users\Owner\.config\opencode\skills\work-unit-commits\SKILL.md` |
+| T-009 | ✅ Crear `resources/js/hooks/useDirectorCartas.ts` — fetch `GET /api/director/cartas/proyectos`, tipos TS del contrato JSON (proyectos, `cartas_habilitadas`, `cierre_efectivo`, estudiantes, `warnings[]`) | T-007 | `npm run build` sin errores | `C:\Users\Owner\.claude\skills\react-patterns\SKILL.md`, `C:\Users\Owner\.claude\skills\typescript-pro\SKILL.md` |
+| T-010 | ✅ Crear `resources/js/pages/director/CartasAval.tsx` — tabla proyectos, botón "Generar cartas" habilitado/deshabilitado + tooltips (RF-CA-01 textos en español), expandir estudiantes, banners de `warnings[]` (D4), botones "Descargar Carta 1"/"Carta 2" (descarga blob), EmptyState sin estudiantes | T-009 | `npm run build` sin errores; flujo manual con rol DIRECTOR | `C:\Users\Owner\.claude\skills\react-patterns\SKILL.md`, `C:\Users\Owner\.claude\skills\shadcn-ui\SKILL.md`, `C:\Users\Owner\.claude\skills\tailwind-patterns\SKILL.md` |
+| T-011 | ✅ Registrar ruta `/dashboard/director/cartas` en `resources/js/app.tsx` + enlace en `Sidebar.tsx` | T-010 | `npm run build` sin errores; navegación desde dashboard director | `C:\Users\Owner\.claude\skills\react-patterns\SKILL.md` |
+| T-012 | ✅ Commit unitario PR2 | T-011 | Commit único < 400 líneas, build OK | `C:\Users\Owner\.config\opencode\skills\work-unit-commits\SKILL.md` |
 
 ## PR 3 — Backend export (base: rama PR 2)
 

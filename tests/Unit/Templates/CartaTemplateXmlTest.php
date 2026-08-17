@@ -52,6 +52,7 @@ function validarEstructuraRuns(string $xml): array
             $maxDepth = max($maxDepth, $depth);
         } else {
             $depth--;
+
             if ($depth < 0) {
                 $violations[] = "close-without-open@{$pos}";
             }
@@ -92,7 +93,7 @@ function skipSinTemplate(string $path): void
 
 // -- Template en disco ---------------------------------------------------------
 
-it('template aval-sustentacion es XML bien formado sin runs anidados y con los 7 placeholders', function () {
+it('template aval-sustentacion es XML bien formado sin runs anidados y con los 9 placeholders', function () {
     $path = storage_path('app/templates/aval-sustentacion.docx');
     skipSinTemplate($path);
 
@@ -107,12 +108,13 @@ it('template aval-sustentacion es XML bien formado sin runs anidados y con los 7
     expect($r['violations'])->toBe([]);
 
     foreach (['nombre_estudiante', 'codigo_estudiante', 'titulo_proyecto',
-        'jurado_1_nombre', 'jurado_2_nombre', 'jurado_3_nombre', 'nombre_director'] as $ph) {
+        'jurado_1_nombre', 'jurado_2_nombre', 'jurado_3_nombre', 'nombre_director',
+        'ciudad', 'fecha'] as $ph) {
         expect($xml)->toContain('${'.$ph.'}');
     }
 });
 
-it('template carta-jurados es XML bien formado sin runs anidados', function () {
+it('template carta-jurados es XML bien formado sin runs anidados y con los placeholders de ciudad y fecha', function () {
     $path = storage_path('app/templates/carta-jurados.docx');
     skipSinTemplate($path);
 
@@ -125,6 +127,9 @@ it('template carta-jurados es XML bien formado sin runs anidados', function () {
     expect($r['nested'])->toBe(0);
     expect($r['maxDepth'])->toBe(1);
     expect($r['violations'])->toBe([]);
+
+    expect($xml)->toContain('${ciudad}');
+    expect($xml)->toContain('${fecha}');
 });
 
 // -- Salida generada (RF-CA-06) -------------------------------------------------
@@ -141,6 +146,8 @@ it('genera aval-sustentacion con caracteres especiales sin runs anidados ni plac
         'jurado_2_nombre' => 'Ing. Ana <TIC>',
         'jurado_3_nombre' => 'Mg. Luis "El Sabio"',
         'nombre_director' => 'Dra. María del Carmen & Asociados',
+        'ciudad' => 'Bucaramanga',
+        'fecha' => '5 de agosto de 2026',
     ]);
 
     try {
@@ -171,6 +178,8 @@ it('genera carta-jurados con caracteres especiales sin runs anidados ni placehol
         'codigo_estudiante' => 'U0012345',
         'titulo_proyecto' => 'Sistema & Seguimiento <2026>',
         'nombre_director' => 'Dra. María del Carmen',
+        'ciudad' => 'Bucaramanga',
+        'fecha' => '5 de agosto de 2026',
     ]);
 
     try {

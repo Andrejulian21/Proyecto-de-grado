@@ -30,7 +30,7 @@ import {
 /* ------------------------------------------------------------------ */
 
 const estadoConfig = {
-    entregado: {
+    entregada: {
         label: 'Entregado',
         icon: CheckCircle2,
         cls: 'bg-[#f0fdf4] text-[#15803d] border-[#bbf7d0]',
@@ -47,6 +47,25 @@ const estadoConfig = {
     },
 } as const;
 
+type EstadoConfigKey = keyof typeof estadoConfig;
+
+/**
+ * Estados que puede reportar el backend y variantes legacy. `entregada`
+ * es el valor canónico; `entregado` se normaliza por compatibilidad.
+ */
+type EstadoEntrega = EstadoConfigKey | 'entregado';
+
+const ESTADO_CANONICO: Record<EstadoEntrega, EstadoConfigKey> = {
+    entregada: 'entregada',
+    entregado: 'entregada',
+    pendiente: 'pendiente',
+    no_entrego: 'no_entrego',
+};
+
+function normalizarEstado(estado: EstadoEntrega): EstadoConfigKey {
+    return ESTADO_CANONICO[estado] ?? 'pendiente';
+}
+
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
@@ -61,8 +80,8 @@ function getObservacion(proy: ProyectoSeguimiento, fase: string): string {
 /*  Subcomponents                                                      */
 /* ------------------------------------------------------------------ */
 
-function EstadoCell({ estado }: { estado: EntregaItem['estado'] }) {
-    const cfg = estadoConfig[estado] ?? estadoConfig.pendiente;
+function EstadoCell({ estado }: { estado: EstadoEntrega }) {
+    const cfg = estadoConfig[normalizarEstado(estado)];
     const Icon = cfg.icon;
     return (
         <span

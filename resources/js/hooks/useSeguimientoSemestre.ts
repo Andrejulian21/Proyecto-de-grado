@@ -8,7 +8,8 @@ import { apiFetch } from '@/lib/utils';
 export interface EntregaItem {
     id: number;
     title: string;
-    estado: 'entregado' | 'pendiente' | 'no_entrego';
+    /** Valores canónicos que emite el backend (SeguimientoService). */
+    estado: 'entregada' | 'pendiente' | 'no_entrego';
 }
 
 export interface FaseEntregas {

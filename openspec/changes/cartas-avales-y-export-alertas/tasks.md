@@ -78,3 +78,14 @@ Chain strategy: feature-branch-chain
 - **Orden de PRs**: 1 → 2 → 3 → 4. PR3 es independiente de PR1/2 en código pero se encadena por la estrategia elegida; si su diff muestra PR2, retarget a rama PR2.
 - **Template faltante** (risk proposal): validar existencia en runtime → 500 claro (cubierto en T-004/T-006).
 - **Open questions del design** (resolver antes de apply): origen de `codigo_estudiante` en `users`; sanitización de nombres de archivo (`/`, `\`, `:`) con regex.
+
+## Follow-up — Ciudad y Fecha en cartas (post-PR4, batch en master)
+
+> Agrega `${ciudad}` (Bucaramanga) y `${fecha}` (fecha de generación en español, ej. "5 de agosto de 2026") a ambas cartas y versiona los templates en storage.
+
+| ID | Tarea | Deps | Criterio de aceptación | Estado |
+|----|-------|------|-------------------------|--------|
+| T-101 | ✅ Inyectar `${ciudad}` y `${fecha}` en la línea "Ciudad, Fecha:" de `aval-sustentacion.docx` y `carta-jurados.docx` (runs hermanos, sin anidar, `xml:space="preserve"`) | — | Tests de template verifican los 2 placeholders nuevos; sin runs anidados; XML bien formado | ✅ |
+| T-102 | ✅ `CartaAvalService::resolverPlaceholders()`: `ciudad`='Bucaramanga' y `fecha` (Carbon locale `es`, formato `D de MMMM de YYYY`) en la base de ambas cartas | T-101 | `generarAvalSustentacion` y `generarCartaJurados` incluyen ambos placeholders | ✅ |
+| T-103 | ✅ Versionar templates en storage: excepciones `!templates/` y `!templates/*.docx` en `storage/app/.gitignore` + commit | T-101 | `git status` muestra los docx como nuevos (trackeados) | ✅ |
+| T-104 | ✅ Tests: `resolverPlaceholders` incluye ciudad/fecha; generación sin `${...}` sobrantes con valores reales; `CartaTemplateXmlTest` valida los 2 placeholders nuevos | T-102 | pest enfocado 26/0 + suite completa 686/0; pint limpio en archivos tocados | ✅ |

@@ -89,3 +89,18 @@ Chain strategy: feature-branch-chain
 | T-102 | ✅ `CartaAvalService::resolverPlaceholders()`: `ciudad`='Bucaramanga' y `fecha` (Carbon locale `es`, formato `D de MMMM de YYYY`) en la base de ambas cartas | T-101 | `generarAvalSustentacion` y `generarCartaJurados` incluyen ambos placeholders | ✅ |
 | T-103 | ✅ Versionar templates en storage: excepciones `!templates/` y `!templates/*.docx` en `storage/app/.gitignore` + commit | T-101 | `git status` muestra los docx como nuevos (trackeados) | ✅ |
 | T-104 | ✅ Tests: `resolverPlaceholders` incluye ciudad/fecha; generación sin `${...}` sobrantes con valores reales; `CartaTemplateXmlTest` valida los 2 placeholders nuevos | T-102 | pest enfocado 26/0 + suite completa 686/0; pint limpio en archivos tocados | ✅ |
+
+## Follow-up — Formato visual del export xlsx (post-PR4, batch en master)
+
+> El usuario reporta que el export xlsx "funciona pero se ve muy feo". Se aplica formato profesional a la hoja generada por `SeguimientoController::exportar()` sin cambiar el contrato (mismo endpoint, columnas y nombre de archivo).
+
+| ID | Tarea | Deps | Criterio de aceptación | Estado |
+|----|-------|------|-------------------------|--------|
+| T-201 | ✅ Fila de título "Seguimiento del Semestre [Nombre]" mergeada en todas las columnas, bold, tamaño mayor, relleno naranja | — | A1 contiene el título; merge A1:{última col}; estilo bold + fondo `C2410C` | ✅ |
+| T-202 | ✅ Fila de encabezados: bold, fondo índigo `4F46E5`, texto blanco, bordes, altura de fila mayor | T-201 | Header en fila 2 con fondo índigo + bold (verificado por test) | ✅ |
+| T-203 | ✅ autoSize de columnas para que no se vean apretadas | T-202 | `setAutoSize(true)` sobre cada columna | ✅ |
+| T-204 | ✅ Estados Entregado/Pendiente/No entregó con relleno verde/ámbar/rojo claro | T-202 | Fill por valor de estado aplicado en celdas de entrega | ✅ |
+| T-205 | ✅ Bordes finos en toda la tabla + zebra en filas de datos | T-202 | allBorders thin + fondo `F9FAFB` alternado | ✅ |
+| T-206 | ✅ Fila de totales: % de entregas "Entregado" por columna + suma de bitácoras | T-203 | Fila final bold con relleno índigo claro; % calculado sobre proyectos con dato | ✅ |
+| T-207 | ✅ `ExportSeguimientoTest` ajustado a la nueva estructura (título+header+datos+totales) + asserts de formato (título mergeado, header bold/fondo) | T-204 | pest enfocado 9/0 (39 assertions); suite completa 0 failed; pint limpio | ✅ |
+| T-208 | ✅ Commit unitario del follow-up (work unit único, sin push/PR) | T-207 | Commit único, diff < 400 líneas, tests verdes | ✅ |

@@ -13,9 +13,28 @@ use App\Models\VersionDocumento;
 use App\Services\SeguimientoService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PhpOffice\PhpSpreadsheet\Reader\Xlsx;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 uses(RefreshDatabase::class);
+
+/**
+ * Carga el contenido binario de un XLSX y devuelve el libro (Spreadsheet)
+ * para inspeccionar celdas y estilos en el test.
+ */
+function cargarXlsxExport(string $contenido): Spreadsheet
+{
+    $tmp = tempnam(sys_get_temp_dir(), 'seguimiento_export_');
+    file_put_contents($tmp, $contenido);
+
+    try {
+        $reader = new Xlsx;
+
+        return $reader->load($tmp);
+    } finally {
+        @unlink($tmp);
+    }
+}
 
 /**
  * Parsea el contenido binario de un XLSX y devuelve sus filas como
@@ -25,17 +44,7 @@ uses(RefreshDatabase::class);
  */
 function parsearXlsxExport(string $contenido): array
 {
-    $tmp = tempnam(sys_get_temp_dir(), 'seguimiento_export_');
-    file_put_contents($tmp, $contenido);
-
-    try {
-        $reader = new Xlsx;
-        $spreadsheet = $reader->load($tmp);
-
-        return $spreadsheet->getActiveSheet()->toArray();
-    } finally {
-        @unlink($tmp);
-    }
+    return cargarXlsxExport($contenido)->getActiveSheet()->toArray();
 }
 
 beforeEach(function () {
@@ -128,19 +137,20 @@ test('exporta xlsx con 5 filas y todas las columnas para un semestre con 5 proye
 
     $filas = parsearXlsxExport($response->streamedContent());
 
-    // 1 header + 5 filas de datos
-    expect($filas)->toHaveCount(6);
-    expect($filas[0])->toContain('Estudiantes');
-    expect($filas[0])->toContain('Proyecto');
-    expect($filas[0])->toContain('Director');
-    expect($filas[0])->toContain('Bitácoras PG1');
-    expect($filas[0])->toContain('Bitácoras PG2');
-    expect($filas[0])->toContain('Observaciones');
+    // 1 título + 1 header + 5 filas de datos + 1 totales
+    expect($filas)->toHaveCount(8);
+    expect($filas[0][0])->toContain('Seguimiento del Semestre');
+    expect($filas[1])->toContain('Estudiantes');
+    expect($filas[1])->toContain('Proyecto');
+    expect($filas[1])->toContain('Director');
+    expect($filas[1])->toContain('Bitácoras PG1');
+    expect($filas[1])->toContain('Bitácoras PG2');
+    expect($filas[1])->toContain('Observaciones');
 
     // Primera fila de datos: estudiante, proyecto y director poblados
-    expect($filas[1][0])->toContain('Estudiante Proyecto A');
-    expect($filas[1][1])->toBe('Proyecto A');
-    expect($filas[1][3])->not->toBeEmpty();
+    expect($filas[2][0])->toContain('Estudiante Proyecto A');
+    expect($filas[2][1])->toBe('Proyecto A');
+    expect($filas[2][3])->not->toBeEmpty();
 });
 
 test('incluye el estado de cada entrega por fase (Entregado/Pendiente/No entregó)', function () {
@@ -151,8 +161,8 @@ test('incluye el estado de cada entrega por fase (Entregado/Pendiente/No entreg�
 
     $filas = parsearXlsxExport($response->streamedContent());
 
-    $header = $filas[0];
-    $dato = $filas[1];
+    $header = $filas[1];
+    $dato = $filas[2];
 
     // Columna dinámica de la entrega entregada → "Entregado"
     $idxEntregada = array_search('Desarrollo - Avance 1', $header, true);
@@ -172,9 +182,35 @@ test('exporta xlsx con headers y 0 filas para un semestre sin proyectos', functi
     $response->assertOk();
     $filas = parsearXlsxExport($response->streamedContent());
 
-    expect($filas)->toHaveCount(1); // solo header
-    expect($filas[0])->toContain('Estudiantes');
-    expect($filas[0])->toContain('Proyecto');
+    expect($filas)->toHaveCount(3); // título + header + totales
+    expect($filas[1])->toContain('Estudiantes');
+    expect($filas[1])->toContain('Proyecto');
+});
+
+test('aplica formato profesional: título mergeado, encabezado bold con fondo', function () {
+    crearProyectoExport($this->semestre, 'Proyecto A');
+
+    $response = $this->actingAs($this->coordinador)
+        ->get("/api/admin/seguimiento/semestre/{$this->semestre->id}/export");
+
+    $response->assertOk();
+    $sheet = cargarXlsxExport($response->streamedContent())->getActiveSheet();
+
+    // Título en A1, mergeado sobre todas las columnas, bold con fondo naranja
+    $merged = $sheet->getMergeCells();
+    expect($merged)->toHaveCount(1);
+    expect(array_key_first($merged))->toStartWith('A1:');
+    expect($sheet->getCell('A1')->getValue())->toContain('Seguimiento del Semestre');
+
+    $titleStyle = $sheet->getStyle('A1');
+    expect($titleStyle->getFont()->getBold())->toBeTrue();
+    expect($titleStyle->getFont()->getSize())->toBe(14.0);
+    expect(strtoupper((string) $titleStyle->getFill()->getStartColor()->getRGB()))->toBe('C2410C');
+
+    // Encabezado en A2, bold con fondo índigo
+    $headerStyle = $sheet->getStyle('A2');
+    expect($headerStyle->getFont()->getBold())->toBeTrue();
+    expect(strtoupper((string) $headerStyle->getFill()->getStartColor()->getRGB()))->toBe('4F46E5');
 });
 
 test('usa el nombre de archivo D5 con el grupo del semestre y fecha-hora', function () {

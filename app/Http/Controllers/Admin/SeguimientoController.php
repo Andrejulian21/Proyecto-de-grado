@@ -11,7 +11,12 @@ use App\Services\SeguimientoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx as XlsxWriter;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
@@ -100,14 +105,19 @@ class SeguimientoController extends Controller
             }
         }
 
+        $clavesEntregas = array_keys($columnasEntregas);
+
         $headers = array_merge(
             self::COLUMNAS_FIJAS,
-            array_keys($columnasEntregas),
+            $clavesEntregas,
             ['Bitácoras PG1', 'Bitácoras PG2', 'Observaciones'],
         );
-        $sheet->fromArray([$headers], null, 'A1');
 
-        $fila = 2;
+        $numCols = count($headers);
+        $ultimaCol = Coordinate::stringFromColumnIndex($numCols);
+
+        // Construimos las filas de datos primero para poder calcular totales.
+        $filasDatos = [];
 
         foreach ($data['proyectos'] as $proyecto) {
             $estadosPorEntrega = [];
@@ -126,7 +136,7 @@ class SeguimientoController extends Controller
                 $proyecto['director'],
             ];
 
-            foreach (array_keys($columnasEntregas) as $clave) {
+            foreach ($clavesEntregas as $clave) {
                 $filaDatos[] = $estadosPorEntrega[$clave] ?? '';
             }
 
@@ -134,11 +144,163 @@ class SeguimientoController extends Controller
             $filaDatos[] = $proyecto['bitacoras_grupo_b'];
             $filaDatos[] = $this->observacionesTexto($proyecto['observaciones']);
 
+            $filasDatos[] = $filaDatos;
+        }
+
+        // -- Fila de título (fila 1) -------------------------------------
+        $titulo = sprintf('Seguimiento del Semestre %s', (string) ($data['semestre']['nombre'] ?? ''));
+        $sheet->mergeCells('A1:'.$ultimaCol.'1');
+        $sheet->setCellValue('A1', $titulo);
+        $sheet->getStyle('A1')->applyFromArray([
+            'font' => ['bold' => true, 'size' => 14, 'color' => ['rgb' => 'FFFFFF']],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'C2410C']],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+                'vertical' => Alignment::VERTICAL_CENTER,
+            ],
+        ]);
+        $sheet->getRowDimension(1)->setRowHeight(28);
+
+        // -- Fila de encabezados de columnas (fila 2) ---------------------
+        $sheet->fromArray([$headers], null, 'A2');
+        $sheet->getStyle('A2:'.$ultimaCol.'2')->applyFromArray([
+            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '4F46E5']],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+                'vertical' => Alignment::VERTICAL_CENTER,
+            ],
+            'borders' => [
+                'allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'FFFFFF']],
+            ],
+        ]);
+        $sheet->getRowDimension(2)->setRowHeight(24);
+
+        // -- Filas de datos (fila 3+) --------------------------------------
+        $fila = 3;
+
+        foreach ($filasDatos as $filaDatos) {
             $sheet->fromArray([$filaDatos], null, 'A'.$fila);
             $fila++;
         }
 
+        // -- Fila de totales ------------------------------------------------
+        $totales = $this->filaTotales($filasDatos, $clavesEntregas);
+        $filaTotales = $fila;
+        $sheet->fromArray([$totales], null, 'A'.$filaTotales);
+        $sheet->getStyle('A'.$filaTotales.':'.$ultimaCol.$filaTotales)->applyFromArray([
+            'font' => ['bold' => true],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'E0E7FF']],
+            'borders' => [
+                'top' => ['borderStyle' => Border::BORDER_MEDIUM, 'color' => ['rgb' => '4F46E5']],
+            ],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+        ]);
+
+        // -- Bordes finos sobre encabezados + datos + totales --------------
+        $sheet->getStyle('A2:'.$ultimaCol.$filaTotales)->getBorders()->applyFromArray([
+            'allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'D1D5DB']],
+        ]);
+
+        // -- Color alternado de filas (zebra) sobre los datos --------------
+        $zebraEnd = $filaTotales - 1;
+
+        for ($r = 3; $r <= $zebraEnd; $r++) {
+            if (($r - 3) % 2 === 1) {
+                $sheet->getStyle('A'.$r.':'.$ultimaCol.$r)->getFill()
+                    ->setFillType(Fill::FILL_SOLID)
+                    ->getStartColor()
+                    ->setRGB('F9FAFB');
+            }
+        }
+
+        // -- Relleno de color por estado en las columnas de entrega --------
+        $this->aplicarEstadosFondo($sheet, $filasDatos, $clavesEntregas);
+
+        // -- Ajuste automático de ancho de columnas ------------------------
+        foreach (range(1, $numCols) as $i) {
+            $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($i))->setAutoSize(true);
+        }
+
+        // Congela título + encabezado al desplazarse.
+        $sheet->freezePane('A3');
+
         return $spreadsheet;
+    }
+
+    /**
+     * Fila de totales: % de entregas "Entregado" por columna de entrega y
+     * suma de bitácoras. Las columnas fijas quedan con "Totales" en la
+     * primera celda; Observaciones en blanco.
+     *
+     * @param  array<int, array<int, mixed>>  $filasDatos
+     * @param  list<string>  $clavesEntregas
+     * @return array<int, mixed>
+     */
+    private function filaTotales(array $filasDatos, array $clavesEntregas): array
+    {
+        $totales = ['Totales', '', '', ''];
+
+        foreach ($clavesEntregas as $i => $clave) {
+            $idx = 4 + $i;
+            $entregados = 0;
+            $conDato = 0;
+
+            foreach ($filasDatos as $filaDatos) {
+                if (($filaDatos[$idx] ?? '') !== '') {
+                    $conDato++;
+
+                    if ($filaDatos[$idx] === 'Entregado') {
+                        $entregados++;
+                    }
+                }
+            }
+
+            $totales[] = $conDato > 0 ? round(($entregados / $conDato) * 100).'%' : '';
+        }
+
+        $bitA = 4 + count($clavesEntregas);
+        $bitB = $bitA + 1;
+        $totales[] = array_sum(array_column($filasDatos, $bitA));
+        $totales[] = array_sum(array_column($filasDatos, $bitB));
+        $totales[] = '';
+
+        return $totales;
+    }
+
+    /**
+     * Aplica un relleno de color por estado en las celdas de entrega:
+     * Entregado (verde), Pendiente (ámbar), No entregó (rojo claro).
+     *
+     * @param  array<int, array<int, mixed>>  $filasDatos
+     * @param  list<string>  $clavesEntregas
+     */
+    private function aplicarEstadosFondo(Worksheet $sheet, array $filasDatos, array $clavesEntregas): void
+    {
+        $estadoFondos = [
+            'Entregado' => 'DCFCE7',
+            'Pendiente' => 'FEF3C7',
+            'No entregó' => 'FEE2E2',
+        ];
+
+        foreach ($filasDatos as $r => $filaDatos) {
+            $filaAbs = 3 + $r;
+
+            foreach ($clavesEntregas as $i => $clave) {
+                $idx = 4 + $i;
+                $valor = $filaDatos[$idx] ?? '';
+
+                if ($valor === '' || ! isset($estadoFondos[$valor])) {
+                    continue;
+                }
+
+                $celda = Coordinate::stringFromColumnIndex($idx + 1).$filaAbs;
+                $sheet->getStyle($celda)->getFill()
+                    ->setFillType(Fill::FILL_SOLID)
+                    ->getStartColor()
+                    ->setRGB($estadoFondos[$valor]);
+            }
+        }
     }
 
     /**

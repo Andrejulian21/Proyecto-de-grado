@@ -13,6 +13,7 @@ export interface EvaluadorInfo {
 
 export interface EvaluadorProyecto {
     id: number;
+    assignment_id: number;
     proyecto_id: number;
     proyecto_codigo: string;
     proyecto_nombre: string;
@@ -55,6 +56,28 @@ export type UpdateEvaluadorPayload = Partial<{
     hora_fin: string;
     fase: 'Anteproyecto' | 'Final';
 }>;
+
+/* ── Helpers ── */
+
+/**
+ * Extrae un mensaje de error legible de cualquier forma de body de error
+ * (`{error}`, `{errors}`, `{message}`) sin asumir su shape. Nunca llama
+ * Object.values sobre undefined.
+ */
+export function extractErrorMessage(body: unknown, status: number): string {
+    if (body && typeof body === 'object') {
+        const b = body as Record<string, unknown>;
+        if (typeof b.error === 'string' && b.error) return b.error;
+        if (b.errors && typeof b.errors === 'object' && b.errors !== null) {
+            const flat = Object.values(b.errors as Record<string, unknown>)
+                .flat()
+                .filter((v): v is string => typeof v === 'string');
+            if (flat.length > 0) return flat.join('. ');
+        }
+        if (typeof b.message === 'string' && b.message) return b.message;
+    }
+    return `Error ${status}`;
+}
 
 /* ── State & Reducer ── */
 
@@ -156,10 +179,7 @@ export function useEvaluadorProyecto() {
             });
             if (!res.ok) {
                 const body = await res.json().catch(() => null);
-                const msg = body?.error ?? body?.errors
-                    ? Object.values(body.errors).flat().join('. ')
-                    : `Error ${res.status}`;
-                throw new Error(msg);
+                throw new Error(extractErrorMessage(body, res.status));
             }
             const json = await res.json();
             const created: EvaluadorProyecto = json.data ?? json;
@@ -182,10 +202,7 @@ export function useEvaluadorProyecto() {
             });
             if (!res.ok) {
                 const body = await res.json().catch(() => null);
-                const msg = body?.error ?? body?.errors
-                    ? Object.values(body.errors).flat().join('. ')
-                    : `Error ${res.status}`;
-                throw new Error(msg);
+                throw new Error(extractErrorMessage(body, res.status));
             }
             const json = await res.json();
             const updated: EvaluadorProyecto = json.data ?? json;

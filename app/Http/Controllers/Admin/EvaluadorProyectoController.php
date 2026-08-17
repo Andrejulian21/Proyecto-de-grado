@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\EstadoInvitacionEvaluador;
 use App\Http\Controllers\Controller;
 use App\Models\EvaluadorProyecto;
+use App\Models\Proyecto;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -54,7 +55,10 @@ class EvaluadorProyectoController extends Controller
             $evaluadores = $items->values();
 
             return [
+                // id es el proyecto_id (compatibilidad con destroy/delete por proyecto).
                 'id' => $first->proyecto_id,
+                // assignment_id es el ID real de la fila evaluador_proyecto (para el PUT de edición).
+                'assignment_id' => $first->id,
                 'proyecto_id' => $first->proyecto_id,
                 'proyecto_codigo' => $proyecto?->code ?? '',
                 'proyecto_nombre' => $proyecto?->title ?? '',
@@ -123,7 +127,8 @@ class EvaluadorProyectoController extends Controller
         $data = $validator->validated();
 
         // Validate: no asignar un Director como evaluador de su propio proyecto
-        $proyecto = \App\Models\Proyecto::findOrFail($data['proyecto_id']);
+        $proyecto = Proyecto::findOrFail($data['proyecto_id']);
+
         foreach ($data['evaluador_ids'] as $evaluadorId) {
             if ((int) $evaluadorId === (int) $proyecto->director_id) {
                 return response()->json([
@@ -145,6 +150,7 @@ class EvaluadorProyectoController extends Controller
         }
 
         $created = [];
+
         foreach ($data['evaluador_ids'] as $evaluadorId) {
             $asignacion = EvaluadorProyecto::create([
                 'proyecto_id' => $data['proyecto_id'],
@@ -227,6 +233,7 @@ class EvaluadorProyectoController extends Controller
         // Validate hora_fin > hora_inicio if both present
         $horaInicio = $data['hora_inicio'] ?? $asignacion->hora_inicio;
         $horaFin = $data['hora_fin'] ?? $asignacion->hora_fin;
+
         if ($horaInicio && $horaFin && $horaFin <= $horaInicio) {
             return response()->json([
                 'errors' => ['hora_fin' => ['La hora fin debe ser posterior a la hora inicio.']],
@@ -250,6 +257,7 @@ class EvaluadorProyectoController extends Controller
 
         return response()->json(['data' => [
             'id' => $first->id,
+            'assignment_id' => $first->id,
             'proyecto_id' => $first->proyecto_id,
             'proyecto_codigo' => $first->proyecto?->code ?? '',
             'proyecto_nombre' => $first->proyecto?->title ?? '',

@@ -52,6 +52,11 @@ function EditModal({
         e.preventDefault();
         setEditError(null);
 
+        if (!assignment.assignment_id) {
+            setEditError('No se pudo identificar la asignación a editar. Recargue la página e intente nuevamente.');
+            return;
+        }
+
         if (horaFin && horaInicio && horaFin <= horaInicio) {
             setEditError('La hora fin debe ser posterior a la hora inicio.');
             return;
@@ -69,7 +74,7 @@ function EditModal({
             return;
         }
 
-        onSave(assignment.id, {
+        onSave(assignment.assignment_id, {
             fase,
             fecha,
             hora_inicio: horaInicio,

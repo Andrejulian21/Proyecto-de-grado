@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 use App\Enums\EstadoInvitacionEvaluador;
 use App\Models\Entrega;
-use App\Models\Evaluacion;
 use App\Models\EvaluadorProyecto;
 use App\Models\Proyecto;
 use App\Models\Semestre;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -59,7 +59,7 @@ describe('T-015: Migraciones y modelos EvaluadorProyecto', function () {
             'evaluador_id' => $evaluador->id,
             'invitation_status' => EstadoInvitacionEvaluador::Aceptada,
             'assigned_at' => now(),
-        ]))->toThrow(Illuminate\Database\QueryException::class);
+        ]))->toThrow(QueryException::class);
     });
 
     it('evaluador_proyecto belongsTo relations', function () {
@@ -104,7 +104,7 @@ describe('T-016: CRUD asignacion evaluador-proyecto', function () {
         ]);
 
         $response = $this->actingAs($this->coordinador)
-            ->getJson('/api/admin/evaluador-proyecto?proyecto_id=' . $this->proyecto->id);
+            ->getJson('/api/admin/evaluador-proyecto?proyecto_id='.$this->proyecto->id);
 
         $response->assertOk();
         expect($response->json('data'))->toHaveCount(1);
@@ -157,11 +157,102 @@ describe('T-016: CRUD asignacion evaluador-proyecto', function () {
         ]);
 
         $response = $this->actingAs($this->coordinador)
-            ->deleteJson('/api/admin/evaluador-proyecto/' . $asignacion->id);
+            ->deleteJson('/api/admin/evaluador-proyecto/'.$asignacion->id);
 
         $response->assertOk();
         expect(EvaluadorProyecto::count())->toBe(0);
     });
 });
 
+// =========================================================================
+// T-016b — PUT update: regresión edición de asignación (bug fix id)
+// =========================================================================
 
+describe('T-016b: update asignacion evaluador-proyecto (bug fix)', function () {
+
+    beforeEach(function () {
+        $this->coordinador = User::factory()->coordinador()->create();
+        $this->director = User::factory()->director()->create();
+        $this->evaluador = User::factory()->external()->create(['password_changed_at' => now()]);
+        $this->evaluador2 = User::factory()->external()->create(['password_changed_at' => now()]);
+        $this->semestre = Semestre::create(['name' => '2026-1', 'start_date' => '2026-02-01', 'end_date' => '2026-06-30']);
+        $this->proyecto = Proyecto::create(['title' => 'Proyecto Test', 'semester_id' => $this->semestre->id, 'director_id' => $this->director->id]);
+    });
+
+    it('el index expone el assignment_id real de la fila para editar', function () {
+        $asignacion = EvaluadorProyecto::create([
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
+            'assigned_at' => now(),
+        ]);
+        EvaluadorProyecto::create([
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador2->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
+            'assigned_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->coordinador)
+            ->getJson('/api/admin/evaluador-proyecto?proyecto_id='.$this->proyecto->id);
+
+        $response->assertOk();
+        expect($response->json('data.0.assignment_id'))->toBe($asignacion->id);
+    });
+
+    it('actualiza fecha/hora/fase de una asignación con el payload del modal', function () {
+        $asignacion = EvaluadorProyecto::create([
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
+            'assigned_at' => now(),
+            'fecha' => '2026-06-15',
+            'hora_inicio' => '09:00',
+            'hora_fin' => '11:00',
+            'fase' => 'Anteproyecto',
+        ]);
+        EvaluadorProyecto::create([
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador2->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
+            'assigned_at' => now(),
+            'fecha' => '2026-06-15',
+            'hora_inicio' => '09:00',
+            'hora_fin' => '11:00',
+            'fase' => 'Anteproyecto',
+        ]);
+
+        $response = $this->actingAs($this->coordinador)
+            ->putJson('/api/admin/evaluador-proyecto/'.$asignacion->id, [
+                'fase' => 'Final',
+                'fecha' => '2026-07-20',
+                'hora_inicio' => '10:00',
+                'hora_fin' => '12:00',
+            ]);
+
+        $response->assertOk();
+        expect($response->json('data.fase'))->toBe('Final');
+        expect($response->json('data.fecha'))->toBe('2026-07-20');
+        expect($response->json('data.assignment_id'))->toBe($asignacion->id);
+        $this->assertDatabaseHas('evaluador_proyecto', [
+            'proyecto_id' => $this->proyecto->id,
+            'fase' => 'Final',
+            'fecha' => '2026-07-20',
+            'hora_inicio' => '10:00',
+            'hora_fin' => '12:00',
+        ]);
+    });
+
+    it('devuelve 404 con error en español cuando la asignación no existe', function () {
+        $response = $this->actingAs($this->coordinador)
+            ->putJson('/api/admin/evaluador-proyecto/999999', [
+                'fase' => 'Final',
+                'fecha' => '2026-07-20',
+                'hora_inicio' => '10:00',
+                'hora_fin' => '12:00',
+            ]);
+
+        $response->assertStatus(404);
+        expect($response->json('error'))->toBe('Asignación no encontrada.');
+    });
+});

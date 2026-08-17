@@ -175,6 +175,34 @@ test('incluye el estado de cada entrega por fase (Entregado/Pendiente/No entregÃ
     expect($dato[$idxPendiente])->toBe('Pendiente');
 });
 
+test('formatea la columna de observaciones con wrapText, etiqueta de fase y ancho fijo', function () {
+    crearProyectoExport($this->semestre, 'Proyecto A');
+
+    $response = $this->actingAs($this->coordinador)
+        ->get("/api/admin/seguimiento/semestre/{$this->semestre->id}/export");
+
+    $response->assertOk();
+    $sheet = cargarXlsxExport($response->streamedContent())->getActiveSheet();
+
+    $filas = $sheet->toArray();
+    $header = $filas[1];
+    $obsIdx = array_search('Observaciones', $header, true);
+    expect($obsIdx)->not->toBeFalse();
+
+    // La celda de observaciones muestra la etiqueta legible de la fase
+    expect($filas[2][$obsIdx])->toContain('Desarrollo: Revisar avance 1');
+
+    // La columna de observaciones usa ancho fijo (no autoSize)
+    $obsCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($obsIdx + 1);
+    expect($sheet->getColumnDimension($obsCol)->getWidth())->toBe(50.0);
+
+    // wrapText habilitado con alineaciÃ³n arriba-izquierda en la celda
+    $alignment = $sheet->getStyle($obsCol.'3')->getAlignment();
+    expect($alignment->getWrapText())->toBeTrue();
+    expect($alignment->getHorizontal())->toBe(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_LEFT);
+    expect($alignment->getVertical())->toBe(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_TOP);
+});
+
 test('exporta xlsx con headers y 0 filas para un semestre sin proyectos', function () {
     $response = $this->actingAs($this->coordinador)
         ->get("/api/admin/seguimiento/semestre/{$this->semestre->id}/export");

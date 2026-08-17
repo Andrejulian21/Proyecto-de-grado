@@ -39,6 +39,26 @@ class SeguimientoController extends Controller
 
     private const COLUMNAS_FIJAS = ['Estudiantes', 'Proyecto', 'Código', 'Director'];
 
+    /**
+     * Ancho fijo (en caracteres) de la columna de observaciones; se usa
+     * con wrapText en vez de autoSize porque las observaciones largas con
+     * saltos de línea no se dimensionan bien con autoSize.
+     */
+    private const ANCHO_OBSERVACIONES = 50;
+
+    /** Altura por línea de texto (puntos) al estimar la fila. */
+    private const ALTURA_LINEA = 15;
+
+    /**
+     * Etiquetas legibles de fase para las observaciones del export.
+     */
+    private const ETIQUETAS_FASE = [
+        'anteproyecto' => 'Anteproyecto',
+        'presentacion_anteproyecto' => 'Presentación Anteproyecto',
+        'desarrollo' => 'Desarrollo',
+        'presentacion_final' => 'Presentación Final',
+    ];
+
     public function __construct(
         private readonly SeguimientoService $seguimientoService,
     ) {}
@@ -217,10 +237,22 @@ class SeguimientoController extends Controller
         // -- Relleno de color por estado en las columnas de entrega --------
         $this->aplicarEstadosFondo($sheet, $filasDatos, $clavesEntregas);
 
-        // -- Ajuste automático de ancho de columnas ------------------------
+        // -- Ajuste de ancho de columnas ----------------------------------
+        // Observaciones usa ancho fijo + wrapText; el resto autoSize.
+        $obsCol = Coordinate::stringFromColumnIndex($numCols);
+
         foreach (range(1, $numCols) as $i) {
-            $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($i))->setAutoSize(true);
+            $col = Coordinate::stringFromColumnIndex($i);
+
+            if ($col === $obsCol) {
+                $sheet->getColumnDimension($col)->setWidth(self::ANCHO_OBSERVACIONES);
+            } else {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
         }
+
+        // -- Formato de la columna Observaciones ---------------------------
+        $this->aplicarFormatoObservaciones($sheet, $filasDatos, $numCols);
 
         // Congela título + encabezado al desplazarse.
         $sheet->freezePane('A3');
@@ -304,16 +336,66 @@ class SeguimientoController extends Controller
     }
 
     /**
-     * Concatena las observaciones por fase en una sola celda.
+     * Concatena las observaciones por fase en una sola celda, con la
+     * etiqueta legible de la fase y salto de línea entre fases.
      *
      * @param  array<int, array{fase: string, contenido: string}>  $observaciones
      */
     private function observacionesTexto(array $observaciones): string
     {
         return implode("\n", array_map(
-            fn (array $obs): string => trim($obs['fase'].': '.$obs['contenido']),
+            fn (array $obs): string => trim(
+                (self::ETIQUETAS_FASE[$obs['fase']] ?? $obs['fase']).': '.$obs['contenido']
+            ),
             $observaciones,
         ));
+    }
+
+    /**
+     * Aplica wrapText + alineación arriba-izquierda a la columna de
+     * observaciones y ajusta la altura de cada fila de datos según el
+     * contenido visible, para que el texto largo se lea sin cortarse.
+     * La zebra y los bordes ya fueron aplicados sobre toda la tabla.
+     *
+     * @param  array<int, array<int, mixed>>  $filasDatos
+     */
+    private function aplicarFormatoObservaciones(Worksheet $sheet, array $filasDatos, int $numCols): void
+    {
+        $obsCol = Coordinate::stringFromColumnIndex($numCols);
+        $obsIdx = $numCols - 1;
+
+        foreach ($filasDatos as $r => $filaDatos) {
+            $filaAbs = 3 + $r;
+            $texto = (string) ($filaDatos[$obsIdx] ?? '');
+
+            $sheet->getStyle($obsCol.$filaAbs)->getAlignment()->applyFromArray([
+                'wrapText' => true,
+                'horizontal' => Alignment::HORIZONTAL_LEFT,
+                'vertical' => Alignment::VERTICAL_TOP,
+            ]);
+
+            if ($texto !== '') {
+                $sheet->getRowDimension($filaAbs)->setRowHeight(
+                    $this->alturaParaTexto($texto, self::ANCHO_OBSERVACIONES)
+                );
+            }
+        }
+    }
+
+    /**
+     * Estima la altura (en puntos) que necesita una celda con wrapText
+     * para mostrar `$texto` en una columna de `$anchoCol` caracteres.
+     */
+    private function alturaParaTexto(string $texto, int $anchoCol): int
+    {
+        $ancho = max($anchoCol - 2, 5);
+        $lineas = 0;
+
+        foreach (explode("\n", $texto) as $linea) {
+            $lineas += max(1, (int) ceil(mb_strlen($linea) / $ancho));
+        }
+
+        return max($lineas * self::ALTURA_LINEA, self::ALTURA_LINEA);
     }
 
     /**

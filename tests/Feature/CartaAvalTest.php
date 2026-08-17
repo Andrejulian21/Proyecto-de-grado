@@ -146,6 +146,7 @@ test('descarga carta de aval de sustentación con nombre D4', function () {
     crearTemplateCarta('aval-sustentacion.docx', [
         'nombre_estudiante', 'codigo_estudiante', 'titulo_proyecto',
         'jurado_1_nombre', 'jurado_2_nombre', 'jurado_3_nombre', 'nombre_director',
+        'ciudad', 'fecha',
     ]);
 
     $response = $this->actingAs($this->director)
@@ -162,6 +163,7 @@ test('descarga carta de aval de sustentación con nombre D4', function () {
 test('descarga carta de aval a jurados con nombre D4', function () {
     crearTemplateCarta('carta-jurados.docx', [
         'nombre_estudiante', 'codigo_estudiante', 'titulo_proyecto', 'nombre_director',
+        'ciudad', 'fecha',
     ]);
 
     $response = $this->actingAs($this->director)

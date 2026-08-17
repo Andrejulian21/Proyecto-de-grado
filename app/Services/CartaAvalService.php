@@ -127,6 +127,8 @@ final class CartaAvalService
             'codigo_estudiante' => $estudiante->codigo_estudiante ?? '',
             'titulo_proyecto' => $proyecto->title ?? '',
             'nombre_director' => $proyecto->director?->name ?? '',
+            'ciudad' => 'Bucaramanga',
+            'fecha' => Carbon::now()->locale('es')->isoFormat('D [de] MMMM [de] YYYY'),
         ];
 
         if ($carta !== self::CARTA_AVAL) {

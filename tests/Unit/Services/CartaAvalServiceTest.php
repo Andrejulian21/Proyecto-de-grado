@@ -6,6 +6,7 @@ use App\Models\Entrega;
 use App\Models\Proyecto;
 use App\Models\User;
 use App\Services\CartaAvalService;
+use Illuminate\Support\Carbon;
 
 /**
  * Helper: build an in-memory Entrega model (no DB) with the fields the
@@ -125,4 +126,45 @@ it('resuelve nombre del director a vacío cuando el proyecto no tiene director',
     $resultado = servicioCartas()->resolverPlaceholders($proyecto, $estudiante, 'jurados');
 
     expect($resultado['placeholders']['nombre_director'])->toBe('');
+});
+
+it('incluye ciudad y fecha de generación en los placeholders de la carta de aval', function () {
+    Carbon::setTestNow('2026-08-05 10:00:00');
+
+    try {
+        $director = new User(['name' => 'Ana']);
+        $proyecto = new Proyecto(['title' => 'X']);
+        $proyecto->setRelation('director', $director);
+        $estudiante = new User(['name' => 'Juan', 'codigo_estudiante' => '12345']);
+
+        $resultado = servicioCartas()->resolverPlaceholders(
+            $proyecto,
+            $estudiante,
+            'aval',
+            ['Jurado Uno', 'Jurado Dos', 'Jurado Tres'],
+        );
+
+        expect($resultado['placeholders']['ciudad'])->toBe('Bucaramanga');
+        expect($resultado['placeholders']['fecha'])->toBe('5 de agosto de 2026');
+    } finally {
+        Carbon::setTestNow();
+    }
+});
+
+it('incluye ciudad y fecha de generación en los placeholders de la carta de jurados', function () {
+    Carbon::setTestNow('2026-08-05 10:00:00');
+
+    try {
+        $director = new User(['name' => 'Ana']);
+        $proyecto = new Proyecto(['title' => 'X']);
+        $proyecto->setRelation('director', $director);
+        $estudiante = new User(['name' => 'Juan', 'codigo_estudiante' => '12345']);
+
+        $resultado = servicioCartas()->resolverPlaceholders($proyecto, $estudiante, 'jurados');
+
+        expect($resultado['placeholders']['ciudad'])->toBe('Bucaramanga');
+        expect($resultado['placeholders']['fecha'])->toBe('5 de agosto de 2026');
+    } finally {
+        Carbon::setTestNow();
+    }
 });

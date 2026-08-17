@@ -121,7 +121,7 @@ describe('T-016: CRUD asignacion evaluador-proyecto', function () {
                 'fecha' => '2026-06-15',
                 'hora_inicio' => '09:00',
                 'hora_fin' => '11:00',
-                'fase' => 'Final',
+                'fase' => 'presentacion_final',
             ]);
 
         $response->assertCreated();
@@ -143,7 +143,7 @@ describe('T-016: CRUD asignacion evaluador-proyecto', function () {
                 'fecha' => '2026-06-15',
                 'hora_inicio' => '09:00',
                 'hora_fin' => '11:00',
-                'fase' => 'Final',
+                'fase' => 'presentacion_final',
             ]);
 
         $response->assertStatus(403);
@@ -211,7 +211,7 @@ describe('T-016b: update asignacion evaluador-proyecto (bug fix)', function () {
             'fecha' => '2026-06-15',
             'hora_inicio' => '09:00',
             'hora_fin' => '11:00',
-            'fase' => 'Anteproyecto',
+            'fase' => 'presentacion_anteproyecto',
         ]);
         EvaluadorProyecto::create([
             'proyecto_id' => $this->proyecto->id,
@@ -221,24 +221,24 @@ describe('T-016b: update asignacion evaluador-proyecto (bug fix)', function () {
             'fecha' => '2026-06-15',
             'hora_inicio' => '09:00',
             'hora_fin' => '11:00',
-            'fase' => 'Anteproyecto',
+            'fase' => 'presentacion_anteproyecto',
         ]);
 
         $response = $this->actingAs($this->coordinador)
             ->putJson('/api/admin/evaluador-proyecto/'.$asignacion->id, [
-                'fase' => 'Final',
+                'fase' => 'presentacion_final',
                 'fecha' => '2026-07-20',
                 'hora_inicio' => '10:00',
                 'hora_fin' => '12:00',
             ]);
 
         $response->assertOk();
-        expect($response->json('data.fase'))->toBe('Final');
+        expect($response->json('data.fase'))->toBe('presentacion_final');
         expect($response->json('data.fecha'))->toBe('2026-07-20');
         expect($response->json('data.assignment_id'))->toBe($asignacion->id);
         $this->assertDatabaseHas('evaluador_proyecto', [
             'proyecto_id' => $this->proyecto->id,
-            'fase' => 'Final',
+            'fase' => 'presentacion_final',
             'fecha' => '2026-07-20',
             'hora_inicio' => '10:00',
             'hora_fin' => '12:00',
@@ -248,7 +248,7 @@ describe('T-016b: update asignacion evaluador-proyecto (bug fix)', function () {
     it('devuelve 404 con error en español cuando la asignación no existe', function () {
         $response = $this->actingAs($this->coordinador)
             ->putJson('/api/admin/evaluador-proyecto/999999', [
-                'fase' => 'Final',
+                'fase' => 'presentacion_final',
                 'fecha' => '2026-07-20',
                 'hora_inicio' => '10:00',
                 'hora_fin' => '12:00',
@@ -284,13 +284,13 @@ describe('T-016c: update cambia evaluadores y fase', function () {
             'fecha' => '2026-06-15',
             'hora_inicio' => '09:00',
             'hora_fin' => '11:00',
-            'fase' => 'Anteproyecto',
+            'fase' => 'presentacion_anteproyecto',
         ]);
 
         $response = $this->actingAs($this->coordinador)
             ->putJson('/api/admin/evaluador-proyecto/'.EvaluadorProyecto::first()->id, [
                 'evaluador_ids' => [$this->evaluador2->id, $this->evaluador3->id],
-                'fase' => 'Final',
+                'fase' => 'presentacion_final',
                 'fecha' => '2026-07-20',
                 'hora_inicio' => '10:00',
                 'hora_fin' => '12:00',
@@ -300,7 +300,7 @@ describe('T-016c: update cambia evaluadores y fase', function () {
         expect($response->json('data.evaluadores_list'))->toHaveCount(2);
         expect(collect($response->json('data.evaluadores_list'))->pluck('id')->all())
             ->toEqualCanonicalizing([$this->evaluador2->id, $this->evaluador3->id]);
-        expect($response->json('data.fase'))->toBe('Final');
+        expect($response->json('data.fase'))->toBe('presentacion_final');
         $this->assertDatabaseMissing('evaluador_proyecto', [
             'proyecto_id' => $this->proyecto->id,
             'evaluador_id' => $this->evaluador->id,
@@ -308,7 +308,7 @@ describe('T-016c: update cambia evaluadores y fase', function () {
         $this->assertDatabaseHas('evaluador_proyecto', [
             'proyecto_id' => $this->proyecto->id,
             'evaluador_id' => $this->evaluador3->id,
-            'fase' => 'Final',
+            'fase' => 'presentacion_final',
             'fecha' => '2026-07-20',
         ]);
     });
@@ -319,7 +319,7 @@ describe('T-016c: update cambia evaluadores y fase', function () {
             'evaluador_id' => $this->evaluador->id,
             'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
             'assigned_at' => now(),
-            'fase' => 'Anteproyecto',
+            'fase' => 'presentacion_anteproyecto',
         ]);
         EvaluacionEvaluador::create([
             'evaluador_proyecto_id' => $asignacion->id,
@@ -330,7 +330,7 @@ describe('T-016c: update cambia evaluadores y fase', function () {
         $response = $this->actingAs($this->coordinador)
             ->putJson('/api/admin/evaluador-proyecto/'.$asignacion->id, [
                 'evaluador_ids' => [$this->evaluador2->id, $this->evaluador3->id],
-                'fase' => 'Anteproyecto',
+                'fase' => 'presentacion_anteproyecto',
                 'fecha' => '2026-07-20',
                 'hora_inicio' => '10:00',
                 'hora_fin' => '12:00',
@@ -351,13 +351,13 @@ describe('T-016c: update cambia evaluadores y fase', function () {
             'evaluador_id' => $this->evaluador->id,
             'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
             'assigned_at' => now(),
-            'fase' => 'Anteproyecto',
+            'fase' => 'presentacion_anteproyecto',
             'evaluado' => true,
         ]);
 
         $response = $this->actingAs($this->coordinador)
             ->putJson('/api/admin/evaluador-proyecto/'.$asignacion->id, [
-                'fase' => 'Final',
+                'fase' => 'presentacion_final',
                 'fecha' => '2026-07-20',
                 'hora_inicio' => '10:00',
                 'hora_fin' => '12:00',
@@ -368,7 +368,7 @@ describe('T-016c: update cambia evaluadores y fase', function () {
             ->toBe('No se puede modificar la asignación porque ya hay evaluaciones realizadas.');
         $this->assertDatabaseHas('evaluador_proyecto', [
             'proyecto_id' => $this->proyecto->id,
-            'fase' => 'Anteproyecto',
+            'fase' => 'presentacion_anteproyecto',
         ]);
     });
 
@@ -381,7 +381,7 @@ describe('T-016c: update cambia evaluadores y fase', function () {
             'fecha' => '2026-06-15',
             'hora_inicio' => '09:00',
             'hora_fin' => '11:00',
-            'fase' => 'Anteproyecto',
+            'fase' => 'presentacion_anteproyecto',
         ]);
         EvaluadorProyecto::create([
             'proyecto_id' => $this->proyecto->id,
@@ -391,7 +391,7 @@ describe('T-016c: update cambia evaluadores y fase', function () {
             'fecha' => '2026-06-15',
             'hora_inicio' => '09:00',
             'hora_fin' => '11:00',
-            'fase' => 'Anteproyecto',
+            'fase' => 'presentacion_anteproyecto',
         ]);
         EvaluacionEvaluador::create([
             'evaluador_proyecto_id' => $asignacion->id,
@@ -425,7 +425,7 @@ describe('T-016c: update cambia evaluadores y fase', function () {
             'fecha' => '2026-06-15',
             'hora_inicio' => '09:00',
             'hora_fin' => '11:00',
-            'fase' => 'Anteproyecto',
+            'fase' => 'presentacion_anteproyecto',
         ]);
         EvaluadorProyecto::create([
             'proyecto_id' => $this->proyecto->id,
@@ -435,7 +435,7 @@ describe('T-016c: update cambia evaluadores y fase', function () {
             'fecha' => '2026-06-15',
             'hora_inicio' => '09:00',
             'hora_fin' => '11:00',
-            'fase' => 'Anteproyecto',
+            'fase' => 'presentacion_anteproyecto',
         ]);
         EvaluacionEvaluador::create([
             'evaluador_proyecto_id' => $asignacion->id,
@@ -446,7 +446,7 @@ describe('T-016c: update cambia evaluadores y fase', function () {
         $response = $this->actingAs($this->coordinador)
             ->putJson('/api/admin/evaluador-proyecto/'.$asignacion->id, [
                 'evaluador_ids' => [$this->evaluador->id, $this->evaluador2->id],
-                'fase' => 'Anteproyecto',
+                'fase' => 'presentacion_anteproyecto',
                 'fecha' => '2026-07-22',
                 'hora_inicio' => '15:00',
                 'hora_fin' => '17:00',
@@ -468,7 +468,7 @@ describe('T-016c: update cambia evaluadores y fase', function () {
         $response = $this->actingAs($this->coordinador)
             ->putJson('/api/admin/evaluador-proyecto/'.$asignacion->id, [
                 'evaluador_ids' => [$this->evaluador->id],
-                'fase' => 'Anteproyecto',
+                'fase' => 'presentacion_anteproyecto',
                 'fecha' => '2026-07-20',
                 'hora_inicio' => '10:00',
                 'hora_fin' => '12:00',
@@ -489,7 +489,7 @@ describe('T-016c: update cambia evaluadores y fase', function () {
         $response = $this->actingAs($this->coordinador)
             ->putJson('/api/admin/evaluador-proyecto/'.$asignacion->id, [
                 'evaluador_ids' => [999999, $this->evaluador2->id],
-                'fase' => 'Anteproyecto',
+                'fase' => 'presentacion_anteproyecto',
                 'fecha' => '2026-07-20',
                 'hora_inicio' => '10:00',
                 'hora_fin' => '12:00',
@@ -509,7 +509,7 @@ describe('T-016c: update cambia evaluadores y fase', function () {
         $response = $this->actingAs($this->coordinador)
             ->putJson('/api/admin/evaluador-proyecto/'.$asignacion->id, [
                 'evaluador_ids' => [$this->director->id, $this->evaluador2->id],
-                'fase' => 'Anteproyecto',
+                'fase' => 'presentacion_anteproyecto',
                 'fecha' => '2026-07-20',
                 'hora_inicio' => '10:00',
                 'hora_fin' => '12:00',
@@ -535,7 +535,7 @@ describe('T-016c: update cambia evaluadores y fase', function () {
             'fecha' => '2026-07-20',
             'hora_inicio' => '09:00',
             'hora_fin' => '11:00',
-            'fase' => 'Anteproyecto',
+            'fase' => 'presentacion_anteproyecto',
         ]);
 
         $asignacion = EvaluadorProyecto::create([
@@ -546,12 +546,12 @@ describe('T-016c: update cambia evaluadores y fase', function () {
             'fecha' => '2026-06-15',
             'hora_inicio' => '09:00',
             'hora_fin' => '11:00',
-            'fase' => 'Anteproyecto',
+            'fase' => 'presentacion_anteproyecto',
         ]);
 
         $response = $this->actingAs($this->coordinador)
             ->putJson('/api/admin/evaluador-proyecto/'.$asignacion->id, [
-                'fase' => 'Anteproyecto',
+                'fase' => 'presentacion_anteproyecto',
                 'fecha' => '2026-07-20',
                 'hora_inicio' => '10:00',
                 'hora_fin' => '12:00',
@@ -570,7 +570,7 @@ describe('T-016c: update cambia evaluadores y fase', function () {
             'fecha' => '2026-07-20',
             'hora_inicio' => '09:00',
             'hora_fin' => '11:00',
-            'fase' => 'Anteproyecto',
+            'fase' => 'presentacion_anteproyecto',
         ]);
         EvaluadorProyecto::create([
             'proyecto_id' => $this->proyecto->id,
@@ -580,12 +580,12 @@ describe('T-016c: update cambia evaluadores y fase', function () {
             'fecha' => '2026-07-20',
             'hora_inicio' => '09:00',
             'hora_fin' => '11:00',
-            'fase' => 'Anteproyecto',
+            'fase' => 'presentacion_anteproyecto',
         ]);
 
         $response = $this->actingAs($this->coordinador)
             ->putJson('/api/admin/evaluador-proyecto/'.$asignacion->id, [
-                'fase' => 'Anteproyecto',
+                'fase' => 'presentacion_anteproyecto',
                 'fecha' => '2026-07-20',
                 'hora_inicio' => '14:00',
                 'hora_fin' => '16:00',
@@ -593,5 +593,116 @@ describe('T-016c: update cambia evaluadores y fase', function () {
 
         $response->assertOk();
         expect($response->json('data.hora_inicio'))->toBe('14:00');
+    });
+});
+
+// =========================================================================
+// T-016d — Validación de fase canónica (alineación a FaseProyecto)
+// =========================================================================
+
+describe('T-016d: fase canónica obligatoria en asignación de evaluadores', function () {
+
+    beforeEach(function () {
+        $this->coordinador = User::factory()->coordinador()->create();
+        $this->director = User::factory()->director()->create();
+        $this->evaluador = User::factory()->external()->create(['password_changed_at' => now()]);
+        $this->evaluador2 = User::factory()->external()->create(['password_changed_at' => now()]);
+        $this->semestre = Semestre::create(['name' => '2026-1', 'start_date' => '2026-02-01', 'end_date' => '2026-06-30']);
+        $this->proyecto = Proyecto::create(['title' => 'Proyecto Test', 'semester_id' => $this->semestre->id, 'director_id' => $this->director->id]);
+    });
+
+    it('crea asignación con fase canónica presentacion_anteproyecto', function () {
+        $response = $this->actingAs($this->coordinador)
+            ->postJson('/api/admin/evaluador-proyecto', [
+                'proyecto_id' => $this->proyecto->id,
+                'evaluador_ids' => [$this->evaluador->id, $this->evaluador2->id],
+                'fecha' => '2026-06-15',
+                'hora_inicio' => '09:00',
+                'hora_fin' => '11:00',
+                'fase' => 'presentacion_anteproyecto',
+            ]);
+
+        $response->assertCreated();
+        $this->assertDatabaseHas('evaluador_proyecto', [
+            'proyecto_id' => $this->proyecto->id,
+            'fase' => 'presentacion_anteproyecto',
+        ]);
+    });
+
+    it('rechaza fase legacy Anteproyecto en create (422)', function () {
+        $response = $this->actingAs($this->coordinador)
+            ->postJson('/api/admin/evaluador-proyecto', [
+                'proyecto_id' => $this->proyecto->id,
+                'evaluador_ids' => [$this->evaluador->id, $this->evaluador2->id],
+                'fecha' => '2026-06-15',
+                'hora_inicio' => '09:00',
+                'hora_fin' => '11:00',
+                'fase' => 'Anteproyecto',
+            ]);
+
+        $response->assertStatus(422);
+        expect($response->json('errors.fase'))->not->toBeNull();
+    });
+
+    it('rechaza fase legacy Final en create (422)', function () {
+        $response = $this->actingAs($this->coordinador)
+            ->postJson('/api/admin/evaluador-proyecto', [
+                'proyecto_id' => $this->proyecto->id,
+                'evaluador_ids' => [$this->evaluador->id, $this->evaluador2->id],
+                'fecha' => '2026-06-15',
+                'hora_inicio' => '09:00',
+                'hora_fin' => '11:00',
+                'fase' => 'Final',
+            ]);
+
+        $response->assertStatus(422);
+        expect($response->json('errors.fase'))->not->toBeNull();
+    });
+
+    it('rechaza fase legacy Final en update (422)', function () {
+        $asignacion = EvaluadorProyecto::create([
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
+            'assigned_at' => now(),
+            'fase' => 'presentacion_anteproyecto',
+        ]);
+
+        $response = $this->actingAs($this->coordinador)
+            ->putJson('/api/admin/evaluador-proyecto/'.$asignacion->id, [
+                'fase' => 'Final',
+            ]);
+
+        $response->assertStatus(422);
+        expect($response->json('errors.fase'))->not->toBeNull();
+    });
+
+    it('acepta fase canónica presentacion_final en update', function () {
+        $asignacion = EvaluadorProyecto::create([
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
+            'assigned_at' => now(),
+            'fase' => 'presentacion_anteproyecto',
+        ]);
+        EvaluadorProyecto::create([
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador2->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
+            'assigned_at' => now(),
+            'fase' => 'presentacion_anteproyecto',
+        ]);
+
+        $response = $this->actingAs($this->coordinador)
+            ->putJson('/api/admin/evaluador-proyecto/'.$asignacion->id, [
+                'fase' => 'presentacion_final',
+            ]);
+
+        $response->assertOk();
+        expect($response->json('data.fase'))->toBe('presentacion_final');
+        $this->assertDatabaseHas('evaluador_proyecto', [
+            'proyecto_id' => $this->proyecto->id,
+            'fase' => 'presentacion_final',
+        ]);
     });
 });

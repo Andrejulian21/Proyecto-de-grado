@@ -2,11 +2,16 @@
 
 declare(strict_types=1);
 
+use App\Enums\EstadoInvitacionEvaluador;
 use App\Models\Entrega;
+use App\Models\EvaluadorProyecto;
 use App\Models\Proyecto;
 use App\Models\User;
 use App\Services\CartaAvalService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+
+uses(RefreshDatabase::class);
 
 /**
  * Helper: build an in-memory Entrega model (no DB) with the fields the
@@ -167,4 +172,47 @@ it('incluye ciudad y fecha de generación en los placeholders de la carta de jur
     } finally {
         Carbon::setTestNow();
     }
+});
+
+// -- obtenerJurados (D2) -----------------------------------------------------
+
+it('resuelve jurados asignados en fase canónica presentacion_final', function () {
+    $director = User::factory()->director()->create();
+    $proyecto = Proyecto::factory()->create(['director_id' => $director->id]);
+
+    $jurados = [
+        User::factory()->external()->create(['name' => 'Jurado Uno']),
+        User::factory()->external()->create(['name' => 'Jurado Dos']),
+        User::factory()->external()->create(['name' => 'Jurado Tres']),
+    ];
+
+    foreach ($jurados as $jurado) {
+        EvaluadorProyecto::create([
+            'proyecto_id' => $proyecto->id,
+            'evaluador_id' => $jurado->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
+            'assigned_at' => now(),
+            'fase' => 'presentacion_final',
+        ]);
+    }
+
+    expect(servicioCartas()->obtenerJurados($proyecto)->all())
+        ->toEqualCanonicalizing(['Jurado Uno', 'Jurado Dos', 'Jurado Tres']);
+});
+
+it('obtenerJurados sigue tolerando el valor legacy Final', function () {
+    $director = User::factory()->director()->create();
+    $proyecto = Proyecto::factory()->create(['director_id' => $director->id]);
+
+    $jurado = User::factory()->external()->create(['name' => 'Jurado Legacy']);
+    EvaluadorProyecto::create([
+        'proyecto_id' => $proyecto->id,
+        'evaluador_id' => $jurado->id,
+        'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
+        'assigned_at' => now(),
+        'fase' => 'Final',
+    ]);
+
+    expect(servicioCartas()->obtenerJurados($proyecto)->all())
+        ->toEqualCanonicalizing(['Jurado Legacy']);
 });

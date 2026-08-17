@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\EstadoInvitacionEvaluador;
+use App\Enums\FaseProyecto;
 use App\Http\Controllers\Controller;
 use App\Models\EvaluacionEvaluador;
 use App\Models\EvaluadorProyecto;
@@ -67,7 +68,7 @@ class EvaluadorProyectoController extends Controller
      *   "fecha": "2026-08-15",
      *   "hora_inicio": "14:00",
      *   "hora_fin": "16:00",
-     *   "fase": "Anteproyecto"
+     *   "fase": "presentacion_anteproyecto"
      * }
      */
     public function store(Request $request): JsonResponse
@@ -79,7 +80,7 @@ class EvaluadorProyectoController extends Controller
             'fecha' => 'required|date',
             'hora_inicio' => 'required|date_format:H:i',
             'hora_fin' => 'required|date_format:H:i|after:hora_inicio',
-            'fase' => 'required|string|in:Anteproyecto,Final',
+            'fase' => 'required|string|in:presentacion_anteproyecto,presentacion_final',
         ]);
 
         if ($validator->fails()) {
@@ -152,7 +153,7 @@ class EvaluadorProyectoController extends Controller
      * Body esperado (todos opcionales):
      * {
      *   "evaluador_ids": [2, 3],
-     *   "fase": "Anteproyecto",
+     *   "fase": "presentacion_anteproyecto",
      *   "fecha": "2026-08-15",
      *   "hora_inicio": "14:00",
      *   "hora_fin": "16:00"
@@ -170,7 +171,7 @@ class EvaluadorProyectoController extends Controller
             'fecha' => 'sometimes|required|date',
             'hora_inicio' => 'sometimes|required|date_format:H:i',
             'hora_fin' => 'sometimes|required|date_format:H:i',
-            'fase' => 'sometimes|required|string|in:Anteproyecto,Final',
+            'fase' => 'sometimes|required|string|in:presentacion_anteproyecto,presentacion_final',
             'evaluador_ids' => 'sometimes|required|array|min:2|max:3',
             'evaluador_ids.*' => 'required|exists:users,id|distinct',
         ]);
@@ -351,7 +352,7 @@ class EvaluadorProyectoController extends Controller
                 'id' => $e->id,
                 'name' => $e->name,
             ])->toArray() ?? [],
-            'fase' => $first->fase ?? 'Anteproyecto',
+            'fase' => $first->fase ?? FaseProyecto::PresentacionAnteproyecto->value,
             'fecha' => $first->fecha?->format('Y-m-d') ?? '',
             'hora_inicio' => $first->hora_inicio ?? '',
             'hora_fin' => $first->hora_fin ?? '',

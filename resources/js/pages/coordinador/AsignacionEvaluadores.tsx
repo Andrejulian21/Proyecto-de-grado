@@ -12,6 +12,19 @@ import { useEvaluaciones } from '@/hooks/useEvaluaciones';
 import { ProjectAutocomplete, type ProjectOption } from '@/components/forms/ProjectAutocomplete';
 import { cn } from '@/lib/utils';
 
+export type FaseAsignacion = 'presentacion_anteproyecto' | 'presentacion_final';
+
+/**
+ * Normaliza el valor de fase de una asignación al dominio canónico.
+ * Acepta el valor legacy 'Final' (filas previas a la migración) y lo mapea
+ * a 'presentacion_final'; cualquier otro valor cae a
+ * 'presentacion_anteproyecto' (default por defecto).
+ */
+function normalizarFase(fase: string | null | undefined): FaseAsignacion {
+    if (fase === 'presentacion_final' || fase === 'Final') return 'presentacion_final';
+    return 'presentacion_anteproyecto';
+}
+
 /* ── Edit Modal ── */
 
 function EditModal({
@@ -33,7 +46,7 @@ function EditModal({
     evaluadores: EvaluadorUser[];
     loadingEvalUsers: boolean;
 }) {
-    const [fase, setFase] = useState<'Anteproyecto' | 'Final'>('Anteproyecto');
+    const [fase, setFase] = useState<FaseAsignacion>('presentacion_anteproyecto');
     const [fecha, setFecha] = useState('');
     const [horaInicio, setHoraInicio] = useState('');
     const [horaFin, setHoraFin] = useState('');
@@ -42,7 +55,7 @@ function EditModal({
 
     useEffect(() => {
         if (assignment) {
-            setFase(assignment.fase);
+            setFase(normalizarFase(assignment.fase));
             // Normalize date for input (assignment.fecha comes as "YYYY-MM-DD")
             setFecha(assignment.fecha || '');
             setHoraInicio(assignment.hora_inicio || '');
@@ -239,11 +252,11 @@ function EditModal({
                         <select
                             id="edit-fase"
                             value={fase}
-                            onChange={(e) => setFase(e.target.value as 'Anteproyecto' | 'Final')}
+                            onChange={(e) => setFase(e.target.value as FaseAsignacion)}
                             className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
                         >
-                            <option value="Anteproyecto">Presentación Anteproyecto</option>
-                            <option value="Final">Presentación Final</option>
+                            <option value="presentacion_anteproyecto">Presentación Anteproyecto</option>
+                            <option value="presentacion_final">Presentación Final</option>
                         </select>
                     </div>
 
@@ -353,7 +366,7 @@ export default function AsignacionEvaluadores() {
 
     // Registration form
     const [selectedProyecto, setSelectedProyecto] = useState<ProjectOption | null>(null);
-    const [formFase, setFormFase] = useState<'Anteproyecto' | 'Final'>('Anteproyecto');
+    const [formFase, setFormFase] = useState<FaseAsignacion>('presentacion_anteproyecto');
     const [formEvalIds, setFormEvalIds] = useState<number[]>([]);
     const [formFecha, setFormFecha] = useState('');
     const [formHoraInicio, setFormHoraInicio] = useState('');
@@ -462,7 +475,7 @@ export default function AsignacionEvaluadores() {
         try {
             await crear(payload);
             setSelectedProyecto(null);
-            setFormFase('Anteproyecto');
+            setFormFase('presentacion_anteproyecto');
             setFormEvalIds([]);
             setFormFecha('');
             setFormHoraInicio('');
@@ -521,8 +534,10 @@ export default function AsignacionEvaluadores() {
             key: 'fase',
             label: 'Fase',
             render: (row) => (
-                <StatusBadge variant={row.fase === 'Final' ? 'info' : 'en-curso'}>
-                    {row.fase === 'Final' ? 'Presentación Final' : 'Presentación Anteproyecto'}
+                <StatusBadge variant={normalizarFase(row.fase) === 'presentacion_final' ? 'info' : 'en-curso'}>
+                    {normalizarFase(row.fase) === 'presentacion_final'
+                        ? 'Presentación Final'
+                        : 'Presentación Anteproyecto'}
                 </StatusBadge>
             ),
         },
@@ -641,9 +656,9 @@ export default function AsignacionEvaluadores() {
                                     <input
                                         type="radio"
                                         name="fase"
-                                        value="Anteproyecto"
-                                        checked={formFase === 'Anteproyecto'}
-                                        onChange={() => setFormFase('Anteproyecto')}
+                                        value="presentacion_anteproyecto"
+                                        checked={formFase === 'presentacion_anteproyecto'}
+                                        onChange={() => setFormFase('presentacion_anteproyecto')}
                                         className="accent-[#c2410c]"
                                     />
                                     Presentación Anteproyecto
@@ -652,9 +667,9 @@ export default function AsignacionEvaluadores() {
                                     <input
                                         type="radio"
                                         name="fase"
-                                        value="Final"
-                                        checked={formFase === 'Final'}
-                                        onChange={() => setFormFase('Final')}
+                                        value="presentacion_final"
+                                        checked={formFase === 'presentacion_final'}
+                                        onChange={() => setFormFase('presentacion_final')}
                                         className="accent-[#c2410c]"
                                     />
                                     Presentación Final

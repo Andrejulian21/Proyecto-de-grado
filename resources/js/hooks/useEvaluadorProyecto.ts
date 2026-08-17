@@ -20,7 +20,7 @@ export interface EvaluadorProyecto {
     proyecto_director_id: number | null;
     proyecto_director_nombre: string;
     estudiantes: { id: number; name: string }[];
-    fase: 'Anteproyecto' | 'Final';
+    fase: 'presentacion_anteproyecto' | 'presentacion_final';
     fecha: string;
     hora_inicio: string;
     hora_fin: string;
@@ -47,14 +47,14 @@ export interface CreateEvaluadorPayload {
     fecha: string;
     hora_inicio: string;
     hora_fin: string;
-    fase: 'Anteproyecto' | 'Final';
+    fase: 'presentacion_anteproyecto' | 'presentacion_final';
 }
 
 export type UpdateEvaluadorPayload = Partial<{
     fecha: string;
     hora_inicio: string;
     hora_fin: string;
-    fase: 'Anteproyecto' | 'Final';
+    fase: 'presentacion_anteproyecto' | 'presentacion_final';
     evaluador_ids: number[];
 }>;
 

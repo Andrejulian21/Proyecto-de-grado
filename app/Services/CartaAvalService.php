@@ -94,10 +94,11 @@ final class CartaAvalService
      */
     public function obtenerJurados(Proyecto $proyecto): Collection
     {
-        // The coordinator assignment module stores fase as 'Anteproyecto'/'Final'
-        // while the canonical domain values are 'presentacion_anteproyecto'/
-        // 'presentacion_final'. Accept both so jurados assigned from either
-        // surface resolve for the final presentation letter.
+        // El módulo de asignación ahora usa el valor canónico
+        // 'presentacion_final' (ver migración align fase). Se mantiene
+        // también el legacy 'Final' por robustez: tolera filas que hayan
+        // quedado sin migrar en otros entornos, de modo que los jurados
+        // sigan resolviéndose para la carta de presentación final.
         return EvaluadorProyecto::query()
             ->where('proyecto_id', $proyecto->id)
             ->whereIn('fase', [self::FASE_JURADOS, 'Final'])

@@ -94,9 +94,13 @@ final class CartaAvalService
      */
     public function obtenerJurados(Proyecto $proyecto): Collection
     {
+        // The coordinator assignment module stores fase as 'Anteproyecto'/'Final'
+        // while the canonical domain values are 'presentacion_anteproyecto'/
+        // 'presentacion_final'. Accept both so jurados assigned from either
+        // surface resolve for the final presentation letter.
         return EvaluadorProyecto::query()
             ->where('proyecto_id', $proyecto->id)
-            ->where('fase', self::FASE_JURADOS)
+            ->whereIn('fase', [self::FASE_JURADOS, 'Final'])
             ->with('evaluador:id,name')
             ->orderBy('id')
             ->get()

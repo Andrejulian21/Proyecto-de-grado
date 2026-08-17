@@ -69,8 +69,8 @@ Chain strategy: feature-branch-chain
 
 | ID | Tarea | Deps | Criterio de aceptación | Skills |
 |----|-------|------|-------------------------|--------|
-| T-017 | Botón "Exportar" en `resources/js/pages/coordinador/SeguimientoSemestre.tsx` (PageHeader actions) — fetch blob a `GET /api/admin/seguimiento/semestre/{id}/export`, descarga vía `URL.createObjectURL`, mantiene nombre del servidor (D5) | T-015 | `npm run build` sin errores; descarga manual .xlsx con rol COORDINADOR | `C:\Users\Owner\.claude\skills\react-patterns\SKILL.md`, `C:\Users\Owner\.claude\skills\typescript-pro\SKILL.md` |
-| T-018 | Commit unitario PR4 | T-017 | Commit único < 400 líneas, build OK | `C:\Users\Owner\.config\opencode\skills\work-unit-commits\SKILL.md` |
+| T-017 | ✅ Botón "Exportar" en `resources/js/pages/coordinador/SeguimientoSemestre.tsx` — junto al selector de semestre, fetch blob a `GET /api/admin/seguimiento/semestre/{id}/export`, descarga vía `URL.createObjectURL`, mantiene nombre del servidor (D5), loading + disabled sin semestre | T-015 | `npm run build` sin errores; descarga manual .xlsx con rol COORDINADOR | `C:\Users\Owner\.claude\skills\react-patterns\SKILL.md`, `C:\Users\Owner\.claude\skills\typescript-pro\SKILL.md` |
+| T-018 | ✅ Commit unitario PR4 | T-017 | Commit único < 400 líneas, build OK | `C:\Users\Owner\.config\opencode\skills\work-unit-commits\SKILL.md` |
 
 ## Notas de ejecución (apply)
 

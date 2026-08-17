@@ -9,6 +9,7 @@ import {
     type FaseEntregas,
     type EntregaItem,
 } from '@/hooks/useSeguimientoSemestre';
+import { useExportSeguimiento } from '@/hooks/useExportSeguimiento';
 import {
     Loader2,
     AlertCircle,
@@ -21,6 +22,7 @@ import {
     Clock,
     FileText,
     EyeOff,
+    Download,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -282,6 +284,8 @@ export default function SeguimientoSemestre({
     const [expandedProject, setExpandedProject] = useState<number | null>(
         null,
     );
+    const { exporting, error: exportError, exportar } =
+        useExportSeguimiento();
 
     const proyectos = data?.proyectos ?? [];
 
@@ -330,18 +334,48 @@ export default function SeguimientoSemestre({
                 />
             )}
 
-            <div className="flex max-w-md flex-col gap-1.5">
-                <label
-                    htmlFor="semestre-trigger"
-                    className="text-xs font-semibold text-[#57534e]"
+            <div className="flex flex-wrap items-end gap-3">
+                <div className="flex max-w-md flex-col gap-1.5">
+                    <label
+                        htmlFor="semestre-trigger"
+                        className="text-xs font-semibold text-[#57534e]"
+                    >
+                        Semestre académico
+                    </label>
+                    <SemestreSelector
+                        value={selectedSemestre}
+                        onChange={setSelectedSemestre}
+                    />
+                </div>
+                <button
+                    type="button"
+                    onClick={() => {
+                        if (selectedSemestre !== null) {
+                            void exportar(selectedSemestre);
+                        }
+                    }}
+                    disabled={selectedSemestre === null || exporting}
+                    aria-label="Exportar seguimiento a Excel"
+                    className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-white px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:bg-[#fafaf9] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                    Semestre académico
-                </label>
-                <SemestreSelector
-                    value={selectedSemestre}
-                    onChange={setSelectedSemestre}
-                />
+                    {exporting ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                        <Download className="h-4 w-4" />
+                    )}
+                    Exportar
+                </button>
             </div>
+
+            {exportError && (
+                <div
+                    role="alert"
+                    className="flex items-center gap-2 rounded-lg border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm text-[#b91c1c]"
+                >
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <span className="flex-1">{exportError}</span>
+                </div>
+            )}
 
             {error && (
                 <div

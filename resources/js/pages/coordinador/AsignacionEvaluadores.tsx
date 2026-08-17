@@ -7,7 +7,7 @@ import { DataTable, type Column } from '@/components/ui/DataTable';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { CalendarGrid, type CalendarAssignment } from '@/components/calendar/CalendarGrid';
 import { ResultsTable } from '@/components/tables/ResultsTable';
-import { useEvaluadorProyecto, useEvaluadorUsers, type EvaluadorProyecto, type CreateEvaluadorPayload, type UpdateEvaluadorPayload } from '@/hooks/useEvaluadorProyecto';
+import { useEvaluadorProyecto, useEvaluadorUsers, type EvaluadorProyecto, type EvaluadorUser, type CreateEvaluadorPayload, type UpdateEvaluadorPayload } from '@/hooks/useEvaluadorProyecto';
 import { useEvaluaciones } from '@/hooks/useEvaluaciones';
 import { ProjectAutocomplete, type ProjectOption } from '@/components/forms/ProjectAutocomplete';
 import { cn } from '@/lib/utils';
@@ -21,6 +21,8 @@ function EditModal({
     onClose,
     saving,
     existingAssignments,
+    evaluadores,
+    loadingEvalUsers,
 }: {
     open: boolean;
     assignment: EvaluadorProyecto | null;
@@ -28,11 +30,14 @@ function EditModal({
     onClose: () => void;
     saving: boolean;
     existingAssignments: EvaluadorProyecto[];
+    evaluadores: EvaluadorUser[];
+    loadingEvalUsers: boolean;
 }) {
     const [fase, setFase] = useState<'Anteproyecto' | 'Final'>('Anteproyecto');
     const [fecha, setFecha] = useState('');
     const [horaInicio, setHoraInicio] = useState('');
     const [horaFin, setHoraFin] = useState('');
+    const [selectedEvalIds, setSelectedEvalIds] = useState<number[]>([]);
     const [editError, setEditError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -42,11 +47,24 @@ function EditModal({
             setFecha(assignment.fecha || '');
             setHoraInicio(assignment.hora_inicio || '');
             setHoraFin(assignment.hora_fin || '');
+            // evaluadores_list[].id es el evaluador_id (usuario), no la fila pivote
+            setSelectedEvalIds(assignment.evaluadores_list.map((e) => e.id));
             setEditError(null);
         }
     }, [assignment]);
 
     if (!open || !assignment) return null;
+
+    const handleEvalToggle = (evaluadorId: number) => {
+        setEditError(null);
+        setSelectedEvalIds((prev) => {
+            if (prev.includes(evaluadorId)) {
+                return prev.filter((id) => id !== evaluadorId);
+            }
+            if (prev.length >= 3) return prev;
+            return [...prev, evaluadorId];
+        });
+    };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -54,6 +72,11 @@ function EditModal({
 
         if (!assignment.assignment_id) {
             setEditError('No se pudo identificar la asignación a editar. Recargue la página e intente nuevamente.');
+            return;
+        }
+
+        if (selectedEvalIds.length < 2) {
+            setEditError('Seleccione al menos 2 evaluadores.');
             return;
         }
 
@@ -75,6 +98,7 @@ function EditModal({
         }
 
         onSave(assignment.assignment_id, {
+            evaluador_ids: selectedEvalIds,
             fase,
             fecha,
             hora_inicio: horaInicio,
@@ -111,12 +135,102 @@ function EditModal({
                         </p>
                     </div>
 
-                    {/* Evaluators (read-only) */}
+                    {/* Evaluators (multi-select) */}
                     <div className="flex flex-col gap-1.5">
-                        <label className="text-sm font-semibold text-[#1c1917]">Evaluadores</label>
-                        <p className="rounded-lg border border-[#e5e5e5] bg-[#f5f5f4] px-3 py-2 text-sm text-[#57534e]">
-                            {assignment.evaluadores_list.map((e) => e.name).join(', ')}
-                        </p>
+                        <label className="text-sm font-semibold text-[#1c1917]">
+                            Evaluadores <span className="font-normal text-[#78716c]"> (seleccione 2-3)</span>
+                        </label>
+                        {loadingEvalUsers ? (
+                            <div className="flex items-center gap-2 py-2 text-sm text-[#78716c]">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Cargando evaluadores...
+                            </div>
+                        ) : (
+                            <div className="max-h-[200px] overflow-y-auto rounded-lg border border-[#e5e5e5] bg-white">
+                                {evaluadores.length === 0 ? (
+                                    <p className="p-3 text-sm text-[#78716c]">No hay evaluadores disponibles.</p>
+                                ) : (
+                                    <>
+                                        {evaluadores.filter((ev) => ev.role === 'Director').length > 0 && (
+                                            <div className="border-b border-[#e5e5e5]">
+                                                <div className="flex items-center gap-2 px-3 pt-2.5 pb-1.5 text-xs font-semibold uppercase tracking-wider text-[#78716c]">
+                                                    <UserCheck className="h-3.5 w-3.5" />
+                                                    Directores
+                                                </div>
+                                                {evaluadores
+                                                    .filter((ev) => ev.role === 'Director')
+                                                    .map((ev) => {
+                                                        const selected = selectedEvalIds.includes(ev.id);
+                                                        return (
+                                                            <label
+                                                                key={ev.id}
+                                                                className={cn(
+                                                                    'flex items-center gap-3 px-3 py-2 text-sm cursor-pointer transition-colors',
+                                                                    selected
+                                                                        ? 'bg-[#fed7aa] text-[#1c1917]'
+                                                                        : 'hover:bg-[#f5f5f4] text-[#1c1917]',
+                                                                )}
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selected}
+                                                                    onChange={() => handleEvalToggle(ev.id)}
+                                                                    className="accent-[#c2410c]"
+                                                                />
+                                                                <div className="flex flex-1 items-center justify-between gap-2">
+                                                                    <div className="truncate">
+                                                                        <span>{ev.name}</span>
+                                                                        <span className="ml-2 text-[#78716c]">({ev.email})</span>
+                                                                    </div>
+                                                                    <StatusBadge variant="info">Director</StatusBadge>
+                                                                </div>
+                                                            </label>
+                                                        );
+                                                    })}
+                                            </div>
+                                        )}
+                                        {evaluadores.filter((ev) => ev.role === 'EvaluadorExterno').length > 0 && (
+                                            <div>
+                                                <div className="flex items-center gap-2 px-3 pt-2.5 pb-1.5 text-xs font-semibold uppercase tracking-wider text-[#78716c]">
+                                                    <GraduationCap className="h-3.5 w-3.5" />
+                                                    Evaluadores Externos
+                                                </div>
+                                                {evaluadores
+                                                    .filter((ev) => ev.role === 'EvaluadorExterno')
+                                                    .map((ev) => {
+                                                        const selected = selectedEvalIds.includes(ev.id);
+                                                        return (
+                                                            <label
+                                                                key={ev.id}
+                                                                className={cn(
+                                                                    'flex items-center gap-3 px-3 py-2 text-sm cursor-pointer transition-colors',
+                                                                    selected
+                                                                        ? 'bg-[#fed7aa] text-[#1c1917]'
+                                                                        : 'hover:bg-[#f5f5f4] text-[#1c1917]',
+                                                                )}
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selected}
+                                                                    onChange={() => handleEvalToggle(ev.id)}
+                                                                    className="accent-[#c2410c]"
+                                                                />
+                                                                <div className="flex flex-1 items-center justify-between gap-2">
+                                                                    <div className="truncate">
+                                                                        <span>{ev.name}</span>
+                                                                        <span className="ml-2 text-[#78716c]">({ev.email})</span>
+                                                                    </div>
+                                                                    <StatusBadge variant="inactivo">Evaluador</StatusBadge>
+                                                                </div>
+                                                            </label>
+                                                        );
+                                                    })}
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {/* Fase */}
@@ -763,6 +877,8 @@ export default function AsignacionEvaluadores() {
                 onClose={() => setEditTarget(null)}
                 saving={mutationLoading}
                 existingAssignments={asignaciones}
+                evaluadores={evaluadores}
+                loadingEvalUsers={loadingEvalUsers}
             />
 
             {/* Delete Confirmation */}

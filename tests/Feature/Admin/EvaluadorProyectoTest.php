@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\EstadoInvitacionEvaluador;
 use App\Models\Entrega;
+use App\Models\EvaluacionEvaluador;
 use App\Models\EvaluadorProyecto;
 use App\Models\Proyecto;
 use App\Models\Semestre;
@@ -198,6 +199,7 @@ describe('T-016b: update asignacion evaluador-proyecto (bug fix)', function () {
 
         $response->assertOk();
         expect($response->json('data.0.assignment_id'))->toBe($asignacion->id);
+        expect($response->json('data.0.evaluadores_list.0.assignment_id'))->toBe($asignacion->id);
     });
 
     it('actualiza fecha/hora/fase de una asignación con el payload del modal', function () {
@@ -254,5 +256,342 @@ describe('T-016b: update asignacion evaluador-proyecto (bug fix)', function () {
 
         $response->assertStatus(404);
         expect($response->json('error'))->toBe('Asignación no encontrada.');
+    });
+});
+
+// =========================================================================
+// T-016c — PUT update: cambiar evaluadores y fase (nueva capacidad)
+// =========================================================================
+
+describe('T-016c: update cambia evaluadores y fase', function () {
+
+    beforeEach(function () {
+        $this->coordinador = User::factory()->coordinador()->create();
+        $this->director = User::factory()->director()->create();
+        $this->evaluador = User::factory()->external()->create(['password_changed_at' => now()]);
+        $this->evaluador2 = User::factory()->external()->create(['password_changed_at' => now()]);
+        $this->evaluador3 = User::factory()->external()->create(['password_changed_at' => now()]);
+        $this->semestre = Semestre::create(['name' => '2026-1', 'start_date' => '2026-02-01', 'end_date' => '2026-06-30']);
+        $this->proyecto = Proyecto::create(['title' => 'Proyecto Test', 'semester_id' => $this->semestre->id, 'director_id' => $this->director->id]);
+    });
+
+    it('reemplaza el set de evaluadores cuando no hay evaluaciones', function () {
+        EvaluadorProyecto::create([
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
+            'assigned_at' => now(),
+            'fecha' => '2026-06-15',
+            'hora_inicio' => '09:00',
+            'hora_fin' => '11:00',
+            'fase' => 'Anteproyecto',
+        ]);
+
+        $response = $this->actingAs($this->coordinador)
+            ->putJson('/api/admin/evaluador-proyecto/'.EvaluadorProyecto::first()->id, [
+                'evaluador_ids' => [$this->evaluador2->id, $this->evaluador3->id],
+                'fase' => 'Final',
+                'fecha' => '2026-07-20',
+                'hora_inicio' => '10:00',
+                'hora_fin' => '12:00',
+            ]);
+
+        $response->assertOk();
+        expect($response->json('data.evaluadores_list'))->toHaveCount(2);
+        expect(collect($response->json('data.evaluadores_list'))->pluck('id')->all())
+            ->toEqualCanonicalizing([$this->evaluador2->id, $this->evaluador3->id]);
+        expect($response->json('data.fase'))->toBe('Final');
+        $this->assertDatabaseMissing('evaluador_proyecto', [
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador->id,
+        ]);
+        $this->assertDatabaseHas('evaluador_proyecto', [
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador3->id,
+            'fase' => 'Final',
+            'fecha' => '2026-07-20',
+        ]);
+    });
+
+    it('no permite cambiar evaluadores si ya existe una evaluación', function () {
+        $asignacion = EvaluadorProyecto::create([
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
+            'assigned_at' => now(),
+            'fase' => 'Anteproyecto',
+        ]);
+        EvaluacionEvaluador::create([
+            'evaluador_proyecto_id' => $asignacion->id,
+            'nota' => 4.5,
+            'evaluated_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->coordinador)
+            ->putJson('/api/admin/evaluador-proyecto/'.$asignacion->id, [
+                'evaluador_ids' => [$this->evaluador2->id, $this->evaluador3->id],
+                'fase' => 'Anteproyecto',
+                'fecha' => '2026-07-20',
+                'hora_inicio' => '10:00',
+                'hora_fin' => '12:00',
+            ]);
+
+        $response->assertStatus(422);
+        expect($response->json('error'))
+            ->toBe('No se puede modificar la asignación porque ya hay evaluaciones realizadas.');
+        $this->assertDatabaseHas('evaluador_proyecto', [
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador->id,
+        ]);
+    });
+
+    it('no permite cambiar la fase si la asignación ya fue evaluada', function () {
+        $asignacion = EvaluadorProyecto::create([
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
+            'assigned_at' => now(),
+            'fase' => 'Anteproyecto',
+            'evaluado' => true,
+        ]);
+
+        $response = $this->actingAs($this->coordinador)
+            ->putJson('/api/admin/evaluador-proyecto/'.$asignacion->id, [
+                'fase' => 'Final',
+                'fecha' => '2026-07-20',
+                'hora_inicio' => '10:00',
+                'hora_fin' => '12:00',
+            ]);
+
+        $response->assertStatus(422);
+        expect($response->json('error'))
+            ->toBe('No se puede modificar la asignación porque ya hay evaluaciones realizadas.');
+        $this->assertDatabaseHas('evaluador_proyecto', [
+            'proyecto_id' => $this->proyecto->id,
+            'fase' => 'Anteproyecto',
+        ]);
+    });
+
+    it('permite cambiar solo fecha/hora si ya hay evaluaciones', function () {
+        $asignacion = EvaluadorProyecto::create([
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
+            'assigned_at' => now(),
+            'fecha' => '2026-06-15',
+            'hora_inicio' => '09:00',
+            'hora_fin' => '11:00',
+            'fase' => 'Anteproyecto',
+        ]);
+        EvaluadorProyecto::create([
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador2->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
+            'assigned_at' => now(),
+            'fecha' => '2026-06-15',
+            'hora_inicio' => '09:00',
+            'hora_fin' => '11:00',
+            'fase' => 'Anteproyecto',
+        ]);
+        EvaluacionEvaluador::create([
+            'evaluador_proyecto_id' => $asignacion->id,
+            'nota' => 4.5,
+            'evaluated_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->coordinador)
+            ->putJson('/api/admin/evaluador-proyecto/'.$asignacion->id, [
+                'fecha' => '2026-07-21',
+                'hora_inicio' => '14:00',
+                'hora_fin' => '16:00',
+            ]);
+
+        $response->assertOk();
+        expect($response->json('data.fecha'))->toBe('2026-07-21');
+        expect($response->json('data.evaluadores_list'))->toHaveCount(2);
+        $this->assertDatabaseHas('evaluador_proyecto', [
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador->id,
+            'fecha' => '2026-07-21',
+        ]);
+    });
+
+    it('permite cambiar fecha/hora si se mantienen evaluadores y fase con evaluaciones', function () {
+        $asignacion = EvaluadorProyecto::create([
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
+            'assigned_at' => now(),
+            'fecha' => '2026-06-15',
+            'hora_inicio' => '09:00',
+            'hora_fin' => '11:00',
+            'fase' => 'Anteproyecto',
+        ]);
+        EvaluadorProyecto::create([
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador2->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
+            'assigned_at' => now(),
+            'fecha' => '2026-06-15',
+            'hora_inicio' => '09:00',
+            'hora_fin' => '11:00',
+            'fase' => 'Anteproyecto',
+        ]);
+        EvaluacionEvaluador::create([
+            'evaluador_proyecto_id' => $asignacion->id,
+            'nota' => 4.5,
+            'evaluated_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->coordinador)
+            ->putJson('/api/admin/evaluador-proyecto/'.$asignacion->id, [
+                'evaluador_ids' => [$this->evaluador->id, $this->evaluador2->id],
+                'fase' => 'Anteproyecto',
+                'fecha' => '2026-07-22',
+                'hora_inicio' => '15:00',
+                'hora_fin' => '17:00',
+            ]);
+
+        $response->assertOk();
+        expect($response->json('data.fecha'))->toBe('2026-07-22');
+        expect($response->json('data.evaluadores_list'))->toHaveCount(2);
+    });
+
+    it('valida mínimo 2 evaluadores al actualizar', function () {
+        $asignacion = EvaluadorProyecto::create([
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
+            'assigned_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->coordinador)
+            ->putJson('/api/admin/evaluador-proyecto/'.$asignacion->id, [
+                'evaluador_ids' => [$this->evaluador->id],
+                'fase' => 'Anteproyecto',
+                'fecha' => '2026-07-20',
+                'hora_inicio' => '10:00',
+                'hora_fin' => '12:00',
+            ]);
+
+        $response->assertStatus(422);
+        expect($response->json('errors.evaluador_ids'))->not->toBeNull();
+    });
+
+    it('valida que el evaluador exista al actualizar', function () {
+        $asignacion = EvaluadorProyecto::create([
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
+            'assigned_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->coordinador)
+            ->putJson('/api/admin/evaluador-proyecto/'.$asignacion->id, [
+                'evaluador_ids' => [999999, $this->evaluador2->id],
+                'fase' => 'Anteproyecto',
+                'fecha' => '2026-07-20',
+                'hora_inicio' => '10:00',
+                'hora_fin' => '12:00',
+            ]);
+
+        $response->assertStatus(422);
+    });
+
+    it('no permite asignar al director del propio proyecto como evaluador', function () {
+        $asignacion = EvaluadorProyecto::create([
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
+            'assigned_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->coordinador)
+            ->putJson('/api/admin/evaluador-proyecto/'.$asignacion->id, [
+                'evaluador_ids' => [$this->director->id, $this->evaluador2->id],
+                'fase' => 'Anteproyecto',
+                'fecha' => '2026-07-20',
+                'hora_inicio' => '10:00',
+                'hora_fin' => '12:00',
+            ]);
+
+        $response->assertStatus(422);
+        expect($response->json('error'))
+            ->toBe('Un director no puede evaluar su propio proyecto.');
+    });
+
+    it('rechaza actualización que se superpone con otra asignación', function () {
+        $directorB = User::factory()->director()->create();
+        $proyectoB = Proyecto::create([
+            'title' => 'Proyecto B',
+            'semester_id' => $this->semestre->id,
+            'director_id' => $directorB->id,
+        ]);
+        EvaluadorProyecto::create([
+            'proyecto_id' => $proyectoB->id,
+            'evaluador_id' => $this->evaluador3->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
+            'assigned_at' => now(),
+            'fecha' => '2026-07-20',
+            'hora_inicio' => '09:00',
+            'hora_fin' => '11:00',
+            'fase' => 'Anteproyecto',
+        ]);
+
+        $asignacion = EvaluadorProyecto::create([
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
+            'assigned_at' => now(),
+            'fecha' => '2026-06-15',
+            'hora_inicio' => '09:00',
+            'hora_fin' => '11:00',
+            'fase' => 'Anteproyecto',
+        ]);
+
+        $response = $this->actingAs($this->coordinador)
+            ->putJson('/api/admin/evaluador-proyecto/'.$asignacion->id, [
+                'fase' => 'Anteproyecto',
+                'fecha' => '2026-07-20',
+                'hora_inicio' => '10:00',
+                'hora_fin' => '12:00',
+            ]);
+
+        $response->assertStatus(422);
+        expect($response->json('error'))->toContain('se superpone');
+    });
+
+    it('permite actualizar al propio horario sin conflicto consigo mismo', function () {
+        $asignacion = EvaluadorProyecto::create([
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
+            'assigned_at' => now(),
+            'fecha' => '2026-07-20',
+            'hora_inicio' => '09:00',
+            'hora_fin' => '11:00',
+            'fase' => 'Anteproyecto',
+        ]);
+        EvaluadorProyecto::create([
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador2->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
+            'assigned_at' => now(),
+            'fecha' => '2026-07-20',
+            'hora_inicio' => '09:00',
+            'hora_fin' => '11:00',
+            'fase' => 'Anteproyecto',
+        ]);
+
+        $response = $this->actingAs($this->coordinador)
+            ->putJson('/api/admin/evaluador-proyecto/'.$asignacion->id, [
+                'fase' => 'Anteproyecto',
+                'fecha' => '2026-07-20',
+                'hora_inicio' => '14:00',
+                'hora_fin' => '16:00',
+            ]);
+
+        $response->assertOk();
+        expect($response->json('data.hora_inicio'))->toBe('14:00');
     });
 });

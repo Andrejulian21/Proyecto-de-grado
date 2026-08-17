@@ -55,6 +55,7 @@ export type UpdateEvaluadorPayload = Partial<{
     hora_inicio: string;
     hora_fin: string;
     fase: 'Anteproyecto' | 'Final';
+    evaluador_ids: number[];
 }>;
 
 /* ── Helpers ── */

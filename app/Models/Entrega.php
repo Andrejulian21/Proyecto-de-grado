@@ -33,6 +33,7 @@ class Entrega extends Model
         'grade_percentage',
         'director_grade',
         'acceptance_criteria',
+        'evaluation_metrics',
         'hora_maxima',
         'archivos_requeridos',
     ];

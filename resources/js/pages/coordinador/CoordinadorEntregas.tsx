@@ -62,22 +62,12 @@ export default function CoordinadorEntregas() {
         mutationLoading, mutationError, getNextFase,
     } = useEntregas(
         selectedGroup != null
-            ? { grupo_id: selectedGroup, fase: faseFilter || null }
+            ? { grupo_id: selectedGroup }
             : undefined,
     );
 
     // ── Ref guard: evita doble envío del formulario ──────────────
     const creatingRef = useRef(false);
-
-    // ── Determine next fase when group changes ───────────────────
-    const [nextFase, setNextFase] = useState<Fase>('anteproyecto');
-    useEffect(() => {
-        if (selectedGroup != null) {
-            setNextFase(getNextFase(selectedGroup));
-        } else {
-            setNextFase('anteproyecto');
-        }
-    }, [selectedGroup, getNextFase]);
 
     // ── Create form state ────────────────────────────────────────
     const [formFase, setFormFase] = useState<Fase>('anteproyecto');
@@ -94,9 +84,13 @@ export default function CoordinadorEntregas() {
     const [formArchivosError, setFormArchivosError] = useState<string | null>(null);
     const [createError, setCreateError] = useState<string | null>(null);
 
+    // Default the single phase field when opening the form or changing group.
+    // Do not reset it on list refetches — formFase is the only source of truth.
     useEffect(() => {
-        setFormFase(nextFase);
-    }, [nextFase]);
+        if (!showCreateForm) return;
+        setFormFase(selectedGroup != null ? getNextFase(selectedGroup) : 'anteproyecto');
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- getNextFase changes with list data; we only want group/open.
+    }, [selectedGroup, showCreateForm]);
 
     const handleCreate = useCallback(
         async (e: React.FormEvent) => {
@@ -259,6 +253,7 @@ export default function CoordinadorEntregas() {
 
     // ── Filtering ────────────────────────────────────────────────
     const filtered = entregas.filter((e) => {
+        if (faseFilter && e.phase !== faseFilter) return false;
         if (searchQuery) {
             const q = searchQuery.toLowerCase();
             const matchDesc = e.description?.toLowerCase().includes(q) ?? false;
@@ -287,29 +282,31 @@ export default function CoordinadorEntregas() {
             />
 
             {/* ── Filters row ─────────────────────────────────── */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className={`grid grid-cols-1 gap-4 ${showCreateForm ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
                 <GroupSelector
                     value={selectedGroup}
                     onChange={setSelectedGroup}
                     error={undefined}
                 />
 
-                <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-semibold text-[#1c1917]">Fase</label>
-                    <select
-                        value={faseFilter}
-                        onChange={(e) => setFaseFilter(e.target.value)}
-                        className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
-                        aria-label="Filtrar por fase"
-                    >
-                        <option value="">Todas las fases</option>
-                        {FASE_SEQUENCE.map((f) => (
-                            <option key={f} value={f}>
-                                {FASE_LABELS[f]}
-                            </option>
-                        ))}
-                    </select>
-                </div>
+                {!showCreateForm && (
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-sm font-semibold text-[#1c1917]">Filtrar por fase</label>
+                        <select
+                            value={faseFilter}
+                            onChange={(e) => setFaseFilter(e.target.value)}
+                            className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                            aria-label="Filtrar listado por fase"
+                        >
+                            <option value="">Todas las fases</option>
+                            {FASE_SEQUENCE.map((f) => (
+                                <option key={f} value={f}>
+                                    {FASE_LABELS[f]}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
 
                 <div className="flex flex-col gap-1.5">
                     <label className="text-sm font-semibold text-[#1c1917]">Buscar</label>
@@ -357,29 +354,24 @@ export default function CoordinadorEntregas() {
                             />
                         </div>
 
-                        <div className="flex flex-col gap-1.5">
-                            <label className="text-sm font-semibold text-[#1c1917]">
+                        <div className="flex flex-col gap-1.5 sm:col-span-2">
+                            <label htmlFor="form-fase" className="text-sm font-semibold text-[#1c1917]">
                                 Fase <span className="text-[#dc2626]">*</span>
                             </label>
-                            <div className="flex items-center gap-2">
-                                <select
-                                    value={formFase}
-                                    onChange={(e) => setFormFase(e.target.value as Fase)}
-                                    className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
-                                    aria-label="Fase de la entrega"
-                                >
-                                    {FASE_SEQUENCE.map((f) => (
-                                        <option key={f} value={f}>
-                                            {FASE_LABELS[f]}
-                                        </option>
-                                    ))}
-                                </select>
-                                {selectedGroup != null && (
-                                    <span className="whitespace-nowrap rounded-full bg-[#fef3c7] px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-[0.03em] text-[#78350f]">
-                                        Siguiente: {FASE_LABELS[nextFase]}
-                                    </span>
-                                )}
-                            </div>
+                            <select
+                                id="form-fase"
+                                value={formFase}
+                                onChange={(e) => setFormFase(e.target.value as Fase)}
+                                className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                aria-label="Fase de la entrega"
+                                required
+                            >
+                                {FASE_SEQUENCE.map((f) => (
+                                    <option key={f} value={f}>
+                                        {FASE_LABELS[f]}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
 
                         <div className="flex flex-col gap-1.5 sm:col-span-2">
@@ -428,12 +420,12 @@ export default function CoordinadorEntregas() {
                             />
                         </div>
 
-                        {/* Porcentaje de nota del par de fases (RF-ENT-03/05) */}
+                        {/* Porcentaje derivado de la fase seleccionada (RF-ENT-03/05) */}
                         <div className="flex flex-col gap-1.5 sm:col-span-2">
                             <label htmlFor="form-grade-percentage" className="text-sm font-semibold text-[#1c1917]">
-                                Porcentaje de nota (%)
+                                Porcentaje de nota de {FASE_LABELS[formFase]} (%)
                                 <span className="ml-1 text-xs font-normal text-[#a8a29e]">
-                                    Peso del par de fases (0-100)
+                                    Peso de esta fase en su par (0-100)
                                 </span>
                             </label>
                             <input
@@ -456,57 +448,67 @@ export default function CoordinadorEntregas() {
                             )}
                         </div>
 
+                        <p className="sm:col-span-2 mb-0 text-sm font-semibold text-[#1c1917]">
+                            Fecha y hora de apertura
+                        </p>
                         <div className="flex flex-col gap-1.5">
-                            <label className="text-sm font-semibold text-[#1c1917]">
-                                Fecha límite <span className="text-[#dc2626]">*</span>
+                            <label htmlFor="form-fecha-apertura" className="text-sm font-semibold text-[#1c1917]">
+                                Fecha de apertura
                             </label>
                             <div className="relative">
                                 <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#78716c]" />
                                 <input
+                                    id="form-fecha-apertura"
+                                    type="date"
+                                    value={formFechaInicio}
+                                    onChange={(e) => setFormFechaInicio(e.target.value)}
+                                    max={formFecha || undefined}
+                                    className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white pl-9 pr-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                />
+                            </div>
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                            <label htmlFor="form-hora-apertura" className="text-sm font-semibold text-[#1c1917]">
+                                Hora de apertura
+                            </label>
+                            <input
+                                id="form-hora-apertura"
+                                type="time"
+                                value={formHoraInicio}
+                                onChange={(e) => setFormHoraInicio(e.target.value)}
+                                className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                            />
+                        </div>
+
+                        <p className="sm:col-span-2 mb-0 text-sm font-semibold text-[#1c1917]">
+                            Fecha y hora de cierre
+                        </p>
+                        <div className="flex flex-col gap-1.5">
+                            <label htmlFor="form-fecha-cierre" className="text-sm font-semibold text-[#1c1917]">
+                                Fecha de cierre <span className="text-[#dc2626]">*</span>
+                            </label>
+                            <div className="relative">
+                                <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#78716c]" />
+                                <input
+                                    id="form-fecha-cierre"
                                     type="date"
                                     value={formFecha}
                                     onChange={(e) => setFormFecha(e.target.value)}
+                                    min={formFechaInicio || undefined}
                                     className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white pl-9 pr-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
                                     required
                                 />
                             </div>
                         </div>
-
                         <div className="flex flex-col gap-1.5">
-                            <label className="text-sm font-semibold text-[#1c1917]">
-                                Hora máxima
+                            <label htmlFor="form-hora-cierre" className="text-sm font-semibold text-[#1c1917]">
+                                Hora de cierre
                             </label>
                             <input
+                                id="form-hora-cierre"
                                 type="time"
                                 value={formHora}
                                 onChange={(e) => setFormHora(e.target.value)}
-                                className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
-                            />
-                        </div>
-
-                        <div className="flex flex-col gap-1.5">
-                            <label className="text-sm font-semibold text-[#1c1917]">
-                                Fecha de inicio
-                            </label>
-                            <div className="relative">
-                                <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#78716c]" />
-                                <input
-                                    type="date"
-                                    value={formFechaInicio}
-                                    onChange={(e) => setFormFechaInicio(e.target.value)}
-                                    className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white pl-9 pr-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex flex-col gap-1.5">
-                            <label className="text-sm font-semibold text-[#1c1917]">
-                                Hora de inicio
-                            </label>
-                            <input
-                                type="time"
-                                value={formHoraInicio}
-                                onChange={(e) => setFormHoraInicio(e.target.value)}
                                 className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
                             />
                         </div>

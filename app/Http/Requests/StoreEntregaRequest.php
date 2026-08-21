@@ -180,6 +180,7 @@ class StoreEntregaRequest extends FormRequest
         return [
             'grade_percentage.min' => 'El porcentaje de nota debe estar entre 0 y 100',
             'grade_percentage.max' => 'El porcentaje de nota debe estar entre 0 y 100',
+            'fecha_inicio.before_or_equal' => 'La fecha de apertura debe ser anterior o igual a la fecha de cierre.',
         ];
     }
 
@@ -195,13 +196,13 @@ class StoreEntregaRequest extends FormRequest
             'fase' => 'fase',
             'titulo' => 'título',
             'descripcion' => 'descripción',
-            'fecha_limite' => 'fecha límite',
-            'fecha_inicio' => 'fecha de inicio',
-            'hora_inicio' => 'hora de inicio',
+            'fecha_limite' => 'fecha de cierre',
+            'fecha_inicio' => 'fecha de apertura',
+            'hora_inicio' => 'hora de apertura',
             'criterios' => 'criterios de aceptación',
             'metricas_evaluacion' => 'métricas de evaluación',
             'evaluation_metrics' => 'métricas de evaluación',
-            'hora_maxima' => 'hora máxima',
+            'hora_maxima' => 'hora de cierre',
             'grade_percentage' => 'porcentaje de nota',
             'archivos_requeridos' => 'archivos requeridos',
             'archivos_requeridos.*.id' => 'identificador del archivo',

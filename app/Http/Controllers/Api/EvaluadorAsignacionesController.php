@@ -12,6 +12,7 @@ use App\Models\EvaluadorProyecto;
 use App\Models\Proyecto;
 use App\Models\User;
 use App\Models\VersionDocumento;
+use App\Services\EvaluadorAreaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -29,25 +30,42 @@ use Illuminate\Support\Facades\Validator;
  */
 class EvaluadorAsignacionesController extends Controller
 {
+    public function __construct(
+        private readonly EvaluadorAreaService $area,
+    ) {}
+
     /**
-     * GET /api/evaluador/mis-asignaciones — RF-EVA-01.
-     *
-     * Cards of the authenticated evaluador's assignments in the active flow.
-     * Eager loads proyecto.estudiantes and proyecto.director to avoid N+1.
-     * Each card carries the director_grade of THAT project's delivery
-     * (D3-rev), so evaluated cards never show a shared template note.
+     * GET /api/evaluador/mis-asignaciones — RF-EVA-01 / RF-EVUI-04.
      */
     public function index(Request $request): JsonResponse
     {
-        $asignaciones = EvaluadorProyecto::query()
-            ->with(['proyecto.estudiantes:id,name', 'proyecto.director:id,name,email'])
-            ->where('evaluador_id', $request->user()->id)
-            ->get();
+        $validated = $request->validate([
+            'q' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'estado' => ['sometimes', 'nullable', 'in:pendiente,evaluada'],
+        ]);
 
         return response()->json([
-            'data' => $asignaciones->map(
-                fn (EvaluadorProyecto $asignacion) => $this->mapCard($asignacion)
-            ),
+            'data' => $this->area->listarAsignaciones($request->user(), $validated),
+        ]);
+    }
+
+    /**
+     * GET /api/evaluador/dashboard
+     */
+    public function dashboard(Request $request): JsonResponse
+    {
+        return response()->json([
+            'data' => $this->area->dashboard($request->user()),
+        ]);
+    }
+
+    /**
+     * GET /api/evaluador/calendario
+     */
+    public function calendario(Request $request): JsonResponse
+    {
+        return response()->json([
+            'data' => $this->area->calendario($request->user()),
         ]);
     }
 
@@ -164,28 +182,6 @@ class EvaluadorAsignacionesController extends Controller
                 'evaluado' => true,
             ],
         ], 201);
-    }
-
-    /**
-     * Map an assignment to the evaluator card shape (RF-EVA-01).
-     * Includes the director_grade of THAT project's delivery (D3-rev).
-     *
-     * @return array<string, mixed>
-     */
-    private function mapCard(EvaluadorProyecto $asignacion): array
-    {
-        $entregaProyecto = $this->entregaProyectoDeAsignacion($asignacion);
-
-        return [
-            'id' => $asignacion->id,
-            'proyecto' => $this->mapProyecto($asignacion->proyecto),
-            'fase' => $this->faseEntrega((string) $asignacion->fase),
-            'evaluado' => (bool) $asignacion->evaluado,
-            'director_grade' => $entregaProyecto?->director_grade !== null
-                ? (float) $entregaProyecto->director_grade
-                : null,
-            'created_at' => $asignacion->created_at?->toDateString(),
-        ];
     }
 
     /**

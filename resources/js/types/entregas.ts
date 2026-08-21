@@ -96,6 +96,10 @@ export interface AsignacionEvaluador {
     proyecto: ProyectoEvaluador | null;
     fase: string;
     evaluado: boolean;
+    estado?: 'pendiente' | 'evaluada';
+    fecha?: string | null;
+    hora_inicio?: string | null;
+    hora_fin?: string | null;
     created_at: string | null;
     /**
      * Optional — the list endpoint does NOT include the note today; it is
@@ -103,6 +107,7 @@ export interface AsignacionEvaluador {
      * definitive note is always available in the detail (RF-EVA-02/04).
      */
     nota?: number | null;
+    evaluated_at?: string | null;
     /**
      * Director's grade for THAT project's delivery (D3-rev), resolved from
      * `entrega_proyecto` — never the shared general-delivery template grade.

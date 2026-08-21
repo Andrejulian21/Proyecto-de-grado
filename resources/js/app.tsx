@@ -44,6 +44,9 @@ const RevisionBitacoraCoordinador = lazy(() => import('@/pages/coordinador/Revis
 const EvaluarProyecto = lazy(() => import('@/pages/evaluador/EvaluarProyecto'));
 const EvaluadorCalificar = lazy(() => import('@/pages/evaluador/EvaluadorCalificar'));
 const MisAsignaciones = lazy(() => import('@/pages/evaluador/MisAsignaciones'));
+const EvaluadorCalendario = lazy(() => import('@/pages/evaluador/EvaluadorCalendario'));
+const EvaluadorPendientes = lazy(() => import('@/pages/evaluador/EvaluadorPendientes'));
+const EvaluadorHistorial = lazy(() => import('@/pages/evaluador/EvaluadorHistorial'));
 const SeleccionEntregaAnalisisIA = lazy(() => import('@/pages/estudiante/SeleccionEntregaAnalisisIA'));
 const AnalisisAutomaticoEntregas = lazy(() => import('@/pages/estudiante/AnalisisAutomaticoEntregas'));
 const AsistenteOrientacion = lazy(() => import('@/pages/estudiante/AsistenteOrientacion'));
@@ -156,10 +159,13 @@ function App() {
                                 {/* PR12: Coordinador reports (removed) */}
                                 <Route path="/recursos/admin" element={<ProtectedRoute allowedRoles={['Coordinador']}><SuspenseWrapper><RecursosAdmin /></SuspenseWrapper></ProtectedRoute>} />
                                 {/* PR13: Evaluador */}
-                                <Route path="/evaluaciones/:id" element={<ProtectedRoute allowedRoles={['Director', 'EvaluadorExterno']}><SuspenseWrapper><EvaluarProyecto /></SuspenseWrapper></ProtectedRoute>} />
+                                <Route path="/evaluaciones/:id" element={<ProtectedRoute allowedRoles={['Director']}><SuspenseWrapper><EvaluarProyecto /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/evaluaciones/:id/calificar" element={<ProtectedRoute allowedRoles={['EvaluadorExterno']}><SuspenseWrapper><EvaluadorCalificar /></SuspenseWrapper></ProtectedRoute>} />
-                                {/* PR5: Mis asignaciones (evaluador externo y director) */}
+                                {/* PR5: Mis asignaciones (director). El evaluador usa pendientes/historial. */}
                                 <Route path="/evaluador/mis-asignaciones" element={<ProtectedRoute allowedRoles={['EvaluadorExterno', 'Director']}><SuspenseWrapper><MisAsignaciones /></SuspenseWrapper></ProtectedRoute>} />
+                                <Route path="/evaluador/pendientes" element={<ProtectedRoute allowedRoles={['EvaluadorExterno', 'Director']}><SuspenseWrapper><EvaluadorPendientes /></SuspenseWrapper></ProtectedRoute>} />
+                                <Route path="/evaluador/historial" element={<ProtectedRoute allowedRoles={['EvaluadorExterno', 'Director']}><SuspenseWrapper><EvaluadorHistorial /></SuspenseWrapper></ProtectedRoute>} />
+                                <Route path="/evaluador/calendario" element={<ProtectedRoute allowedRoles={['EvaluadorExterno', 'Director']}><SuspenseWrapper><EvaluadorCalendario /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/evaluador/asignaciones/:id" element={<ProtectedRoute allowedRoles={['EvaluadorExterno', 'Director']}><SuspenseWrapper><EvaluadorCalificar /></SuspenseWrapper></ProtectedRoute>} />
                                 {/* Estudiante detalle entrega */}
                                 <Route path="/estudiante/entregas/:entregaId" element={<ProtectedRoute allowedRoles={['Estudiante']}><SuspenseWrapper><DetalleEntregaEstudiante /></SuspenseWrapper></ProtectedRoute>} />

@@ -218,6 +218,10 @@ Route::middleware([
     Route::prefix('evaluador')->name('evaluador.')->group(function () {
         Route::get('/mis-asignaciones', [EvaluadorAsignacionesController::class, 'index'])
             ->name('mis-asignaciones');
+        Route::get('/dashboard', [EvaluadorAsignacionesController::class, 'dashboard'])
+            ->name('dashboard');
+        Route::get('/calendario', [EvaluadorAsignacionesController::class, 'calendario'])
+            ->name('calendario');
         Route::get('/asignaciones/{id}/detalle', [EvaluadorAsignacionesController::class, 'detalle'])
             ->whereNumber('id')
             ->name('asignaciones.detalle');

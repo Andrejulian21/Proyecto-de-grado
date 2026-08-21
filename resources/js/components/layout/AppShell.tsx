@@ -35,6 +35,9 @@ const ROUTE_TITLES: Record<string, string> = {
     '/directores': 'Directores',
     '/coordinador/entregas': 'Entregas',
     '/notas': 'Notas',
+    '/evaluador/calendario': 'Calendario de evaluaciones',
+    '/evaluador/pendientes': 'Evaluaciones pendientes',
+    '/evaluador/historial': 'Historial de evaluaciones',
     '/coordinador/bitacoras': 'Bitácoras',
     '/supervision': 'Supervisión',
 };

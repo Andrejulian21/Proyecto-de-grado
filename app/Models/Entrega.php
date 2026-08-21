@@ -122,18 +122,69 @@ class Entrega extends Model
     }
 
     /**
-     * Find a specific archivo requerido by its slug.
+     * Requested documents declared on this entrega (JSON configuration).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function documentosSolicitados(): array
+    {
+        $documentos = $this->archivos_requeridos ?? [];
+
+        return is_array($documentos) ? $documentos : [];
+    }
+
+    /**
+     * Identity (slug/id) of the single AI-analyzable document, if any.
+     */
+    public function idDocumentoAnalizableIa(): ?string
+    {
+        foreach ($this->documentosSolicitados() as $documento) {
+            if (! filter_var($documento['analizable_ia'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+                continue;
+            }
+
+            $id = $documento['slug'] ?? $documento['id'] ?? null;
+
+            return is_string($id) && $id !== '' ? $id : null;
+        }
+
+        return null;
+    }
+
+    /**
+     * Whether the version belongs to the AI-analyzable requested document.
+     */
+    public function versionEsAnalizableIa(VersionDocumento $version): bool
+    {
+        $iaId = $this->idDocumentoAnalizableIa();
+
+        if ($iaId === null) {
+            return false;
+        }
+
+        $versionDocId = $version->archivo_requerido_id;
+
+        if ($versionDocId === null || $versionDocId === '') {
+            $first = $this->documentosSolicitados()[0] ?? null;
+            $firstId = is_array($first) ? ($first['slug'] ?? $first['id'] ?? null) : null;
+
+            return $firstId === $iaId;
+        }
+
+        return $versionDocId === $iaId;
+    }
+
+    /**
+     * Find a requested document by its slug or id.
+     *
+     * @return array<string, mixed>|null
      */
     public function getArchivoRequerido(string $slug): ?array
     {
-        $archivos = $this->archivos_requeridos ?? [];
+        foreach ($this->documentosSolicitados() as $archivo) {
+            $id = $archivo['slug'] ?? $archivo['id'] ?? null;
 
-        if (! is_array($archivos)) {
-            return null;
-        }
-
-        foreach ($archivos as $archivo) {
-            if (($archivo['slug'] ?? null) === $slug) {
+            if ($id === $slug) {
                 return $archivo;
             }
         }

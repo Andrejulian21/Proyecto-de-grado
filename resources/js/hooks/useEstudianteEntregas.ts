@@ -60,6 +60,8 @@ export interface EntregaAnalisisContext {
     descripcion: string | null;
     criterios_aceptacion: string | null;
     estado: string;
+    documento_analizable_ia: string | null;
+    documentos: { id: string; nombre: string; analizable_ia?: boolean }[];
 }
 
 export function buildPhaseSteps(current: string) {
@@ -72,6 +74,11 @@ export function buildPhaseSteps(current: string) {
 
 export function mapEntregaToAnalisisContext(raw: any): EntregaAnalisisContext {
     const fase = raw.fase ?? raw.phase ?? '';
+    const documentos = (raw.archivos_requeridos ?? []).map((d: any) => ({
+        id: d.id ?? d.slug ?? '',
+        nombre: d.nombre ?? 'Documento',
+        analizable_ia: Boolean(d.analizable_ia),
+    }));
     return {
         id: raw.id,
         titulo: raw.titulo || raw.title || LABELS[fase] || `Entrega #${raw.id}`,
@@ -80,6 +87,8 @@ export function mapEntregaToAnalisisContext(raw: any): EntregaAnalisisContext {
         descripcion: raw.descripcion ?? raw.description ?? null,
         criterios_aceptacion: raw.criterios ?? raw.acceptance_criteria ?? null,
         estado: raw.estado || raw.status || '',
+        documento_analizable_ia: raw.documento_analizable_ia ?? documentos.find((d: { analizable_ia?: boolean }) => d.analizable_ia)?.id ?? null,
+        documentos,
     };
 }
 

@@ -111,7 +111,7 @@ it('store acepta archivos con slug en lugar de id (alias)', function () {
     expect(Entrega::first()->archivos_requeridos[0]['slug'])->toBe('documento-proyecto');
 });
 
-it('store rechaza analizable_ia en secundario incluso con slug (RF-ENT-02)', function () {
+it('store rechaza dos documentos analizable_ia incluso con slug', function () {
     $response = $this->actingAs($this->coordinador)
         ->postJson('/api/admin/entregas', [
             'grupo_id' => $this->semestre->id,
@@ -120,14 +120,14 @@ it('store rechaza analizable_ia en secundario incluso con slug (RF-ENT-02)', fun
             'descripcion' => 'Descripción',
             'fecha_limite' => now()->addMonths(1)->toDateString(),
             'archivos_requeridos' => [
-                ['slug' => 'documento-proyecto', 'nombre' => 'Documento del proyecto', 'versionamiento' => true],
+                ['slug' => 'documento-proyecto', 'nombre' => 'Documento del proyecto', 'versionamiento' => true, 'analizable_ia' => true],
                 ['slug' => 'anexo', 'nombre' => 'Anexo', 'versionamiento' => false, 'analizable_ia' => true],
             ],
         ]);
 
     $response->assertStatus(422);
     expect($response->json('errors.archivos_requeridos.0'))
-        ->toContain("Solo el archivo 'documento del proyecto' puede ser analizable con IA");
+        ->toContain('Solo un documento de la entrega puede analizarse con IA');
 });
 
 it('update ignora las claves legacy del contrato anterior', function () {

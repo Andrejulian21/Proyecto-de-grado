@@ -1,27 +1,24 @@
-export interface ArchivoRequeridoConfig {
+export interface DocumentoSolicitado {
     /**
-     * Canonical identity of the file (RF-ENT-01). The persisted JSON uses
-     * `slug`; the builder tolerates both via `obtenerIdArchivo`.
+     * Canonical identity of the requested document (`id` in the builder,
+     * persisted as `slug` in `entregas.archivos_requeridos`).
      */
     id: string;
-    /**
-     * Alias of `id` for items loaded from the persisted JSON shape
-     * (entregas.archivos_requeridos stores `slug`).
-     */
     slug?: string;
     nombre: string;
     versionamiento: boolean;
-    /**
-     * Only the main project file (slug `documento-proyecto`) may be
-     * AI-analyzable (RF-ENT-02). Backend rejects `true` on any other file.
-     */
+    /** At most one document per entrega may be true. */
     analizable_ia?: boolean;
 }
+
+/** Alias kept so existing imports resolve to the requested-document type. */
+export type ArchivoRequeridoConfig = DocumentoSolicitado;
 
 export interface ArchivoRequeridoEstado {
     id: string;
     nombre: string;
     versionamiento: boolean;
+    analizable_ia?: boolean;
     completo: boolean;
     versiones_count: number;
     ultima_version?: {

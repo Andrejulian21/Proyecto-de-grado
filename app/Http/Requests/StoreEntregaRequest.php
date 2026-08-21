@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests;
 
 use App\Enums\UserRole;
+use App\Http\Requests\Concerns\ValidatesDocumentosSolicitados;
 use App\Models\User;
 use App\Services\EntregaPesoService;
 use Illuminate\Foundation\Http\FormRequest;
@@ -13,6 +14,8 @@ use Illuminate\Validation\ValidationException;
 
 class StoreEntregaRequest extends FormRequest
 {
+    use ValidatesDocumentosSolicitados;
+
     /**
      * Only Coordinador can create entregas.
      */
@@ -77,70 +80,21 @@ class StoreEntregaRequest extends FormRequest
     }
 
     /**
-     * Cross-field rules: main file default (RF-ENT-01), analizable_ia only
-     * on the main file (RF-ENT-02), unique ids and the 100% pair rule
-     * (RF-ENT-04) enforced through EntregaPesoService.
+     * Cross-field rules: unique document ids, at most one analizable_ia
+     * document, and the 100% pair rule (RF-ENT-04) via EntregaPesoService.
      */
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
             $archivos = $this->input('archivos_requeridos');
 
-            if (! is_array($archivos)) {
-                return;
-            }
-
-            $this->validarArchivoPrincipal($validator, $archivos);
-            $this->validarAnalizableIa($validator, $archivos);
-
-            $ids = array_column($archivos, 'id');
-
-            if (count($ids) !== count(array_unique($ids))) {
-                $validator->errors()->add(
-                    'archivos_requeridos',
-                    'Los IDs de los archivos requeridos deben ser únicos.'
-                );
+            if (is_array($archivos)) {
+                $this->validarUnicidadDocumentos($validator, $archivos);
+                $this->validarUnicoDocumentoAnalizableIa($validator, $archivos);
             }
 
             $this->validarPesos($validator);
         });
-    }
-
-    /**
-     * RF-ENT-01: the main project file must always be present.
-     *
-     * @param  array<int, array<string, mixed>>  $archivos
-     */
-    private function validarArchivoPrincipal($validator, array $archivos): void
-    {
-        $slugs = array_column($archivos, 'id');
-
-        if (! in_array('documento-proyecto', $slugs, true)) {
-            $validator->errors()->add(
-                'archivos_requeridos',
-                "Debe existir al menos el archivo 'documento del proyecto' en los archivos requeridos"
-            );
-        }
-    }
-
-    /**
-     * RF-ENT-02: only the main project file may be AI-analyzable.
-     *
-     * @param  array<int, array<string, mixed>>  $archivos
-     */
-    private function validarAnalizableIa($validator, array $archivos): void
-    {
-        foreach ($archivos as $archivo) {
-            $slug = $archivo['id'] ?? null;
-            $analizable = $archivo['analizable_ia'] ?? false;
-
-            if ($slug !== 'documento-proyecto' && filter_var($analizable, FILTER_VALIDATE_BOOLEAN)) {
-                $validator->errors()->add(
-                    'archivos_requeridos',
-                    "Solo el archivo 'documento del proyecto' puede ser analizable con IA"
-                );
-            }
-        }
     }
 
     /**

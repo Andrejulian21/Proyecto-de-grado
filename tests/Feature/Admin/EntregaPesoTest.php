@@ -51,8 +51,6 @@ function seedEntregaConPeso(int $semestreId, string $phase, ?float $peso): Entre
     ]);
 }
 
-// -- RF-ENT-01: documento-proyecto default -----------------------------------
-
 it('store crea entrega con documento-proyecto y grade_percentage valido', function () {
     $response = $this->actingAs($this->coordinador)
         ->postJson('/api/admin/entregas', baseEntregaPayload($this->semestre->id, ['grade_percentage' => 60]));
@@ -64,37 +62,19 @@ it('store crea entrega con documento-proyecto y grade_percentage valido', functi
     expect($principal['analizable_ia'])->toBeFalse();
 });
 
-it('store rechaza payload sin archivo principal documento-proyecto (422)', function () {
+it('store acepta documentos sin slug documento-proyecto', function () {
     $response = $this->actingAs($this->coordinador)
         ->postJson('/api/admin/entregas', baseEntregaPayload($this->semestre->id, [
             'archivos_requeridos' => [
-                ['id' => 'anexo', 'nombre' => 'Anexo', 'versionamiento' => false],
-            ],
-        ]));
-
-    $response->assertStatus(422);
-    expect($response->json('errors.archivos_requeridos.0'))
-        ->toContain("Debe existir al menos el archivo 'documento del proyecto'");
-});
-
-// -- RF-ENT-02: analizable_ia only on the main file --------------------------
-
-it('store persiste analizable_ia en el archivo principal', function () {
-    $response = $this->actingAs($this->coordinador)
-        ->postJson('/api/admin/entregas', baseEntregaPayload($this->semestre->id, [
-            'archivos_requeridos' => [
-                ['id' => 'documento-proyecto', 'nombre' => 'Documento del proyecto', 'versionamiento' => true, 'analizable_ia' => true],
                 ['id' => 'anexo', 'nombre' => 'Anexo', 'versionamiento' => false],
             ],
         ]));
 
     $response->assertCreated();
-    $principal = collect($response->json('data.archivos_requeridos'))
-        ->firstWhere('slug', 'documento-proyecto');
-    expect($principal['analizable_ia'])->toBeTrue();
+    expect($response->json('data.archivos_requeridos.0.slug'))->toBe('anexo');
 });
 
-it('store rechaza analizable_ia en archivo secundario (422)', function () {
+it('store persiste analizable_ia en cualquier documento si es el unico', function () {
     $response = $this->actingAs($this->coordinador)
         ->postJson('/api/admin/entregas', baseEntregaPayload($this->semestre->id, [
             'archivos_requeridos' => [
@@ -103,9 +83,23 @@ it('store rechaza analizable_ia en archivo secundario (422)', function () {
             ],
         ]));
 
+    $response->assertCreated();
+    $anexo = collect($response->json('data.archivos_requeridos'))->firstWhere('slug', 'anexo');
+    expect($anexo['analizable_ia'])->toBeTrue();
+});
+
+it('store rechaza dos documentos analizable_ia (422)', function () {
+    $response = $this->actingAs($this->coordinador)
+        ->postJson('/api/admin/entregas', baseEntregaPayload($this->semestre->id, [
+            'archivos_requeridos' => [
+                ['id' => 'documento-proyecto', 'nombre' => 'Documento del proyecto', 'versionamiento' => true, 'analizable_ia' => true],
+                ['id' => 'anexo', 'nombre' => 'Anexo', 'versionamiento' => false, 'analizable_ia' => true],
+            ],
+        ]));
+
     $response->assertStatus(422);
     expect($response->json('errors.archivos_requeridos.0'))
-        ->toContain("Solo el archivo 'documento del proyecto' puede ser analizable con IA");
+        ->toContain('Solo un documento de la entrega puede analizarse con IA');
 });
 
 // -- RF-ENT-03: grade_percentage range ---------------------------------------

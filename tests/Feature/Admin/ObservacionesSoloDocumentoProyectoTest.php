@@ -22,13 +22,10 @@ beforeEach(function () {
 });
 
 /**
- * Seed an active entrega with a file configuration and one version belonging
- * to the given archivo_requerido_id (RF-SUP-01/02).
- *
  * @param  array<int, array<string, mixed>>  $archivos
  * @return array{entrega: Entrega, version: VersionDocumento, pivot: EntregaProyecto}
  */
-function crearEntregaConVersion(Proyecto $proyecto, array $archivos, string $archivoId): array
+function crearEntregaConVersion(Proyecto $proyecto, array $archivos, string $archivoId, int $versionNumber = 1): array
 {
     $entrega = Entrega::create([
         'proyecto_id' => $proyecto->id,
@@ -49,23 +46,21 @@ function crearEntregaConVersion(Proyecto $proyecto, array $archivos, string $arc
         'entrega_id' => $entrega->id,
         'entrega_proyecto_id' => $pivot->id,
         'archivo_requerido_id' => $archivoId,
-        'version_number' => 1,
-        'file_path' => 'entregas/test.pdf',
+        'version_number' => $versionNumber,
+        'file_path' => "entregas/test-v{$versionNumber}.pdf",
         'file_size' => 1024,
-        'original_name' => 'test.pdf',
+        'original_name' => "test-v{$versionNumber}.pdf",
         'uploaded_at' => now(),
     ]);
 
     return ['entrega' => $entrega, 'version' => $version, 'pivot' => $pivot];
 }
 
-// -- RF-SUP-01: observaciones solo en versiones del documento-proyecto --------
-
-it('no persiste observaciones en versiones de archivos que no son documento-proyecto', function () {
-    ['entrega' => $entrega, 'version' => $version, 'pivot' => $pivot] = crearEntregaConVersion(
+it('persiste observaciones en versiones de cualquier documento solicitado', function () {
+    ['entrega' => $entrega, 'version' => $version] = crearEntregaConVersion(
         $this->proyecto,
         [
-            ['slug' => 'documento-proyecto', 'nombre' => 'Documento del proyecto', 'versionamiento' => true],
+            ['slug' => 'planteamiento', 'nombre' => 'Planteamiento', 'versionamiento' => true],
             ['slug' => 'anexo-1', 'nombre' => 'Anexo', 'versionamiento' => false],
         ],
         'anexo-1',
@@ -73,20 +68,99 @@ it('no persiste observaciones en versiones de archivos que no son documento-proy
 
     $this->actingAs($this->director)
         ->putJson("/api/admin/entregas/{$entrega->id}/revisar", [
-            'status' => 'aprobada',
-            'consolidated_grade' => 4.5,
-            'director_notes' => 'Observación fuera de lugar',
+            'status' => 'revisada',
+            'director_notes' => 'Revisar las referencias utilizadas',
             'version_id' => $version->id,
-            'director_grade' => 4.0,
         ])
         ->assertOk();
 
-    expect($version->fresh()->director_notes)->toBeNull();
-    expect($pivot->fresh()->observaciones_director)->toBeNull();
+    expect($version->fresh()->director_notes)->toBe('Revisar las referencias utilizadas');
+});
+
+it('persiste observaciones independientes por version del mismo documento', function () {
+    $archivos = [
+        ['slug' => 'marco_teorico', 'nombre' => 'Marco teórico', 'versionamiento' => true],
+    ];
+
+    ['entrega' => $entrega, 'version' => $v1, 'pivot' => $pivot] = crearEntregaConVersion(
+        $this->proyecto,
+        $archivos,
+        'marco_teorico',
+        1,
+    );
+
+    $v2 = VersionDocumento::create([
+        'entrega_id' => $entrega->id,
+        'entrega_proyecto_id' => $pivot->id,
+        'archivo_requerido_id' => 'marco_teorico',
+        'version_number' => 2,
+        'file_path' => 'entregas/test-v2.pdf',
+        'file_size' => 2048,
+        'original_name' => 'test-v2.pdf',
+        'uploaded_at' => now()->addDay(),
+    ]);
+
+    $this->actingAs($this->director)
+        ->putJson("/api/admin/entregas/{$entrega->id}/revisar", [
+            'status' => 'revisada',
+            'director_notes' => 'Revisar las referencias utilizadas',
+            'version_id' => $v1->id,
+        ])
+        ->assertOk();
+
+    $this->actingAs($this->director)
+        ->putJson("/api/admin/entregas/{$entrega->id}/revisar", [
+            'status' => 'revisada',
+            'director_notes' => 'Mejoró la estructura, pero falta el estado del arte',
+            'version_id' => $v2->id,
+        ])
+        ->assertOk();
+
+    expect($v1->fresh()->director_notes)->toBe('Revisar las referencias utilizadas')
+        ->and($v2->fresh()->director_notes)->toBe('Mejoró la estructura, pero falta el estado del arte');
+});
+
+it('el estudiante consulta la observacion de cada version sin reutilizar otra', function () {
+    $estudiante = User::factory()->create();
+    $this->proyecto->estudiantes()->attach($estudiante);
+
+    $archivos = [
+        ['slug' => 'marco_teorico', 'nombre' => 'Marco teórico', 'versionamiento' => true],
+    ];
+
+    ['entrega' => $entrega, 'version' => $v1, 'pivot' => $pivot] = crearEntregaConVersion(
+        $this->proyecto,
+        $archivos,
+        'marco_teorico',
+        1,
+    );
+
+    $v2 = VersionDocumento::create([
+        'entrega_id' => $entrega->id,
+        'entrega_proyecto_id' => $pivot->id,
+        'archivo_requerido_id' => 'marco_teorico',
+        'version_number' => 2,
+        'file_path' => 'entregas/test-v2.pdf',
+        'file_size' => 2048,
+        'original_name' => 'test-v2.pdf',
+        'uploaded_at' => now()->addDay(),
+        'director_notes' => null,
+    ]);
+
+    $v1->update(['director_notes' => 'Observación de la versión 1']);
+
+    $response = $this->actingAs($estudiante)->getJson('/api/estudiante/entregas');
+    $response->assertOk();
+
+    $item = collect($response->json('data'))->firstWhere('id', $entrega->id);
+    $porNumero = collect($item['versiones'])->keyBy('numero_version');
+
+    expect($porNumero[1]['observacion'])->toBe('Observación de la versión 1')
+        ->and($porNumero[2]['observacion'])->toBeNull();
 });
 
 it('persiste observaciones en versiones del documento-proyecto', function () {
-    ['entrega' => $entrega, 'version' => $version, 'pivot' => $pivot] = crearEntregaConVersion(
+    ['entrega' => $entrega, 'version' => $version] = crearEntregaConVersion(
         $this->proyecto,
         [
             ['slug' => 'documento-proyecto', 'nombre' => 'Documento del proyecto', 'versionamiento' => true],
@@ -105,18 +179,15 @@ it('persiste observaciones en versiones del documento-proyecto', function () {
         ->assertOk();
 
     expect($version->fresh()->director_notes)->toBe('Excelente documento');
-    expect($pivot->fresh()->observaciones_director)->toBe('Excelente documento');
 });
 
-// -- RF-SUP-02: archivos sin versionamiento nunca llevan observaciones --------
-
-it('no persiste observaciones cuando documento-proyecto no tiene versionamiento', function () {
-    ['entrega' => $entrega, 'version' => $version, 'pivot' => $pivot] = crearEntregaConVersion(
+it('persiste observaciones cuando el documento no tiene versionamiento', function () {
+    ['entrega' => $entrega, 'version' => $version] = crearEntregaConVersion(
         $this->proyecto,
         [
-            ['slug' => 'documento-proyecto', 'nombre' => 'Documento del proyecto', 'versionamiento' => false],
+            ['slug' => 'carta_aval', 'nombre' => 'Carta de aval', 'versionamiento' => false],
         ],
-        'documento-proyecto',
+        'carta_aval',
     );
 
     $this->actingAs($this->director)
@@ -127,14 +198,11 @@ it('no persiste observaciones cuando documento-proyecto no tiene versionamiento'
         ])
         ->assertOk();
 
-    expect($version->fresh()->director_notes)->toBeNull();
-    expect($pivot->fresh()->observaciones_director)->toBeNull();
+    expect($version->fresh()->director_notes)->toBe('Ajustes requeridos');
 });
 
-// -- Legacy: versiones sin archivo_requerido_id conservan el comportamiento ----
-
 it('persiste observaciones en versiones legacy sin archivo_requerido_id', function () {
-    ['entrega' => $entrega, 'version' => $version, 'pivot' => $pivot] = crearEntregaConVersion(
+    ['entrega' => $entrega, 'version' => $version] = crearEntregaConVersion(
         $this->proyecto,
         [
             ['slug' => 'documento-proyecto', 'nombre' => 'Documento del proyecto', 'versionamiento' => true],
@@ -142,7 +210,6 @@ it('persiste observaciones en versiones legacy sin archivo_requerido_id', functi
         'documento-proyecto',
     );
 
-    // Simulate a legacy version created before the per-file system.
     $version->update(['archivo_requerido_id' => null]);
 
     $this->actingAs($this->director)
@@ -156,5 +223,4 @@ it('persiste observaciones en versiones legacy sin archivo_requerido_id', functi
         ->assertOk();
 
     expect($version->fresh()->director_notes)->toBe('Comportamiento histórico');
-    expect($pivot->fresh()->observaciones_director)->toBe('Comportamiento histórico');
 });

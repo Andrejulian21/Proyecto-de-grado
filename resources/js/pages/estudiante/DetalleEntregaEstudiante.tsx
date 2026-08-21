@@ -7,12 +7,10 @@ import {
     AlertTriangle, Trash2, Lock, Upload,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
-import type { ArchivoRequeridoConfig } from '@/types/entregas';
+import type { DocumentoSolicitado } from '@/types/entregas';
 import {
     agruparVersionesPorArchivo,
-    archivoAceptaObservaciones,
-    esDocumentoProyecto,
-    type ArchivoConVersiones,
+    type DocumentoConVersiones,
 } from '@/lib/entregas';
 
 /* ── Types ── */
@@ -40,7 +38,7 @@ interface EntregaDetail {
     start_time: string | null;
     hora_maxima: string | null;
     acceptance_criteria: string | null;
-    archivos_requeridos?: ArchivoRequeridoConfig[];
+    archivos_requeridos?: DocumentoSolicitado[];
     proyecto?: {
         id: number;
         code: string;
@@ -136,9 +134,8 @@ export default function DetalleEntregaEstudiante() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    /* Selected archivo (switch between required documents) and version */
-    const [selectedArchivoIdx, setSelectedArchivoIdx] = useState(0);
-    const [selectedVersionIdx, setSelectedVersionIdx] = useState(0);
+    /* Selected version index per requested document */
+    const [selectedVersionByDoc, setSelectedVersionByDoc] = useState<Record<string, number>>({});
 
     /* Upload state per slug */
     const [uploadingSlug, setUploadingSlug] = useState<string | null>(null);
@@ -185,8 +182,7 @@ export default function DetalleEntregaEstudiante() {
 
     /* Reset selection when a fresh entrega payload arrives */
     useEffect(() => {
-        setSelectedArchivoIdx(0);
-        setSelectedVersionIdx(0);
+        setSelectedVersionByDoc({});
         setUploadError(null);
     }, [entrega?.id]);
 
@@ -230,7 +226,6 @@ export default function DetalleEntregaEstudiante() {
                 const json = await refreshRes.json();
                 const data: EntregaDetail = json.data ?? json;
                 setEntrega(data);
-                setSelectedVersionIdx(0);
             }
         } catch (err) {
             setUploadError(err instanceof Error ? err.message : 'Error al subir el archivo.');
@@ -336,48 +331,38 @@ export default function DetalleEntregaEstudiante() {
     const projectCode = mainProyecto?.code ?? '';
     const projectTitle = mainProyecto?.title ?? '';
 
-    /* Group versions per archivo (normalizing slug→id, legacy-safe) */
-    const archivosConVersiones: ArchivoConVersiones<Version>[] = agruparVersionesPorArchivo(
+    /* Group versions per requested document (normalizing slug→id, legacy-safe) */
+    const documentosConVersiones: DocumentoConVersiones<Version>[] = agruparVersionesPorArchivo(
         entrega.archivos_requeridos ?? [],
         entrega.versiones ?? [],
     );
-
-    const safeArchivoIdx = Math.min(selectedArchivoIdx, Math.max(0, archivosConVersiones.length - 1));
-    const activeArchivo = archivosConVersiones[safeArchivoIdx] ?? null;
-
-    const sortedVersions = activeArchivo?.versiones ?? [];
-    const safeVersionIdx = Math.min(selectedVersionIdx, Math.max(0, sortedVersions.length - 1));
-    const selectedVersion: Version | null = sortedVersions[safeVersionIdx] ?? null;
-
-    const esProyecto = activeArchivo ? esDocumentoProyecto(activeArchivo.config) : false;
-    const aceptaObservaciones = activeArchivo ? archivoAceptaObservaciones(activeArchivo.config) : false;
 
     function canDeleteVersion(v: Version): boolean {
         return !v.director_notes || v.director_notes.trim().length === 0;
     }
 
-    function selectArchivo(idx: number) {
-        setSelectedArchivoIdx(idx);
-        setSelectedVersionIdx(0);
+    function selectVersion(docId: string, idx: number) {
+        setSelectedVersionByDoc((prev) => ({ ...prev, [docId]: idx }));
         setUploadError(null);
     }
 
-    /* ── Upload button label depends on versioning mode ── */
-    function uploadLabel(): string {
-        if (!activeArchivo) return 'Subir';
-        if (activeArchivo.config.versionamiento) return 'Subir versión';
-        return sortedVersions.length === 0 ? 'Subir' : 'Reemplazar';
+    function uploadLabel(doc: DocumentoConVersiones<Version>): string {
+        if (doc.config.versionamiento) return 'Subir nueva versión';
+        return doc.versiones.length === 0 ? 'Subir' : 'Reemplazar';
     }
 
-    function canUpload(): boolean {
-        if (vencida || !activeArchivo) return false;
-        if (activeArchivo.config.versionamiento) {
-            return sortedVersions.length < MAX_VERSIONS_PER_ARCHIVO;
+    function canUpload(doc: DocumentoConVersiones<Version>): boolean {
+        if (vencida) return false;
+        if (doc.config.versionamiento) {
+            return doc.versiones.length < MAX_VERSIONS_PER_ARCHIVO;
         }
         return true;
     }
 
-    const reviewStatus = selectedVersion ? getReviewStatus(selectedVersion, entrega.status) : null;
+    function versionIdx(doc: DocumentoConVersiones<Version>): number {
+        const raw = selectedVersionByDoc[doc.config.id] ?? 0;
+        return Math.min(raw, Math.max(0, doc.versiones.length - 1));
+    }
 
     return (
         <div className="flex flex-col gap-6">
@@ -479,15 +464,13 @@ export default function DetalleEntregaEstudiante() {
                         </p>
                     </div>
                 )}
-
-                {/* ── D. Documento (diseño del coordinador + acciones del estudiante) ── */}
+                {/* ── D. Documentos solicitados (sección independiente por documento) ── */}
                 {isLocked ? (
-                    /* ── Locked state ── */
                     <div className="rounded-xl border border-[#e5e5e5] bg-white shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                         <div className="border-b border-[#e5e5e5] px-6 py-4">
                             <div className="flex items-center gap-2">
                                 <FileText className="h-5 w-5 text-[#c2410c]" />
-                                <h3 className="text-base font-bold text-[#1c1917]">Documento</h3>
+                                <h3 className="text-base font-bold text-[#1c1917]">Documentos solicitados</h3>
                             </div>
                         </div>
                         <div className="flex flex-col items-center gap-4 py-16 text-center">
@@ -513,262 +496,206 @@ export default function DetalleEntregaEstudiante() {
                             </div>
                         )}
 
-                        {archivosConVersiones.length === 0 ? (
+                        {documentosConVersiones.length === 0 ? (
                             <div className="rounded-xl border border-[#e5e5e5] bg-white p-8 text-center shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                                 <p className="text-sm text-[#a8a29e]">
-                                    No se han configurado archivos requeridos para esta entrega.
+                                    No se han configurado documentos solicitados para esta entrega.
                                 </p>
                             </div>
                         ) : (
-                            <div className="rounded-xl border border-[#e5e5e5] bg-white shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
-                                {/* Header: Documento + selector de archivos (switch entre documentos) */}
-                                <div className="flex flex-col gap-3 border-b border-[#e5e5e5] px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <FileText className="h-5 w-5 text-[#c2410c]" />
-                                        <h3 className="text-base font-bold text-[#1c1917]">Documento</h3>
-                                    </div>
+                            documentosConVersiones.map((doc) => {
+                                const idx = versionIdx(doc);
+                                const selectedVersion = doc.versiones[idx] ?? null;
+                                const reviewStatus = selectedVersion
+                                    ? getReviewStatus(selectedVersion, entrega.status)
+                                    : null;
 
-                                    {archivosConVersiones.length > 1 && (
-                                        <div className="flex flex-wrap items-center gap-1">
-                                            {archivosConVersiones.map((av, idx) => {
-                                                const isActive = safeArchivoIdx === idx;
-                                                const isCompleto = av.versiones.length > 0;
-                                                return (
-                                                    <button
-                                                        key={av.config.id}
-                                                        onClick={() => selectArchivo(idx)}
-                                                        className={`inline-flex min-h-[32px] items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-                                                            isActive
-                                                                ? 'bg-[#c2410c] text-white shadow-sm'
-                                                                : 'bg-[#f5f5f4] text-[#57534e] hover:bg-[#e7e5e4]'
-                                                        } ${!isCompleto ? 'opacity-60' : ''}`}
-                                                    >
-                                                        {av.config.nombre}
-                                                        {isCompleto && (
-                                                            <span className={`ml-0.5 rounded-full px-1.5 text-[10px] ${isActive ? 'bg-white/20' : 'bg-[#e7e5e4]'}`}>
-                                                                {av.versiones.length}
-                                                            </span>
-                                                        )}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Body */}
-                                {activeArchivo && selectedVersion ? (
-                                    <div className="p-6">
-                                        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[280px_1fr]">
-                                            {/* Documento */}
-                                            <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-[#e5e5e5] bg-[#fafaf9] py-10">
-                                                <FileText className="h-16 w-16 text-[#d6d3d1]" />
-                                                <div className="text-center">
-                                                    <p className="text-sm font-semibold text-[#1c1917]">
-                                                        {selectedVersion.original_name || `documento_v${selectedVersion.version_number}.pdf`}
-                                                    </p>
-                                                    <p className="mt-1 flex items-center justify-center gap-1 text-xs text-[#78716c]">
-                                                        <Calendar className="h-3 w-3" />
-                                                        {formatDateTime(selectedVersion.uploaded_at || selectedVersion.created_at)}
-                                                        {activeArchivo.config.versionamiento && (
-                                                            <span className="mx-1">·</span>
-                                                        )}
-                                                        {activeArchivo.config.versionamiento && (
-                                                            <span>v{selectedVersion.version_number}</span>
-                                                        )}
-                                                    </p>
-                                                </div>
-                                                <a
-                                                    href={getDownloadUrl(selectedVersion.file_path)}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a]"
-                                                >
-                                                    <Download className="h-4 w-4" />
-                                                    Abrir documento
-                                                </a>
-
-                                                {/* Selector de versiones (igual que el coordinador) */}
-                                                {activeArchivo.config.versionamiento && sortedVersions.length > 1 && (
-                                                    sortedVersions.length <= 4 ? (
-                                                        <div className="flex items-center gap-1">
-                                                            {sortedVersions.map((v, idx) => (
-                                                                <button
-                                                                    key={v.id}
-                                                                    onClick={() => setSelectedVersionIdx(idx)}
-                                                                    className={`inline-flex min-h-[28px] items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                                                                        safeVersionIdx === idx
-                                                                            ? 'bg-[#c2410c] text-white shadow-sm'
-                                                                            : 'bg-white text-[#57534e] ring-1 ring-[#e5e5e5] hover:bg-[#e7e5e4]'
-                                                                    }`}
-                                                                >
-                                                                    v{v.version_number}
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    ) : (
-                                                        <select
-                                                            value={safeVersionIdx}
-                                                            onChange={(e) => setSelectedVersionIdx(Number(e.target.value))}
-                                                            className="rounded-lg border border-[#e5e5e5] bg-white px-3 py-1.5 text-xs font-semibold text-[#1c1917] focus:border-[#c2410c] focus:outline-none focus:ring-1 focus:ring-[#c2410c]"
-                                                        >
-                                                            {sortedVersions.map((v, idx) => (
-                                                                <option key={v.id} value={idx}>
-                                                                    Versión {v.version_number}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                    )
-                                                )}
-
-                                                {/* Acciones del estudiante: subir / reemplazar / eliminar */}
-                                                <div className="flex flex-wrap items-center justify-center gap-2">
-                                                    <input
-                                                        ref={(el) => setFileInputRef(activeArchivo.config.id, el)}
-                                                        type="file"
-                                                        accept=".pdf,.docx"
-                                                        className="hidden"
-                                                        onChange={(e) => {
-                                                            const file = e.target.files?.[0];
-                                                            if (file) {
-                                                                handleFileUpload(activeArchivo.config.id, file);
-                                                            }
-                                                            e.target.value = '';
-                                                        }}
-                                                    />
-
-                                                    {canUpload() && (
-                                                        <button
-                                                            onClick={() => fileInputRefs.current[activeArchivo.config.id]?.click()}
-                                                            disabled={uploadingSlug === activeArchivo.config.id}
-                                                            title={vencida ? 'La fecha límite ya pasó' : undefined}
-                                                            className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg bg-[#c2410c] px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#9a330a] disabled:cursor-not-allowed disabled:opacity-50"
-                                                        >
-                                                            {uploadingSlug === activeArchivo.config.id ? (
-                                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                                            ) : (
-                                                                <Upload className="h-3.5 w-3.5" />
-                                                            )}
-                                                            {uploadLabel()}
-                                                        </button>
-                                                    )}
-
-                                                    {canDeleteVersion(selectedVersion) && (
-                                                        <button
-                                                            onClick={() => {
-                                                                if (window.confirm(`¿Eliminar versión ${selectedVersion.version_number} del archivo "${activeArchivo.config.nombre}"?`)) {
-                                                                    handleDeleteVersion(selectedVersion.id);
-                                                                }
-                                                            }}
-                                                            disabled={deletingVersionId === selectedVersion.id}
-                                                            className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-[#e5e5e5] bg-white px-3.5 py-1.5 text-xs font-semibold text-[#57534e] transition-colors hover:bg-[#fee2e2] hover:text-[#dc2626] disabled:opacity-50"
-                                                            title="Eliminar versión"
-                                                        >
-                                                            {deletingVersionId === selectedVersion.id ? (
-                                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                                            ) : (
-                                                                <Trash2 className="h-3.5 w-3.5" />
-                                                            )}
-                                                            Eliminar
-                                                        </button>
-                                                    )}
-                                                </div>
+                                return (
+                                    <div
+                                        key={doc.config.id}
+                                        className="rounded-xl border border-[#e5e5e5] bg-white shadow-[0_1px_2px_rgba(28,25,23,0.05)]"
+                                    >
+                                        <div className="flex flex-col gap-1 border-b border-[#e5e5e5] px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <FileText className="h-5 w-5 text-[#c2410c]" />
+                                                <h3 className="text-base font-bold text-[#1c1917]">
+                                                    Documento: {doc.config.nombre}
+                                                </h3>
                                             </div>
+                                            {doc.config.analizable_ia && (
+                                                <span className="rounded-full bg-[#ffedd5] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.03em] text-[#9a330a]">
+                                                    Analizable con IA
+                                                </span>
+                                            )}
+                                        </div>
 
-                                            {/* Observaciones de esta versión (solo documento-proyecto) */}
-                                            {aceptaObservaciones ? (
-                                                <div className="rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-4">
-                                                    <div className="mb-3 flex items-center justify-between gap-2">
-                                                        <span className="text-sm font-bold text-[#1c1917]">
-                                                            {activeArchivo.config.nombre} · Versión {selectedVersion.version_number}
-                                                        </span>
-                                                        {reviewStatus && (
-                                                            <StatusBadge variant={reviewStatus.variant}>
-                                                                {reviewStatus.label}
-                                                            </StatusBadge>
+                                        {selectedVersion ? (
+                                            <div className="p-6">
+                                                <div className="grid grid-cols-1 gap-6 xl:grid-cols-[280px_1fr]">
+                                                    <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-[#e5e5e5] bg-[#fafaf9] py-10">
+                                                        <FileText className="h-16 w-16 text-[#d6d3d1]" />
+                                                        <div className="text-center">
+                                                            <p className="text-sm font-semibold text-[#1c1917]">
+                                                                {selectedVersion.original_name || `documento_v${selectedVersion.version_number}.pdf`}
+                                                            </p>
+                                                            <p className="mt-1 flex items-center justify-center gap-1 text-xs text-[#78716c]">
+                                                                <Calendar className="h-3 w-3" />
+                                                                {formatDateTime(selectedVersion.uploaded_at || selectedVersion.created_at)}
+                                                                {doc.config.versionamiento && (
+                                                                    <>
+                                                                        <span className="mx-1">·</span>
+                                                                        <span>v{selectedVersion.version_number}</span>
+                                                                    </>
+                                                                )}
+                                                            </p>
+                                                        </div>
+                                                        <a
+                                                            href={getDownloadUrl(selectedVersion.file_path)}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a]"
+                                                        >
+                                                            <Download className="h-4 w-4" />
+                                                            Abrir documento
+                                                        </a>
+
+                                                        {doc.config.versionamiento && doc.versiones.length > 1 && (
+                                                            <div className="flex flex-wrap items-center justify-center gap-1">
+                                                                {doc.versiones.map((v, vidx) => (
+                                                                    <button
+                                                                        key={v.id}
+                                                                        onClick={() => selectVersion(doc.config.id, vidx)}
+                                                                        className={`inline-flex min-h-[28px] items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                                                                            idx === vidx
+                                                                                ? 'bg-[#c2410c] text-white shadow-sm'
+                                                                                : 'bg-white text-[#57534e] ring-1 ring-[#e5e5e5] hover:bg-[#e7e5e4]'
+                                                                        }`}
+                                                                    >
+                                                                        v{v.version_number}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
                                                         )}
+
+                                                        <div className="flex flex-wrap items-center justify-center gap-2">
+                                                            <input
+                                                                ref={(el) => setFileInputRef(doc.config.id, el)}
+                                                                type="file"
+                                                                accept=".pdf,.docx"
+                                                                className="hidden"
+                                                                onChange={(e) => {
+                                                                    const file = e.target.files?.[0];
+                                                                    if (file) handleFileUpload(doc.config.id, file);
+                                                                    e.target.value = '';
+                                                                }}
+                                                            />
+                                                            {canUpload(doc) && (
+                                                                <button
+                                                                    onClick={() => fileInputRefs.current[doc.config.id]?.click()}
+                                                                    disabled={uploadingSlug === doc.config.id}
+                                                                    className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg bg-[#c2410c] px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#9a330a] disabled:cursor-not-allowed disabled:opacity-50"
+                                                                >
+                                                                    {uploadingSlug === doc.config.id ? (
+                                                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                                    ) : (
+                                                                        <Upload className="h-3.5 w-3.5" />
+                                                                    )}
+                                                                    {uploadLabel(doc)}
+                                                                </button>
+                                                            )}
+                                                            {canDeleteVersion(selectedVersion) && (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        if (window.confirm(`¿Eliminar versión ${selectedVersion.version_number} de "${doc.config.nombre}"?`)) {
+                                                                            handleDeleteVersion(selectedVersion.id);
+                                                                        }
+                                                                    }}
+                                                                    disabled={deletingVersionId === selectedVersion.id}
+                                                                    className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-[#e5e5e5] bg-white px-3.5 py-1.5 text-xs font-semibold text-[#57534e] transition-colors hover:bg-[#fee2e2] hover:text-[#dc2626] disabled:opacity-50"
+                                                                >
+                                                                    {deletingVersionId === selectedVersion.id ? (
+                                                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                                    ) : (
+                                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                                    )}
+                                                                    Eliminar
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                    <div className="mb-3 space-y-1">
-                                                        <p className="flex items-center gap-1 text-xs text-[#78716c]">
+
+                                                    <div className="rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-4">
+                                                        <div className="mb-3 flex items-center justify-between gap-2">
+                                                            <span className="text-sm font-bold text-[#1c1917]">
+                                                                {doc.config.nombre} · Versión {selectedVersion.version_number}
+                                                            </span>
+                                                            {reviewStatus && (
+                                                                <StatusBadge variant={reviewStatus.variant}>
+                                                                    {reviewStatus.label}
+                                                                </StatusBadge>
+                                                            )}
+                                                        </div>
+                                                        <p className="mb-3 flex items-center gap-1 text-xs text-[#78716c]">
                                                             <Calendar className="h-3 w-3" />
                                                             {formatDateTime(selectedVersion.uploaded_at || selectedVersion.created_at)}
                                                         </p>
-                                                    </div>
-                                                    {selectedVersion.director_notes ? (
-                                                        <div className="rounded-md bg-white p-3">
-                                                            <p className="whitespace-pre-wrap text-xs leading-relaxed text-[#1c1917]">
-                                                                {selectedVersion.director_notes}
+                                                        {selectedVersion.director_notes ? (
+                                                            <div className="rounded-md bg-white p-3">
+                                                                <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.05em] text-[#57534e]">
+                                                                    Observación del director
+                                                                </p>
+                                                                <p className="whitespace-pre-wrap text-xs leading-relaxed text-[#1c1917]">
+                                                                    {selectedVersion.director_notes}
+                                                                </p>
+                                                            </div>
+                                                        ) : (
+                                                            <p className="text-xs text-[#a8a29e] italic">
+                                                                Sin observación del director.
                                                             </p>
-                                                        </div>
-                                                    ) : (
-                                                        <p className="text-xs text-[#a8a29e] italic">
-                                                            Sin observaciones del director.
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <div className="rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-4">
-                                                    <div className="mb-3 flex items-center justify-between gap-2">
-                                                        <span className="text-sm font-bold text-[#1c1917]">
-                                                            {activeArchivo.config.nombre} · Versión {selectedVersion.version_number}
-                                                        </span>
-                                                        {reviewStatus && (
-                                                            <StatusBadge variant={reviewStatus.variant}>
-                                                                {reviewStatus.label}
-                                                            </StatusBadge>
                                                         )}
                                                     </div>
-                                                    <p className="text-xs text-[#a8a29e] italic">
-                                                        {esProyecto
-                                                            ? 'Este documento no tiene observaciones del director.'
-                                                            : 'Las observaciones del director se guardan únicamente en el documento del proyecto de grado.'}
-                                                    </p>
                                                 </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    /* Sin versiones para el archivo seleccionado */
-                                    <div className="flex flex-col items-center gap-4 py-12 text-center">
-                                        <FileText className="h-10 w-10 text-[#d6d3d1]" />
-                                        <p className="text-sm text-[#a8a29e]">
-                                            No has subido el archivo "{activeArchivo?.config.nombre ?? ''}".
-                                        </p>
-                                        {activeArchivo && canUpload() && (
-                                            <>
-                                                <input
-                                                    ref={(el) => setFileInputRef(activeArchivo.config.id, el)}
-                                                    type="file"
-                                                    accept=".pdf,.docx"
-                                                    className="hidden"
-                                                    onChange={(e) => {
-                                                        const file = e.target.files?.[0];
-                                                        if (file) {
-                                                            handleFileUpload(activeArchivo.config.id, file);
-                                                        }
-                                                        e.target.value = '';
-                                                    }}
-                                                />
-                                                <button
-                                                    onClick={() => fileInputRefs.current[activeArchivo.config.id]?.click()}
-                                                    disabled={uploadingSlug === activeArchivo.config.id}
-                                                    className="inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a] disabled:cursor-not-allowed disabled:opacity-50"
-                                                >
-                                                    {uploadingSlug === activeArchivo.config.id ? (
-                                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                                    ) : (
-                                                        <Upload className="h-4 w-4" />
-                                                    )}
-                                                    {activeArchivo.config.versionamiento ? 'Subir versión' : 'Subir'}
-                                                </button>
-                                            </>
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col items-center gap-4 py-12 text-center">
+                                                <FileText className="h-10 w-10 text-[#d6d3d1]" />
+                                                <p className="text-sm text-[#a8a29e]">
+                                                    No has subido el documento "{doc.config.nombre}".
+                                                </p>
+                                                {canUpload(doc) && (
+                                                    <>
+                                                        <input
+                                                            ref={(el) => setFileInputRef(doc.config.id, el)}
+                                                            type="file"
+                                                            accept=".pdf,.docx"
+                                                            className="hidden"
+                                                            onChange={(e) => {
+                                                                const file = e.target.files?.[0];
+                                                                if (file) handleFileUpload(doc.config.id, file);
+                                                                e.target.value = '';
+                                                            }}
+                                                        />
+                                                        <button
+                                                            onClick={() => fileInputRefs.current[doc.config.id]?.click()}
+                                                            disabled={uploadingSlug === doc.config.id}
+                                                            className="inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a] disabled:cursor-not-allowed disabled:opacity-50"
+                                                        >
+                                                            {uploadingSlug === doc.config.id ? (
+                                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                            ) : (
+                                                                <Upload className="h-4 w-4" />
+                                                            )}
+                                                            {uploadLabel(doc)}
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
-                                )}
-                            </div>
+                                );
+                            })
                         )}
 
-                        {/* Upload error */}
                         {uploadError && (
                             <div className="flex items-center gap-2 rounded-lg bg-[#fee2e2] px-4 py-2 text-sm text-[#dc2626]">
                                 <AlertTriangle className="h-4 w-4 shrink-0" />

@@ -3,10 +3,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { GroupSelector } from '@/components/forms/GroupSelector';
 import { useEntregas, FASE_SEQUENCE, type Fase, type Entrega, type UpdateEntregaPayload } from '@/hooks/useEntregas';
-import ArchivosRequeridosBuilder, {
-    SLUG_DOCUMENTO_PROYECTO,
-    NOMBRE_DOCUMENTO_PROYECTO,
-} from '@/components/entregas/ArchivosRequeridosBuilder';
+import ArchivosRequeridosBuilder from '@/components/entregas/ArchivosRequeridosBuilder';
 import IndicadorSumaPar from '@/components/entregas/IndicadorSumaPar';
 import type { ArchivoRequeridoConfig } from '@/types/entregas';
 import {
@@ -29,10 +26,10 @@ const FASE_LABELS: Record<string, string> = {
     presentacion_final: 'Presentación Final',
 };
 
-/** Default main file enforced by RF-ENT-01 (slug documento-proyecto). */
+/** Default: one untitled requested document the coordinator must name. */
 function archivosPorDefecto(): ArchivoRequeridoConfig[] {
     return [
-        { id: SLUG_DOCUMENTO_PROYECTO, nombre: NOMBRE_DOCUMENTO_PROYECTO, versionamiento: true },
+        { id: 'documento_1', nombre: '', versionamiento: true, analizable_ia: false },
     ];
 }
 
@@ -99,7 +96,7 @@ export default function CoordinadorEntregas() {
             // Validate archivos_requeridos
             const validArchivos = formArchivos.filter((a) => a.nombre.trim().length > 0);
             if (validArchivos.length === 0) {
-                setFormArchivosError('Debe agregar al menos un archivo requerido con nombre.');
+                setFormArchivosError('Debe agregar al menos un documento solicitado con título.');
                 return;
             }
             setFormArchivosError(null);
@@ -176,9 +173,7 @@ export default function CoordinadorEntregas() {
         setEditGradePercentage(entrega.grade_percentage != null ? String(entrega.grade_percentage) : '');
         setEditFase(entrega.phase);
         setEditGrupoId(entrega.grupo_id);
-        // Persisted items use `slug`; normalize to the builder shape
-        // (`id`) so the main-file detection (RF-ENT-01) and the outgoing
-        // update payload both carry the canonical identity.
+        // Persisted items use `slug`; normalize to the builder shape (`id`).
         const persistidos = (entrega.archivos_requeridos ?? []).map((a) => ({
             id: a.id ?? a.slug ?? '',
             nombre: a.nombre,
@@ -204,7 +199,7 @@ export default function CoordinadorEntregas() {
         // Validate archivos_requeridos
         const validArchivos = editArchivos.filter((a) => a.nombre.trim().length > 0);
         if (validArchivos.length === 0) {
-            setEditArchivosError('Debe haber al menos un archivo requerido con nombre.');
+            setEditArchivosError('Debe haber al menos un documento solicitado con título.');
             return;
         }
         setEditArchivosError(null);

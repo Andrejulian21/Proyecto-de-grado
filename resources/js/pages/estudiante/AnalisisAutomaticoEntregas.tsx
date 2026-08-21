@@ -103,6 +103,10 @@ export default function AnalisisAutomaticoEntregas() {
     }, [file]);
 
     async function handleAnalyze() {
+        if (!entrega?.documento_analizable_ia) {
+            setActionError('Esta entrega no tiene un documento configurado para análisis mediante IA.');
+            return;
+        }
         if (!entregaId || !file) {
             setActionError('Selecciona un archivo DOCX temporal para analizar.');
             return;
@@ -194,7 +198,14 @@ export default function AnalisisAutomaticoEntregas() {
                             <p className="text-xs text-[#78716c]">Fase</p>
                             <p className="text-sm font-semibold text-[#1c1917]">{entrega.faseLabel}</p>
                         </div>
-                        <div className="sm:col-span-2">
+                        <div>
+                            <p className="text-xs text-[#78716c]">Documento analizable</p>
+                            <p className="text-sm font-semibold text-[#1c1917]">
+                                {entrega.documentos.find((d) => d.id === entrega.documento_analizable_ia)?.nombre
+                                    ?? 'Ninguno configurado'}
+                            </p>
+                        </div>
+                        <div className="sm:col-span-2 lg:col-span-4">
                             <p className="text-xs text-[#78716c]">Lo esperado en esta entrega</p>
                             <p className="text-sm text-[#44403c] whitespace-pre-wrap">
                                 {entrega.descripcion || 'Esta entrega no tiene una descripción definida.'}

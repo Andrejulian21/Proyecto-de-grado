@@ -60,6 +60,8 @@ final class DocumentEvaluationService
         $proyecto = $resolved['proyecto'];
         $entrega = $resolved['entrega'];
 
+        $this->assertEntregaTieneDocumentoAnalizable($entrega);
+
         $tempRelativePath = null;
         $version = null;
 
@@ -72,6 +74,7 @@ final class DocumentEvaluationService
                 $versionDocumentoId = null;
             } else {
                 $version = $this->resolveDocxVersion($entrega, $versionId);
+                $this->assertVersionEsAnalizable($entrega, $version);
                 $absolutePath = Storage::disk('public')->path($version->file_path);
                 $documentHash = is_file($absolutePath) ? hash_file('sha256', $absolutePath) : null;
                 $originalName = (string) ($version->original_name ?? basename($version->file_path));
@@ -179,10 +182,27 @@ final class DocumentEvaluationService
 
     private function resolveDocxVersion(Entrega $entrega, ?int $versionId): VersionDocumento
     {
+        $iaId = $entrega->idDocumentoAnalizableIa();
         $query = VersionDocumento::query()->where('entrega_id', $entrega->id);
 
+        if ($iaId !== null) {
+            $query->where(function ($q) use ($entrega, $iaId) {
+                $q->where('archivo_requerido_id', $iaId);
+
+                $first = $entrega->documentosSolicitados()[0] ?? null;
+                $firstId = is_array($first) ? ($first['slug'] ?? $first['id'] ?? null) : null;
+
+                if ($firstId === $iaId) {
+                    $q->orWhereNull('archivo_requerido_id');
+                }
+            });
+        }
+
         if ($versionId !== null) {
-            $version = (clone $query)->where('id', $versionId)->first();
+            $version = VersionDocumento::query()
+                ->where('entrega_id', $entrega->id)
+                ->where('id', $versionId)
+                ->first();
 
             if (! $version) {
                 throw DocumentEvaluationException::notFound('No se encontró la versión del documento.');
@@ -214,6 +234,22 @@ final class DocumentEvaluationService
         }
 
         return $version;
+    }
+
+    private function assertEntregaTieneDocumentoAnalizable(Entrega $entrega): void
+    {
+        if ($entrega->idDocumentoAnalizableIa() === null) {
+            throw DocumentEvaluationException::notAnalyzable(
+                'Esta entrega no tiene un documento configurado para análisis mediante IA.',
+            );
+        }
+    }
+
+    private function assertVersionEsAnalizable(Entrega $entrega, VersionDocumento $version): void
+    {
+        if (! $entrega->versionEsAnalizableIa($version)) {
+            throw DocumentEvaluationException::notAnalyzable();
+        }
     }
 
     private function markFailed(

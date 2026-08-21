@@ -105,6 +105,38 @@ it('returns 404 for non-existent slug', function () {
         ->assertStatus(404);
 });
 
+it('allows version 1 on two different documents of the same entrega', function () {
+    $fileA = UploadedFile::fake()->create('planteamiento.pdf', 100);
+    $this->actingAs($this->estudiante)
+        ->postJson("/api/entregas/{$this->entrega->id}/archivos/documento", ['file' => $fileA])
+        ->assertStatus(201);
+
+    $fileB = UploadedFile::fake()->create('anexos.pdf', 100);
+    $this->actingAs($this->estudiante)
+        ->postJson("/api/entregas/{$this->entrega->id}/archivos/anexos", ['file' => $fileB])
+        ->assertStatus(201);
+
+    $pivot = EntregaProyecto::where('entrega_id', $this->entrega->id)
+        ->where('proyecto_id', $this->proyecto->id)
+        ->first();
+
+    $vDocumento = VersionDocumento::where('entrega_proyecto_id', $pivot->id)
+        ->where('archivo_requerido_id', 'documento')
+        ->where('descontinuado', false)
+        ->first();
+    $vAnexos = VersionDocumento::where('entrega_proyecto_id', $pivot->id)
+        ->where('archivo_requerido_id', 'anexos')
+        ->where('descontinuado', false)
+        ->first();
+
+    expect($vDocumento)->not->toBeNull()
+        ->and($vAnexos)->not->toBeNull()
+        ->and($vDocumento->version_number)->toBe(1)
+        ->and($vAnexos->version_number)->toBe(1)
+        ->and($vDocumento->uploaded_at)->not->toBeNull()
+        ->and($vAnexos->uploaded_at)->not->toBeNull();
+});
+
 it('enforces max 4 versions per archivo_requerido', function () {
     $pivot = EntregaProyecto::firstOrCreate(
         ['entrega_id' => $this->entrega->id, 'proyecto_id' => $this->proyecto->id],
@@ -124,4 +156,13 @@ it('enforces max 4 versions per archivo_requerido', function () {
     $this->actingAs($this->estudiante)
         ->postJson("/api/entregas/{$this->entrega->id}/archivos/documento", ['file' => $file5])
         ->assertStatus(422);
+});
+
+it('niega la subida a un estudiante sin proyecto asignado', function () {
+    $otro = User::factory()->create(['role' => UserRole::Estudiante->value]);
+    $file = UploadedFile::fake()->create('doc.pdf', 100);
+
+    $this->actingAs($otro)
+        ->postJson("/api/entregas/{$this->entrega->id}/archivos/documento", ['file' => $file])
+        ->assertStatus(404);
 });

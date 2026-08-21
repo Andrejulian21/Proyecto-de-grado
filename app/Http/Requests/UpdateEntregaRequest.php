@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests;
 
 use App\Enums\UserRole;
+use App\Http\Requests\Concerns\ValidatesDocumentosSolicitados;
 use App\Models\Entrega;
 use App\Models\User;
 use App\Services\EntregaPesoService;
@@ -14,6 +15,8 @@ use Illuminate\Validation\ValidationException;
 
 class UpdateEntregaRequest extends FormRequest
 {
+    use ValidatesDocumentosSolicitados;
+
     /**
      * Only Coordinador can update entregas.
      */
@@ -83,8 +86,8 @@ class UpdateEntregaRequest extends FormRequest
     }
 
     /**
-     * Cross-field rules mirroring StoreEntregaRequest (RF-ENT-01/02, D4)
-     * plus the 100% pair rule excluding the entrega's own current value.
+     * Cross-field rules mirroring StoreEntregaRequest plus the 100% pair
+     * rule excluding the entrega's own current value.
      */
     public function withValidator($validator): void
     {
@@ -92,49 +95,12 @@ class UpdateEntregaRequest extends FormRequest
             $archivos = $this->input('archivos_requeridos');
 
             if (is_array($archivos)) {
-                $this->validarArchivoPrincipal($validator, $archivos);
-                $this->validarAnalizableIa($validator, $archivos);
+                $this->validarUnicidadDocumentos($validator, $archivos);
+                $this->validarUnicoDocumentoAnalizableIa($validator, $archivos);
             }
 
             $this->validarPesos($validator);
         });
-    }
-
-    /**
-     * RF-ENT-01: the main project file must always be present.
-     *
-     * @param  array<int, array<string, mixed>>  $archivos
-     */
-    private function validarArchivoPrincipal($validator, array $archivos): void
-    {
-        $slugs = array_column($archivos, 'id');
-
-        if (! in_array('documento-proyecto', $slugs, true)) {
-            $validator->errors()->add(
-                'archivos_requeridos',
-                "Debe existir al menos el archivo 'documento del proyecto' en los archivos requeridos"
-            );
-        }
-    }
-
-    /**
-     * RF-ENT-02: only the main project file may be AI-analyzable.
-     *
-     * @param  array<int, array<string, mixed>>  $archivos
-     */
-    private function validarAnalizableIa($validator, array $archivos): void
-    {
-        foreach ($archivos as $archivo) {
-            $slug = $archivo['id'] ?? null;
-            $analizable = $archivo['analizable_ia'] ?? false;
-
-            if ($slug !== 'documento-proyecto' && filter_var($analizable, FILTER_VALIDATE_BOOLEAN)) {
-                $validator->errors()->add(
-                    'archivos_requeridos',
-                    "Solo el archivo 'documento del proyecto' puede ser analizable con IA"
-                );
-            }
-        }
     }
 
     /**

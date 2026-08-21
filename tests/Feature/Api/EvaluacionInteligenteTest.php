@@ -284,3 +284,91 @@ it('analiza archivo temporal sin crear version oficial', function () {
 
     @unlink($tmpPath);
 });
+
+it('rechaza el analisis de una version que no es el documento analizable', function () {
+    $this->entrega->update([
+        'archivos_requeridos' => [
+            [
+                'slug' => 'documento-proyecto',
+                'nombre' => 'Documento del proyecto',
+                'versionamiento' => true,
+                'analizable_ia' => true,
+            ],
+            [
+                'slug' => 'anexo',
+                'nombre' => 'Anexo',
+                'versionamiento' => true,
+                'analizable_ia' => false,
+            ],
+        ],
+    ]);
+
+    $phpWord = new PhpWord;
+    $phpWord->addSection()->addText('Anexo no analizable.');
+    $relative = 'entregas/'.$this->entrega->id.'/anexo.docx';
+    $absolute = Storage::disk('public')->path($relative);
+
+    if (! is_dir(dirname($absolute))) {
+        mkdir(dirname($absolute), 0777, true);
+    }
+    IOFactory::createWriter($phpWord, 'Word2007')->save($absolute);
+
+    $version = VersionDocumento::create([
+        'entrega_id' => $this->entrega->id,
+        'version_number' => 1,
+        'file_path' => $relative,
+        'original_name' => 'anexo.docx',
+        'file_size' => filesize($absolute) ?: 0,
+        'uploaded_at' => now(),
+        'archivo_requerido_id' => 'anexo',
+    ]);
+
+    bindStubAiProvider(samplePreliminaryPayload());
+
+    $response = $this->actingAs($this->estudiante)
+        ->postJson("/api/estudiante/entregas/{$this->entrega->id}/evaluacion-inteligente", [
+            'version_id' => $version->id,
+        ]);
+
+    $response->assertStatus(422)
+        ->assertJsonPath('code', 'document_not_analyzable');
+    expect(AiDocumentEvaluation::query()->count())->toBe(0);
+});
+
+it('rechaza el analisis cuando la entrega no tiene documento analizable', function () {
+    $this->entrega->update([
+        'archivos_requeridos' => [
+            [
+                'slug' => 'objetivos',
+                'nombre' => 'Objetivos',
+                'versionamiento' => true,
+                'analizable_ia' => false,
+            ],
+        ],
+    ]);
+
+    bindStubAiProvider(samplePreliminaryPayload());
+
+    $phpWord = new PhpWord;
+    $phpWord->addSection()->addText('Borrador sin documento IA.');
+    $tmpPath = sys_get_temp_dir().DIRECTORY_SEPARATOR.'borrador-sin-ia-'.uniqid().'.docx';
+    IOFactory::createWriter($phpWord, 'Word2007')->save($tmpPath);
+
+    $upload = new UploadedFile(
+        $tmpPath,
+        'borrador.docx',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        null,
+        true,
+    );
+
+    $response = $this->actingAs($this->estudiante)
+        ->post("/api/estudiante/entregas/{$this->entrega->id}/evaluacion-inteligente", [
+            'file' => $upload,
+        ]);
+
+    $response->assertStatus(422)
+        ->assertJsonPath('code', 'document_not_analyzable');
+
+    @unlink($tmpPath);
+});

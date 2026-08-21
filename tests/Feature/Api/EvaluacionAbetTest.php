@@ -227,3 +227,51 @@ it('exige autenticacion', function () {
         'version_id' => 1,
     ])->assertUnauthorized();
 });
+
+it('rechaza el analisis del director sobre un documento no analizable', function () {
+    $this->entrega->update([
+        'archivos_requeridos' => [
+            [
+                'slug' => 'documento-proyecto',
+                'nombre' => 'Documento del proyecto',
+                'versionamiento' => true,
+                'analizable_ia' => true,
+            ],
+            [
+                'slug' => 'anexo',
+                'nombre' => 'Anexo',
+                'versionamiento' => true,
+                'analizable_ia' => false,
+            ],
+        ],
+    ]);
+
+    $phpWord = new PhpWord;
+    $phpWord->addSection()->addText('Anexo no analizable.');
+    $relative = 'entregas/'.$this->entrega->id.'/anexo.docx';
+    $absolute = Storage::disk('public')->path($relative);
+
+    if (! is_dir(dirname($absolute))) {
+        mkdir(dirname($absolute), 0777, true);
+    }
+    IOFactory::createWriter($phpWord, 'Word2007')->save($absolute);
+
+    $version = VersionDocumento::create([
+        'entrega_id' => $this->entrega->id,
+        'version_number' => 1,
+        'file_path' => $relative,
+        'original_name' => 'anexo.docx',
+        'file_size' => filesize($absolute) ?: 0,
+        'uploaded_at' => now(),
+        'archivo_requerido_id' => 'anexo',
+    ]);
+
+    bindAbetStubProvider(sampleDirectorPreliminaryPayload());
+
+    $this->actingAs($this->director)
+        ->postJson("/api/director/entregas/{$this->entrega->id}/evaluacion-abet", [
+            'version_id' => $version->id,
+        ])
+        ->assertStatus(422)
+        ->assertJsonPath('code', 'document_not_analyzable');
+});

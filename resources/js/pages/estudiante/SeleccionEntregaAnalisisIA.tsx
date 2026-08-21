@@ -111,21 +111,36 @@ export default function SeleccionEntregaAnalisisIA() {
                         No hay entregas para esta fase.
                     </div>
                 ) : (
-                    filtered.map((d) => (
+                    filtered.map((d) => {
+                        const raw = rawEntregas.find((e) => e.id === d.id);
+                        const ctx = raw
+                            ? mapEntregaToAnalisisContext(raw)
+                            : mapEntregaToAnalisisContext({ id: d.id, fase: activePhaseId });
+                        const puedeAnalizar = Boolean(ctx.documento_analizable_ia);
+                        const docIa = ctx.documentos.find((doc) => doc.id === ctx.documento_analizable_ia);
+
+                        return (
                         <div key={d.id} className="flex flex-col">
                             <DeliveryAccordion delivery={d} />
-                            <div className="flex justify-end rounded-b-xl border-x border-b border-[#e5e5e5] bg-white px-4 pb-3 pt-0">
-                                <button
-                                    type="button"
-                                    onClick={() => goToAnalysis(d.id)}
-                                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#c2410c] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#9a330a] active:scale-[0.98]"
-                                >
-                                    <Brain className="h-3.5 w-3.5" />
-                                    Analizar con IA
-                                </button>
+                            <div className="flex flex-col items-end gap-1 rounded-b-xl border-x border-b border-[#e5e5e5] bg-white px-4 pb-3 pt-0">
+                                {puedeAnalizar ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => goToAnalysis(d.id)}
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-[#c2410c] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#9a330a] active:scale-[0.98]"
+                                    >
+                                        <Brain className="h-3.5 w-3.5" />
+                                        Analizar {docIa?.nombre ? `"${docIa.nombre}"` : 'con IA'}
+                                    </button>
+                                ) : (
+                                    <p className="text-xs text-[#a8a29e]">
+                                        Esta entrega no tiene un documento configurado para análisis con IA.
+                                    </p>
+                                )}
                             </div>
                         </div>
-                    ))
+                        );
+                    })
                 )}
             </div>
         </div>

@@ -3,9 +3,12 @@
 declare(strict_types=1);
 
 use App\Models\Entrega;
+use App\Models\EntregaProyecto;
 use App\Models\Proyecto;
 use App\Models\Semestre;
 use App\Models\VersionDocumento;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -29,8 +32,8 @@ beforeEach(function () {
 });
 
 test('VersionDocumento model exists and extends Model', function () {
-    $version = new VersionDocumento();
-    expect($version)->toBeInstanceOf(Illuminate\Database\Eloquent\Model::class);
+    $version = new VersionDocumento;
+    expect($version)->toBeInstanceOf(Model::class);
 });
 
 test('VersionDocumento fillable fields create correctly', function () {
@@ -78,17 +81,37 @@ test('VersionDocumento scope ultima orders by version_number desc', function () 
     expect($latest->last()->version_number)->toBe(1);
 });
 
-test('VersionDocumento unique constraint prevents duplicate version numbers', function () {
+test('VersionDocumento unique constraint is per document and project', function () {
+    $pivot = EntregaProyecto::create([
+        'entrega_id' => $this->entrega->id,
+        'proyecto_id' => $this->entrega->proyecto_id,
+    ]);
+
     VersionDocumento::create([
         'entrega_id' => $this->entrega->id,
+        'entrega_proyecto_id' => $pivot->id,
+        'archivo_requerido_id' => 'planteamiento',
         'version_number' => 1,
         'file_path' => 'v1.pdf',
         'original_name' => 'v1.pdf',
     ]);
 
-    $this->expectException(Illuminate\Database\QueryException::class);
     VersionDocumento::create([
         'entrega_id' => $this->entrega->id,
+        'entrega_proyecto_id' => $pivot->id,
+        'archivo_requerido_id' => 'objetivos',
+        'version_number' => 1,
+        'file_path' => 'objetivos-v1.pdf',
+        'original_name' => 'objetivos-v1.pdf',
+    ]);
+
+    expect(VersionDocumento::where('entrega_id', $this->entrega->id)->count())->toBe(2);
+
+    $this->expectException(QueryException::class);
+    VersionDocumento::create([
+        'entrega_id' => $this->entrega->id,
+        'entrega_proyecto_id' => $pivot->id,
+        'archivo_requerido_id' => 'planteamiento',
         'version_number' => 1,
         'file_path' => 'v1-dupe.pdf',
         'original_name' => 'v1-dupe.pdf',

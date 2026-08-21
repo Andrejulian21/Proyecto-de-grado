@@ -33,4 +33,10 @@ final class DocumentEvaluationException extends RuntimeException
     {
         return new self('invalid_document', $message, 422);
     }
+
+    public static function notAnalyzable(
+        string $message = 'Este documento no está configurado para análisis mediante IA.',
+    ): self {
+        return new self('document_not_analyzable', $message, 422);
+    }
 }

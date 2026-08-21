@@ -147,6 +147,7 @@ class EstudianteController extends Controller
                     'nota' => $entrega->consolidated_grade,
                     'criterios' => $entrega->acceptance_criteria,
                     'archivos_requeridos' => $entrega->archivos_requeridos,
+                    'documento_analizable_ia' => $entrega->idDocumentoAnalizableIa(),
                     'total_versiones' => $versiones->count(),
                     'ultima_version' => $versiones->last()['numero_version'] ?? null,
                     'versiones' => $versiones,

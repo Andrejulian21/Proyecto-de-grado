@@ -44,6 +44,7 @@ const RevisionBitacoraCoordinador = lazy(() => import('@/pages/coordinador/Revis
 const EvaluarProyecto = lazy(() => import('@/pages/evaluador/EvaluarProyecto'));
 const EvaluadorCalificar = lazy(() => import('@/pages/evaluador/EvaluadorCalificar'));
 const MisAsignaciones = lazy(() => import('@/pages/evaluador/MisAsignaciones'));
+const SeleccionEntregaAnalisisIA = lazy(() => import('@/pages/estudiante/SeleccionEntregaAnalisisIA'));
 const AnalisisAutomaticoEntregas = lazy(() => import('@/pages/estudiante/AnalisisAutomaticoEntregas'));
 const AsistenteOrientacion = lazy(() => import('@/pages/estudiante/AsistenteOrientacion'));
 const EvaluacionesDirector = lazy(() => import('@/pages/director/EvaluacionesDirector'));
@@ -161,8 +162,9 @@ function App() {
                                 <Route path="/evaluador/asignaciones/:id" element={<ProtectedRoute allowedRoles={['EvaluadorExterno', 'Director']}><SuspenseWrapper><EvaluadorCalificar /></SuspenseWrapper></ProtectedRoute>} />
                                 {/* Estudiante detalle entrega */}
                                 <Route path="/estudiante/entregas/:entregaId" element={<ProtectedRoute allowedRoles={['Estudiante']}><SuspenseWrapper><DetalleEntregaEstudiante /></SuspenseWrapper></ProtectedRoute>} />
-                                {/* PR14: IA mock */}
-                                <Route path="/analisis-entregas" element={<ProtectedRoute allowedRoles={['Estudiante']}><SuspenseWrapper><AnalisisAutomaticoEntregas /></SuspenseWrapper></ProtectedRoute>} />
+                                {/* PR14: Análisis IA (API real, selector + detalle) */}
+                                <Route path="/analisis-entregas" element={<ProtectedRoute allowedRoles={['Estudiante']}><SuspenseWrapper><SeleccionEntregaAnalisisIA /></SuspenseWrapper></ProtectedRoute>} />
+                                <Route path="/analisis-entregas/:entregaId" element={<ProtectedRoute allowedRoles={['Estudiante']}><SuspenseWrapper><AnalisisAutomaticoEntregas /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/asistente" element={<ProtectedRoute allowedRoles={['Estudiante']}><SuspenseWrapper><AsistenteOrientacion /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="*" element={<Navigate to="/" replace />} />
                             </Routes>

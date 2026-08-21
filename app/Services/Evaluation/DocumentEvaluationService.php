@@ -16,11 +16,14 @@ use App\Models\AiDocumentEvaluation;
 use App\Models\Entrega;
 use App\Models\User;
 use App\Models\VersionDocumento;
+use App\Enums\DocumentConversionError;
+use App\Enums\DocumentFormat;
 use App\Services\Ai\AiGateway;
 use App\Services\Ai\AiPromptComposer;
 use App\Services\Ai\DTO\AiMessage;
 use App\Services\Ai\DTO\AiRequest;
-use App\Services\Documents\DocxToMarkdownConverter;
+use App\Services\Documents\DocumentFormatDetector;
+use App\Services\Documents\DocumentMarkdownRouter;
 use App\Services\Evaluation\DTO\EvaluationContext;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -28,13 +31,14 @@ use Illuminate\Support\Str;
 use Throwable;
 
 /**
- * Reusable orchestrator: DOCX → Markdown → prompt strategy → AiGateway → structured result.
+ * Reusable orchestrator: document (DOCX|PDF) → Markdown → prompt strategy → AiGateway → structured result.
  * Document source may be an official VersionDocumento or a temporary student upload (never persisted as a version).
  */
 final class DocumentEvaluationService
 {
     public function __construct(
-        private readonly DocxToMarkdownConverter $docxConverter,
+        private readonly DocumentMarkdownRouter $markdownRouter,
+        private readonly DocumentFormatDetector $formatDetector,
         private readonly AiPromptComposer $promptComposer,
         private readonly AiGateway $aiGateway,
     ) {}
@@ -69,13 +73,13 @@ final class DocumentEvaluationService
             $documentoId = $entrega->idDocumentoAnalizableIa();
 
             if ($temporaryFile !== null) {
-                [$absolutePath, $originalName, $documentHash, $tempRelativePath] = $this->storeTemporaryDocx(
+                [$absolutePath, $originalName, $documentHash, $tempRelativePath] = $this->storeTemporaryDocument(
                     $user->id,
                     $temporaryFile,
                 );
                 $versionDocumentoId = null;
             } else {
-                $version = $this->resolveDocxVersion($entrega, $versionId);
+                $version = $this->resolveAnalyzableVersion($entrega, $versionId);
                 $this->assertVersionEsAnalizable($entrega, $version);
                 $absolutePath = Storage::disk('public')->path($version->file_path);
                 $documentHash = is_file($absolutePath) ? hash_file('sha256', $absolutePath) : null;
@@ -83,6 +87,8 @@ final class DocumentEvaluationService
                 $versionDocumentoId = $version->id;
                 $documentoId = $version->archivo_requerido_id ?: $documentoId;
             }
+
+            $this->assertSupportedDocument($absolutePath, $originalName);
 
             $record = AiDocumentEvaluation::create([
                 'user_id' => $user->id,
@@ -96,7 +102,7 @@ final class DocumentEvaluationService
             ]);
 
             try {
-                $markdown = $this->docxConverter->convert($absolutePath);
+                $markdown = $this->markdownRouter->convert($absolutePath, $originalName);
 
                 $context = new EvaluationContext(
                     documentMarkdown: $markdown,
@@ -129,10 +135,10 @@ final class DocumentEvaluationService
 
                 return ['evaluation' => $record->fresh(), 'result' => $result];
             } catch (DocumentConversionException $exception) {
-                $this->markFailed($record, 'conversion_failed', $exception->getMessage(), $started);
+                $this->markFailed($record, $exception->error->value, $exception->getMessage(), $started);
 
                 throw DocumentEvaluationException::invalidDocument(
-                    'No fue posible procesar el documento DOCX para el análisis.',
+                    $this->friendlyConversionMessage($exception),
                 );
             } catch (AiException $exception) {
                 $this->markFailed(
@@ -161,18 +167,23 @@ final class DocumentEvaluationService
     /**
      * @return array{0: string, 1: string, 2: string|null, 3: string}
      */
-    private function storeTemporaryDocx(int $userId, UploadedFile $file): array
+    private function storeTemporaryDocument(int $userId, UploadedFile $file): array
     {
-        $originalName = (string) ($file->getClientOriginalName() ?: 'documento.docx');
+        $originalName = (string) ($file->getClientOriginalName() ?: 'documento');
+        $realPath = (string) $file->getRealPath();
 
-        if (! str_ends_with(strtolower($originalName), '.docx')) {
+        if ($realPath === '' || ! is_file($realPath)) {
             throw DocumentEvaluationException::invalidDocument(
-                'Solo se pueden analizar documentos en formato DOCX.',
+                'No fue posible leer el archivo temporal para el análisis.',
             );
         }
 
-        $relative = 'tmp/ai-eval/'.$userId.'/'.Str::uuid()->toString().'.docx';
-        Storage::disk('local')->put($relative, file_get_contents($file->getRealPath()) ?: '');
+        $this->assertSupportedDocument($realPath, $originalName, $file->getMimeType());
+
+        $format = $this->formatDetector->detect($realPath, $originalName, $file->getMimeType());
+        $extension = $format === DocumentFormat::Pdf ? 'pdf' : 'docx';
+        $relative = 'tmp/ai-eval/'.$userId.'/'.Str::uuid()->toString().'.'.$extension;
+        Storage::disk('local')->put($relative, file_get_contents($realPath) ?: '');
         $absolute = Storage::disk('local')->path($relative);
 
         if (! is_file($absolute)) {
@@ -184,7 +195,7 @@ final class DocumentEvaluationService
         return [$absolute, $originalName, hash_file('sha256', $absolute) ?: null, $relative];
     }
 
-    private function resolveDocxVersion(Entrega $entrega, ?int $versionId): VersionDocumento
+    private function resolveAnalyzableVersion(Entrega $entrega, ?int $versionId): VersionDocumento
     {
         $iaId = $entrega->idDocumentoAnalizableIa();
         $query = VersionDocumento::query()->where('entrega_id', $entrega->id);
@@ -216,17 +227,9 @@ final class DocumentEvaluationService
 
             if (! $version) {
                 throw DocumentEvaluationException::invalidDocument(
-                    'La entrega no tiene versiones para analizar. Sube un documento DOCX primero.',
+                    'La entrega no tiene versiones para analizar. Sube un documento DOCX o PDF primero.',
                 );
             }
-        }
-
-        $name = strtolower((string) ($version->original_name ?? $version->file_path));
-
-        if (! str_ends_with($name, '.docx')) {
-            throw DocumentEvaluationException::invalidDocument(
-                'Solo se pueden analizar documentos en formato DOCX.',
-            );
         }
 
         $absolutePath = Storage::disk('public')->path($version->file_path);
@@ -237,7 +240,23 @@ final class DocumentEvaluationService
             );
         }
 
+        $this->assertSupportedDocument(
+            $absolutePath,
+            (string) ($version->original_name ?? $version->file_path),
+        );
+
         return $version;
+    }
+
+    private function assertSupportedDocument(string $absolutePath, string $originalName, ?string $mime = null): void
+    {
+        $format = $this->formatDetector->detect($absolutePath, $originalName, $mime);
+
+        if ($format === DocumentFormat::Unsupported) {
+            throw DocumentEvaluationException::invalidDocument(
+                'Solo se aceptan documentos en formato DOCX o PDF.',
+            );
+        }
     }
 
     private function assertEntregaTieneDocumentoAnalizable(Entrega $entrega): void
@@ -278,6 +297,17 @@ final class DocumentEvaluationService
             AiErrorCode::ProviderNotConfigured,
             AiErrorCode::UnknownProvider => 'No fue posible conectarse al servicio de Inteligencia Artificial. Inténtalo más tarde.',
             default => 'No fue posible completar el análisis con el servicio de Inteligencia Artificial.',
+        };
+    }
+
+    private function friendlyConversionMessage(DocumentConversionException $exception): string
+    {
+        return match ($exception->error) {
+            DocumentConversionError::UnsupportedFormat,
+            DocumentConversionError::InvalidExtension => 'Solo se aceptan documentos en formato DOCX o PDF.',
+            DocumentConversionError::EmptyDocument => 'El documento está vacío o no contiene texto procesable.',
+            DocumentConversionError::CorruptFile => 'El archivo está corrupto o no es válido.',
+            default => 'No fue posible convertir el documento para el análisis.',
         };
     }
 }

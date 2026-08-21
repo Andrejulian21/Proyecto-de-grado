@@ -40,12 +40,22 @@ final class DocumentConversionException extends RuntimeException
         );
     }
 
-    public static function corruptFile(?Throwable $previous = null): self
+    public static function corruptFile(?Throwable $previous = null, string $kind = 'DOCX'): self
     {
+        $label = strtoupper($kind) === 'PDF' ? 'PDF' : 'DOCX';
+
         return new self(
             DocumentConversionError::CorruptFile,
-            'El archivo DOCX está corrupto o no es válido.',
+            "El archivo {$label} está corrupto o no es válido.",
             $previous,
+        );
+    }
+
+    public static function unsupportedFormat(): self
+    {
+        return new self(
+            DocumentConversionError::UnsupportedFormat,
+            'Solo se aceptan documentos en formato DOCX o PDF.',
         );
     }
 

@@ -8,7 +8,7 @@ interface Props {
     entregaId: number;
     versionId: number | null;
     versionLabel?: string;
-    isDocx: boolean;
+    isConvertible: boolean;
     analisisInicial?: AnalisisIa[];
 }
 
@@ -34,7 +34,7 @@ export function EvaluacionAbetPanel({
     entregaId,
     versionId,
     versionLabel,
-    isDocx,
+    isConvertible,
     analisisInicial = [],
 }: Props) {
     const [processing, setProcessing] = useState(false);
@@ -95,11 +95,11 @@ export function EvaluacionAbetPanel({
 
     async function handleEvaluate() {
         if (!versionId) {
-            setActionError('Selecciona una versión DOCX para analizar.');
+            setActionError('Selecciona una versión DOCX o PDF para analizar.');
             return;
         }
-        if (!isDocx) {
-            setActionError('Solo se pueden analizar documentos en formato DOCX.');
+        if (!isConvertible) {
+            setActionError('Solo se aceptan documentos en formato DOCX o PDF.');
             return;
         }
 
@@ -156,7 +156,7 @@ export function EvaluacionAbetPanel({
                 <button
                     type="button"
                     onClick={() => void handleEvaluate()}
-                    disabled={processing || !versionId || !isDocx}
+                    disabled={processing || !versionId || !isConvertible}
                     className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                     {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
@@ -178,9 +178,10 @@ export function EvaluacionAbetPanel({
                 </div>
             )}
 
-            {!isDocx && versionId && (
+            {!isConvertible && versionId && (
                 <p className="mb-4 text-xs text-[#78716c]">
-                    La versión seleccionada no es DOCX. Selecciona un documento Word para analizar.
+                    La versión seleccionada no es DOCX ni PDF. Selecciona un documento Word o PDF para
+                    analizar.
                 </p>
             )}
 

@@ -16,4 +16,5 @@ enum DocumentConversionError: string
     case UnprocessableContent = 'unprocessable_content';
     case ConversionFailed = 'conversion_failed';
     case Unexpected = 'unexpected';
+    case UnsupportedFormat = 'unsupported_format';
 }

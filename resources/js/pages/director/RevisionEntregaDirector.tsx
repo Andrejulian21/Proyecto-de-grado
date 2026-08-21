@@ -597,9 +597,9 @@ export default function RevisionEntregaDirector() {
                         entregaId={entrega.id}
                         versionId={selectedVersion.id}
                         versionLabel={`${activeArchivo?.config.nombre ?? 'Documento'} · Versión ${selectedVersion.version_number}`}
-                        isDocx={(selectedVersion.original_name || selectedVersion.file_path || '')
-                            .toLowerCase()
-                            .endsWith('.docx')}
+                        isConvertible={/\.(docx|pdf)$/i.test(
+                            selectedVersion.original_name || selectedVersion.file_path || '',
+                        )}
                         analisisInicial={selectedVersion.analisis_ia ?? []}
                     />
                 )}

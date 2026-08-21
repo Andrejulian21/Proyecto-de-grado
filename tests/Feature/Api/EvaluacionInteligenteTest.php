@@ -21,6 +21,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpWord\IOFactory;
 use PhpOffice\PhpWord\PhpWord;
+use Tests\Support\PdfDocumentFactory;
 
 uses(RefreshDatabase::class);
 
@@ -202,19 +203,21 @@ it('responde 503 amigable cuando el proveedor no esta configurado', function () 
     expect(AiDocumentEvaluation::query()->first()?->status)->toBe(AiEvaluationStatus::Failed);
 });
 
-it('rechaza versiones que no son DOCX', function () {
-    $relative = 'entregas/'.$this->entrega->id.'/avance.pdf';
-    Storage::disk('public')->put($relative, '%PDF-1.4 fake');
+it('rechaza versiones cuyo contenido no es DOCX ni PDF', function () {
+    $relative = 'entregas/'.$this->entrega->id.'/notas.txt';
+    Storage::disk('public')->put($relative, 'texto plano no convertible');
 
     $version = VersionDocumento::create([
         'entrega_id' => $this->entrega->id,
         'version_number' => 1,
         'file_path' => $relative,
-        'original_name' => 'avance.pdf',
+        'original_name' => 'notas.txt',
         'file_size' => 10,
         'uploaded_at' => now(),
         'archivo_requerido_id' => 'documento-proyecto',
     ]);
+
+    $stub = bindStubAiProvider(samplePreliminaryPayload());
 
     $response = $this->actingAs($this->estudiante)
         ->postJson("/api/estudiante/entregas/{$this->entrega->id}/evaluacion-inteligente", [
@@ -222,7 +225,44 @@ it('rechaza versiones que no son DOCX', function () {
         ]);
 
     $response->assertStatus(422)
-        ->assertJsonPath('code', 'invalid_document');
+        ->assertJsonPath('code', 'invalid_document')
+        ->assertJsonPath('error', 'Solo se aceptan documentos en formato DOCX o PDF.');
+
+    expect($stub->lastRequest)->toBeNull();
+});
+
+it('completa analisis preliminar del estudiante a partir de un PDF', function () {
+    $relative = 'entregas/'.$this->entrega->id.'/avance.pdf';
+    $absolute = Storage::disk('public')->path($relative);
+    if (! is_dir(dirname($absolute))) {
+        mkdir(dirname($absolute), 0777, true);
+    }
+    file_put_contents($absolute, PdfDocumentFactory::bytes('Borrador PDF del estudiante para analisis preliminar.'));
+
+    $version = VersionDocumento::create([
+        'entrega_id' => $this->entrega->id,
+        'version_number' => 1,
+        'file_path' => $relative,
+        'original_name' => 'avance.pdf',
+        'file_size' => filesize($absolute) ?: 0,
+        'uploaded_at' => now(),
+        'archivo_requerido_id' => 'documento-proyecto',
+    ]);
+
+    $stub = bindStubAiProvider(samplePreliminaryPayload());
+
+    $this->actingAs($this->estudiante)
+        ->postJson("/api/estudiante/entregas/{$this->entrega->id}/evaluacion-inteligente", [
+            'version_id' => $version->id,
+        ])
+        ->assertOk()
+        ->assertJsonPath('data.estado', 'completed');
+
+    $promptText = collect($stub->lastRequest?->messages ?? [])
+        ->map(fn ($message) => $message->content)
+        ->implode("\n");
+
+    expect($promptText)->toContain('Borrador PDF del estudiante para analisis preliminar.');
 });
 
 it('niega acceso a estudiantes de otro proyecto', function () {

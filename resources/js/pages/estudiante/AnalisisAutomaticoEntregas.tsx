@@ -108,11 +108,11 @@ export default function AnalisisAutomaticoEntregas() {
             return;
         }
         if (!entregaId || !file) {
-            setActionError('Selecciona un archivo DOCX temporal para analizar.');
+            setActionError('Selecciona un archivo DOCX o PDF temporal para analizar.');
             return;
         }
-        if (!file.name.toLowerCase().endsWith('.docx')) {
-            setActionError('Solo se admiten archivos DOCX.');
+        if (!/\.(docx|pdf)$/i.test(file.name)) {
+            setActionError('Solo se aceptan documentos en formato DOCX o PDF.');
             return;
         }
 
@@ -225,7 +225,7 @@ export default function AnalisisAutomaticoEntregas() {
                         <div className="flex aspect-[8.5/11] w-full flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-[#e5e5e5] bg-[#fafaf9] px-4 text-center">
                             <Eye className="h-12 w-12 text-[#78716c]" />
                             <p className="text-sm font-medium text-[#1c1917]">
-                                {fileLabel ?? 'Selecciona un borrador DOCX'}
+                                {fileLabel ?? 'Selecciona un borrador DOCX o PDF'}
                             </p>
                             <p className="max-w-md text-xs text-[#78716c]">
                                 Este archivo no se guarda como versión oficial. La retroalimentación de IA sí
@@ -234,10 +234,10 @@ export default function AnalisisAutomaticoEntregas() {
                             </p>
                             <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[#e5e5e5] bg-white px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:border-[#c2410c] hover:bg-[#fed7aa]">
                                 <Upload className="h-4 w-4" />
-                                Elegir DOCX
+                                Elegir DOCX o PDF
                                 <input
                                     type="file"
-                                    accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                    accept=".docx,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf"
                                     className="hidden"
                                     onChange={(e) => {
                                         const next = e.target.files?.[0] ?? null;

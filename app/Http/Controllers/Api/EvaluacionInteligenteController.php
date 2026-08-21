@@ -77,7 +77,7 @@ class EvaluacionInteligenteController extends Controller
                 'nullable',
                 'file',
                 'required_without:version_id',
-                'mimes:docx',
+                'mimes:docx,pdf',
                 'max:10240',
             ],
         ]);
@@ -87,7 +87,7 @@ class EvaluacionInteligenteController extends Controller
 
         if ($temporaryFile === null && $versionId === null) {
             return response()->json([
-                'error' => 'Debes adjuntar un archivo DOCX temporal o indicar una versión.',
+                'error' => 'Debes adjuntar un archivo DOCX o PDF temporal o indicar una versión.',
                 'code' => 'invalid_request',
             ], 422);
         }

@@ -21,6 +21,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpWord\IOFactory;
 use PhpOffice\PhpWord\PhpWord;
+use Tests\Support\PdfDocumentFactory;
 
 uses(RefreshDatabase::class);
 
@@ -82,6 +83,27 @@ function storeAbetDocxVersion(Entrega $entrega, string $name = 'avance.docx'): V
         mkdir(dirname($absolute), 0777, true);
     }
     IOFactory::createWriter($phpWord, 'Word2007')->save($absolute);
+
+    return VersionDocumento::create([
+        'entrega_id' => $entrega->id,
+        'version_number' => 1,
+        'file_path' => $relative,
+        'original_name' => $name,
+        'file_size' => filesize($absolute) ?: 0,
+        'uploaded_at' => now(),
+        'archivo_requerido_id' => 'documento-proyecto',
+    ]);
+}
+
+function storeAbetPdfVersion(Entrega $entrega, string $name = 'avance.pdf'): VersionDocumento
+{
+    $relative = 'entregas/'.$entrega->id.'/'.$name;
+    $absolute = Storage::disk('public')->path($relative);
+
+    if (! is_dir(dirname($absolute))) {
+        mkdir(dirname($absolute), 0777, true);
+    }
+    file_put_contents($absolute, PdfDocumentFactory::bytes('Documento PDF de prueba para analisis preliminar ABET.'));
 
     return VersionDocumento::create([
         'entrega_id' => $entrega->id,
@@ -274,4 +296,98 @@ it('rechaza el analisis del director sobre un documento no analizable', function
         ])
         ->assertStatus(422)
         ->assertJsonPath('code', 'document_not_analyzable');
+});
+
+it('completa analisis preliminar ABET a partir de un PDF convertido a Markdown', function () {
+    $version = storeAbetPdfVersion($this->entrega);
+    $stub = bindAbetStubProvider(sampleDirectorPreliminaryPayload());
+
+    $response = $this->actingAs($this->director)
+        ->postJson("/api/director/entregas/{$this->entrega->id}/evaluacion-abet", [
+            'version_id' => $version->id,
+        ]);
+
+    $response->assertOk()
+        ->assertJsonPath('data.tipo', 'abet')
+        ->assertJsonPath('data.estado', 'completed');
+
+    $promptText = collect($stub->lastRequest?->messages ?? [])
+        ->map(fn ($message) => $message->content)
+        ->implode("\n");
+
+    expect($promptText)->toContain('Documento PDF de prueba para analisis preliminar ABET.');
+});
+
+it('rechaza un formato no soportado sin llamar al proveedor IA', function () {
+    $relative = 'entregas/'.$this->entrega->id.'/notas.txt';
+    $absolute = Storage::disk('public')->path($relative);
+    if (! is_dir(dirname($absolute))) {
+        mkdir(dirname($absolute), 0777, true);
+    }
+    file_put_contents($absolute, 'esto no es un documento soportado');
+
+    $version = VersionDocumento::create([
+        'entrega_id' => $this->entrega->id,
+        'version_number' => 1,
+        'file_path' => $relative,
+        'original_name' => 'notas.txt',
+        'file_size' => filesize($absolute) ?: 0,
+        'uploaded_at' => now(),
+        'archivo_requerido_id' => 'documento-proyecto',
+    ]);
+
+    $stub = bindAbetStubProvider(sampleDirectorPreliminaryPayload());
+
+    $this->actingAs($this->director)
+        ->postJson("/api/director/entregas/{$this->entrega->id}/evaluacion-abet", [
+            'version_id' => $version->id,
+        ])
+        ->assertStatus(422)
+        ->assertJsonPath('code', 'invalid_document')
+        ->assertJsonPath('error', 'Solo se aceptan documentos en formato DOCX o PDF.');
+
+    expect($stub->lastRequest)->toBeNull()
+        ->and(AiDocumentEvaluation::query()->count())->toBe(0);
+});
+
+it('rechaza un PDF corrupto sin llamar al proveedor IA', function () {
+    $relative = 'entregas/'.$this->entrega->id.'/roto.pdf';
+    $absolute = Storage::disk('public')->path($relative);
+    if (! is_dir(dirname($absolute))) {
+        mkdir(dirname($absolute), 0777, true);
+    }
+    file_put_contents($absolute, '%PDF-1.4 contenido corrupto que no se puede parsear');
+
+    $version = VersionDocumento::create([
+        'entrega_id' => $this->entrega->id,
+        'version_number' => 1,
+        'file_path' => $relative,
+        'original_name' => 'roto.pdf',
+        'file_size' => filesize($absolute) ?: 0,
+        'uploaded_at' => now(),
+        'archivo_requerido_id' => 'documento-proyecto',
+    ]);
+
+    $stub = bindAbetStubProvider(sampleDirectorPreliminaryPayload());
+
+    $this->actingAs($this->director)
+        ->postJson("/api/director/entregas/{$this->entrega->id}/evaluacion-abet", [
+            'version_id' => $version->id,
+        ])
+        ->assertStatus(422)
+        ->assertJsonPath('code', 'invalid_document')
+        ->assertJsonPath('error', 'El archivo está corrupto o no es válido.');
+
+    expect($stub->lastRequest)->toBeNull();
+});
+
+it('diferencia un error de proveedor IA de un error de conversion', function () {
+    $version = storeAbetPdfVersion($this->entrega);
+
+    $this->actingAs($this->director)
+        ->postJson("/api/director/entregas/{$this->entrega->id}/evaluacion-abet", [
+            'version_id' => $version->id,
+        ])
+        ->assertStatus(503)
+        ->assertJsonPath('code', 'ai_unavailable');
 });

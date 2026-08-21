@@ -40,7 +40,6 @@ final class StoreEntregaAction
             'start_time' => $data['hora_inicio'] ?? null,
             'hora_maxima' => $data['hora_maxima'] ?? null,
             'acceptance_criteria' => $data['criterios'] ?? null,
-            'evaluation_metrics' => $data['metricas_evaluacion'] ?? $data['evaluation_metrics'] ?? null,
             'status' => 'pendiente',
             'grade_percentage' => $data['grade_percentage'] ?? null,
             'archivos_requeridos' => $archivos,

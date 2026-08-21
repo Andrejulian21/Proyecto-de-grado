@@ -43,10 +43,6 @@ final class UpdateEntregaAction
             $entrega->acceptance_criteria = $data['criterios'];
         }
 
-        if (array_key_exists('metricas_evaluacion', $data) || array_key_exists('evaluation_metrics', $data)) {
-            $entrega->evaluation_metrics = $data['metricas_evaluacion'] ?? $data['evaluation_metrics'];
-        }
-
         if (array_key_exists('hora_maxima', $data)) {
             $entrega->hora_maxima = $data['hora_maxima'];
         }

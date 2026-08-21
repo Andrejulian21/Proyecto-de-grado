@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { GroupSelector } from '@/components/forms/GroupSelector';
-import { MetricasEvaluacionField } from '@/components/forms/MetricasEvaluacionField';
 import { useEntregas, FASE_SEQUENCE, type Fase, type Entrega, type UpdateEntregaPayload } from '@/hooks/useEntregas';
 import ArchivosRequeridosBuilder, {
     SLUG_DOCUMENTO_PROYECTO,
@@ -78,7 +77,6 @@ export default function CoordinadorEntregas() {
     const [formHoraInicio, setFormHoraInicio] = useState('');
     const [formHora, setFormHora] = useState('');
     const [formCriterios, setFormCriterios] = useState('');
-    const [formMetricas, setFormMetricas] = useState('');
     const [formGradePercentage, setFormGradePercentage] = useState('');
     const [formArchivos, setFormArchivos] = useState<ArchivoRequeridoConfig[]>(archivosPorDefecto);
     const [formArchivosError, setFormArchivosError] = useState<string | null>(null);
@@ -118,7 +116,6 @@ export default function CoordinadorEntregas() {
                     fecha_inicio: formFechaInicio || undefined,
                     hora_inicio: formHoraInicio || undefined,
                     criterios: formCriterios.trim() || undefined,
-                    metricas_evaluacion: formMetricas.trim() || undefined,
                     hora_maxima: formHora || undefined,
                     grade_percentage: formGradePercentage === '' ? null : Number(formGradePercentage),
                     archivos_requeridos: validArchivos,
@@ -130,7 +127,6 @@ export default function CoordinadorEntregas() {
                 setFormHoraInicio('');
                 setFormHora('');
                 setFormCriterios('');
-                setFormMetricas('');
                 setFormGradePercentage('');
                 setFormArchivos(archivosPorDefecto());
                 setFormArchivosError(null);
@@ -141,7 +137,7 @@ export default function CoordinadorEntregas() {
                 creatingRef.current = false;
             }
         },
-        [selectedGroup, formFase, formTitulo, formDesc, formFecha, formFechaInicio, formHoraInicio, formHora, formCriterios, formMetricas, formGradePercentage, formArchivos, crear],
+        [selectedGroup, formFase, formTitulo, formDesc, formFecha, formFechaInicio, formHoraInicio, formHora, formCriterios, formGradePercentage, formArchivos, crear],
     );
 
     // ── Edit modal state ─────────────────────────────────────────
@@ -153,7 +149,6 @@ export default function CoordinadorEntregas() {
     const [editDesc, setEditDesc] = useState('');
     const [editHora, setEditHora] = useState('');
     const [editCriterios, setEditCriterios] = useState('');
-    const [editMetricas, setEditMetricas] = useState('');
     const [editGradePercentage, setEditGradePercentage] = useState('');
     const [editFase, setEditFase] = useState<string>('');
     const [editGrupoId, setEditGrupoId] = useState<number | null>(null);
@@ -178,7 +173,6 @@ export default function CoordinadorEntregas() {
         setEditDesc(entrega.description || '');
         setEditHora(entrega.hora_maxima ?? '');
         setEditCriterios(entrega.acceptance_criteria ?? '');
-        setEditMetricas(entrega.evaluation_metrics ?? '');
         setEditGradePercentage(entrega.grade_percentage != null ? String(entrega.grade_percentage) : '');
         setEditFase(entrega.phase);
         setEditGrupoId(entrega.grupo_id);
@@ -221,7 +215,6 @@ export default function CoordinadorEntregas() {
                 descripcion: editDesc.trim(),
                 fecha_limite: editFecha,
                 criterios: editCriterios.trim() || null,
-                metricas_evaluacion: editMetricas.trim() || null,
                 hora_maxima: editHora || null,
                 fecha_inicio: editFechaInicio || null,
                 hora_inicio: editHoraInicio || null,
@@ -234,7 +227,7 @@ export default function CoordinadorEntregas() {
         } catch (err) {
             setEditError(err instanceof Error ? err.message : 'Error al actualizar');
         }
-    }, [editingEntrega, editFecha, editFechaInicio, editHoraInicio, editTitulo, editDesc, editHora, editCriterios, editMetricas, editGradePercentage, editFase, editArchivos, actualizar, closeEditModal]);
+    }, [editingEntrega, editFecha, editFechaInicio, editHoraInicio, editTitulo, editDesc, editHora, editCriterios, editGradePercentage, editFase, editArchivos, actualizar, closeEditModal]);
 
     // ── Delete confirmation state ────────────────────────────────
     const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -375,17 +368,23 @@ export default function CoordinadorEntregas() {
                         </div>
 
                         <div className="flex flex-col gap-1.5 sm:col-span-2">
-                            <label className="text-sm font-semibold text-[#1c1917]">
+                            <label htmlFor="form-descripcion" className="text-sm font-semibold text-[#1c1917]">
                                 Descripción <span className="text-[#dc2626]">*</span>
                             </label>
                             <textarea
+                                id="form-descripcion"
                                 value={formDesc}
                                 onChange={(e) => setFormDesc(e.target.value)}
-                                rows={3}
-                                placeholder="Descripción de la entrega"
-                                className="w-full min-h-[60px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y"
+                                rows={4}
+                                maxLength={2000}
+                                placeholder="Ej: En esta entrega el estudiante debe presentar el planteamiento del problema, incluyendo contexto, situación problemática, causas y consecuencias."
+                                className="w-full min-h-[80px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y"
                                 required
                             />
+                            <p className="text-xs text-[#78716c]">
+                                Explique qué debe entregar el estudiante. Este texto también es el contexto del
+                                análisis preliminar de IA.
+                            </p>
                         </div>
 
                         <div className="flex flex-col gap-1.5 sm:col-span-2">
@@ -398,14 +397,6 @@ export default function CoordinadorEntregas() {
                                 rows={3}
                                 placeholder="Criterios que debe cumplir la entrega para ser aprobada"
                                 className="w-full min-h-[60px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y"
-                            />
-                        </div>
-
-                        <div className="sm:col-span-2">
-                            <MetricasEvaluacionField
-                                id="create-metricas-evaluacion"
-                                value={formMetricas}
-                                onChange={setFormMetricas}
                             />
                         </div>
 
@@ -700,15 +691,6 @@ export default function CoordinadorEntregas() {
                                                 </p>
                                             </div>
                                         )}
-
-                                        {entrega.evaluation_metrics && (
-                                            <div>
-                                                <span className="font-medium text-[#78716c]">Métricas IA:</span>
-                                                <p className="mt-0.5 line-clamp-2 text-[#1c1917]">
-                                                    {entrega.evaluation_metrics}
-                                                </p>
-                                            </div>
-                                        )}
                                     </div>
 
                                     {/* Card footer — acciones */}
@@ -792,15 +774,17 @@ export default function CoordinadorEntregas() {
 
                             {/* Descripción */}
                             <div className="flex flex-col gap-1.5">
-                                <label className="text-sm font-semibold text-[#1c1917]">
+                                <label htmlFor="edit-descripcion" className="text-sm font-semibold text-[#1c1917]">
                                     Descripción <span className="text-[#dc2626]">*</span>
                                 </label>
                                 <textarea
+                                    id="edit-descripcion"
                                     value={editDesc}
                                     onChange={(e) => setEditDesc(e.target.value)}
-                                    rows={3}
-                                    placeholder="Descripción de la entrega"
-                                    className="w-full min-h-[60px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y"
+                                    rows={4}
+                                    maxLength={2000}
+                                    placeholder="Explique qué debe entregar el estudiante. Este texto es el contexto del análisis preliminar de IA."
+                                    className="w-full min-h-[80px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y"
                                 />
                             </div>
 
@@ -817,12 +801,6 @@ export default function CoordinadorEntregas() {
                                     className="w-full min-h-[60px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y"
                                 />
                             </div>
-
-                            <MetricasEvaluacionField
-                                id="edit-metricas-evaluacion"
-                                value={editMetricas}
-                                onChange={setEditMetricas}
-                            />
 
                             {/* Archivos requeridos */}
                             <ArchivosRequeridosBuilder

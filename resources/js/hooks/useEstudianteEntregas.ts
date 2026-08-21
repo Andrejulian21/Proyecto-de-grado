@@ -58,7 +58,6 @@ export interface EntregaAnalisisContext {
     fase: string;
     faseLabel: string;
     descripcion: string | null;
-    metricas_evaluacion: string | null;
     criterios_aceptacion: string | null;
     estado: string;
 }
@@ -79,7 +78,6 @@ export function mapEntregaToAnalisisContext(raw: any): EntregaAnalisisContext {
         fase,
         faseLabel: ESTUDIANTE_PHASES.find((p) => p.id === fase)?.label ?? fase,
         descripcion: raw.descripcion ?? raw.description ?? null,
-        metricas_evaluacion: raw.metricas_evaluacion ?? raw.evaluation_metrics ?? null,
         criterios_aceptacion: raw.criterios ?? raw.acceptance_criteria ?? null,
         estado: raw.estado || raw.status || '',
     };

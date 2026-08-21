@@ -44,11 +44,14 @@ beforeEach(function () {
     ]);
     $this->proyecto->estudiantes()->attach($this->estudiante);
 
+    $this->descripcionEsperada = 'En esta entrega el estudiante debe presentar el planteamiento del problema.';
+
     $this->entrega = Entrega::create([
         'proyecto_id' => $this->proyecto->id,
         'semester_id' => $this->semestre->id,
         'phase' => 'anteproyecto',
         'title' => 'Anteproyecto ABET',
+        'description' => $this->descripcionEsperada,
         'due_date' => '2026-03-15',
         'status' => 'enviada',
         'evaluation_metrics' => 'Claridad de objetivos y evidencia de competencias.',
@@ -69,8 +72,8 @@ function storeAbetDocxVersion(Entrega $entrega, string $name = 'avance.docx'): V
 {
     $phpWord = new PhpWord;
     $section = $phpWord->addSection();
-    $section->addText('Documento de prueba para evaluacion ABET.');
-    $section->addText('Objetivo: validar el flujo de evaluacion por criterios.');
+    $section->addText('Documento de prueba para analisis preliminar del director.');
+    $section->addText('Objetivo: validar el flujo sin metricas.');
 
     $relative = 'entregas/'.$entrega->id.'/'.$name;
     $absolute = Storage::disk('public')->path($relative);
@@ -91,10 +94,12 @@ function storeAbetDocxVersion(Entrega $entrega, string $name = 'avance.docx'): V
     ]);
 }
 
-function bindAbetStubProvider(string $json): void
+function bindAbetStubProvider(string $json): object
 {
     $stub = new class($json) implements AiProvider
     {
+        public ?AiRequest $lastRequest = null;
+
         public function __construct(private readonly string $json) {}
 
         public function name(): string
@@ -104,6 +109,8 @@ function bindAbetStubProvider(string $json): void
 
         public function complete(AiRequest $request): AiResponse
         {
+            $this->lastRequest = $request;
+
             return new AiResponse(content: $this->json, provider: $this->name(), model: 'stub-model');
         }
     };
@@ -115,34 +122,28 @@ function bindAbetStubProvider(string $json): void
 
     app()->instance(AiProviderRegistry::class, $registry);
     app()->instance(AiGateway::class, new AiGateway($registry));
+
+    return $stub;
 }
 
-function sampleAbetPayload(): string
+function sampleDirectorPreliminaryPayload(): string
 {
     return json_encode([
-        'resumen_ejecutivo' => 'El documento muestra avances parciales en competencias clave.',
-        'criterios_evaluados' => [
-            [
-                'id' => 'SO1',
-                'nombre' => 'Resolución de problemas complejos',
-                'cumplimiento' => 'medio',
-                'evidencias' => ['Se formula el problema en la introducción'],
-                'observaciones' => 'Falta mayor formalización matemática',
-            ],
-        ],
-        'fortalezas' => ['Estructura clara'],
-        'oportunidades_mejora' => ['Ampliar evidencia de experimentación'],
-        'observaciones' => ['El alcance aún es amplio'],
-        'recomendaciones' => ['Agregar métricas de éxito'],
-        'riesgos' => ['Retraso por alcance'],
-        'conclusion' => 'Apto para revisión del Director con ajustes menores.',
-        'perfil_metricas' => 'abet_placeholder_v1',
+        'resumen' => 'Análisis preliminar del documento oficial.',
+        'coherencia' => 'El hilo argumental es reconocible.',
+        'claridad' => 'La redacción se entiende en términos generales.',
+        'estructura' => 'Hay secciones identificables.',
+        'completitud_aparente' => 'Cubre de forma superficial lo pedido.',
+        'correspondencia' => 'Se relaciona con el planteamiento del problema.',
+        'observaciones' => ['Falta detalle en las consecuencias.'],
+        'recomendaciones' => ['Pedir al estudiante que amplíe el contexto.'],
+        'conclusion' => 'Orientación preliminar. La evaluación académica corresponde al director.',
     ], JSON_THROW_ON_ERROR);
 }
 
-it('completa evaluacion ABET con proveedor stub y persiste resultado', function () {
+it('completa analisis preliminar del director con proveedor stub', function () {
     $version = storeAbetDocxVersion($this->entrega);
-    bindAbetStubProvider(sampleAbetPayload());
+    $stub = bindAbetStubProvider(sampleDirectorPreliminaryPayload());
 
     $response = $this->actingAs($this->director)
         ->postJson("/api/director/entregas/{$this->entrega->id}/evaluacion-abet", [
@@ -153,15 +154,24 @@ it('completa evaluacion ABET con proveedor stub y persiste resultado', function 
         ->assertJsonPath('data.tipo', 'abet')
         ->assertJsonPath('data.estado', 'completed')
         ->assertJsonPath('data.proveedor', 'stub')
-        ->assertJsonPath('data.perfil_metricas', 'abet_placeholder_v1')
-        ->assertJsonPath('data.resultado.resumen_ejecutivo', 'El documento muestra avances parciales en competencias clave.')
-        ->assertJsonPath('data.resultado.criterios_evaluados.0.id', 'SO1');
+        ->assertJsonPath('data.resultado.observaciones.0', 'Falta detalle en las consecuencias.')
+        ->assertJsonMissingPath('data.perfil_metricas')
+        ->assertJsonMissingPath('data.resultado.criterios_evaluados')
+        ->assertJsonMissingPath('data.resultado.puntaje_orientativo');
 
     $row = AiDocumentEvaluation::query()->first();
     expect($row)->not->toBeNull()
         ->and($row->type)->toBe(AiEvaluationType::Abet)
         ->and($row->status)->toBe(AiEvaluationStatus::Completed)
-        ->and($row->result_json['perfil_metricas'])->toBe('abet_placeholder_v1');
+        ->and($row->result_json)->not->toHaveKey('perfil_metricas');
+
+    $promptText = collect($stub->lastRequest?->messages ?? [])
+        ->map(fn ($message) => $message->content)
+        ->implode("\n");
+
+    expect($promptText)->toContain($this->descripcionEsperada)
+        ->and($promptText)->not->toContain('Claridad de objetivos y evidencia de competencias.')
+        ->and($promptText)->not->toContain('abet_placeholder_v1');
 });
 
 it('responde 503 amigable cuando el proveedor no esta configurado', function () {
@@ -193,9 +203,9 @@ it('niega acceso a un director que no dirige el proyecto', function () {
     $response->assertStatus(403);
 });
 
-it('devuelve la ultima evaluacion ABET completada', function () {
+it('devuelve el ultimo analisis preliminar completado', function () {
     $version = storeAbetDocxVersion($this->entrega);
-    bindAbetStubProvider(sampleAbetPayload());
+    bindAbetStubProvider(sampleDirectorPreliminaryPayload());
 
     $this->actingAs($this->director)
         ->postJson("/api/director/entregas/{$this->entrega->id}/evaluacion-abet", [
@@ -208,7 +218,8 @@ it('devuelve la ultima evaluacion ABET completada', function () {
 
     $response->assertOk()
         ->assertJsonPath('data.tipo', 'abet')
-        ->assertJsonPath('data.resultado.conclusion', 'Apto para revisión del Director con ajustes menores.');
+        ->assertJsonPath('data.resultado.conclusion', 'Orientación preliminar. La evaluación académica corresponde al director.')
+        ->assertJsonMissingPath('data.perfil_metricas');
 });
 
 it('exige autenticacion', function () {

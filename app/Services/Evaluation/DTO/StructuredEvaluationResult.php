@@ -5,29 +5,25 @@ declare(strict_types=1);
 namespace App\Services\Evaluation\DTO;
 
 /**
- * Normalized evaluation payload returned to consumers / UI.
- *
- * @phpstan-type PriorityItem array{item: string, criticidad: string}
+ * Normalized preliminary analysis payload returned to consumers / UI.
+ * Must not include an academic grade.
  */
 final readonly class StructuredEvaluationResult
 {
     /**
-     * @param  list<string>  $fortalezas
-     * @param  list<string>  $aspectosMejorar
-     * @param  list<string>  $errores
+     * @param  list<string>  $observaciones
      * @param  list<string>  $recomendaciones
-     * @param  list<array{item: string, criticidad: string}>  $prioridades
      */
     public function __construct(
         public string $resumen,
-        public array $fortalezas,
-        public array $aspectosMejorar,
-        public array $errores,
+        public string $coherencia,
+        public string $claridad,
+        public string $estructura,
+        public string $completitudAparente,
+        public string $correspondencia,
+        public array $observaciones,
         public array $recomendaciones,
         public string $conclusion,
-        public array $prioridades = [],
-        public ?float $confianza = null,
-        public ?int $puntajeOrientativo = null,
     ) {}
 
     /**
@@ -37,14 +33,14 @@ final readonly class StructuredEvaluationResult
     {
         return [
             'resumen' => $this->resumen,
-            'fortalezas' => $this->fortalezas,
-            'aspectos_mejorar' => $this->aspectosMejorar,
-            'errores' => $this->errores,
+            'coherencia' => $this->coherencia,
+            'claridad' => $this->claridad,
+            'estructura' => $this->estructura,
+            'completitud_aparente' => $this->completitudAparente,
+            'correspondencia' => $this->correspondencia,
+            'observaciones' => $this->observaciones,
             'recomendaciones' => $this->recomendaciones,
             'conclusion' => $this->conclusion,
-            'prioridades' => $this->prioridades,
-            'confianza' => $this->confianza,
-            'puntaje_orientativo' => $this->puntajeOrientativo,
         ];
     }
 }

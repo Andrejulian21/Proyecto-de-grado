@@ -8,7 +8,8 @@ use App\Exceptions\AiException;
 use App\Services\Evaluation\DTO\StructuredEvaluationResult;
 
 /**
- * Parses provider-agnostic AI text into a structured evaluation result.
+ * Parses provider-agnostic AI text into a preliminary analysis result.
+ * Academic scores and metric profiles are ignored even if the model emits them.
  */
 final class EvaluationResultParser
 {
@@ -21,16 +22,28 @@ final class EvaluationResultParser
             throw AiException::providerFailed('La respuesta de IA no tiene un formato JSON válido.');
         }
 
+        $observaciones = $this->stringList($data, 'observaciones');
+
+        if ($observaciones === []) {
+            $observaciones = array_values(array_filter([
+                ...$this->stringList($data, 'fortalezas'),
+                ...$this->stringList($data, 'aspectos_mejorar'),
+                ...$this->stringList($data, 'errores'),
+            ]));
+        }
+
         return new StructuredEvaluationResult(
-            resumen: $this->stringField($data, 'resumen'),
-            fortalezas: $this->stringList($data, 'fortalezas'),
-            aspectosMejorar: $this->stringList($data, 'aspectos_mejorar'),
-            errores: $this->stringList($data, 'errores'),
+            resumen: $this->stringField($data, 'resumen') !== ''
+                ? $this->stringField($data, 'resumen')
+                : $this->stringField($data, 'resumen_ejecutivo'),
+            coherencia: $this->stringField($data, 'coherencia'),
+            claridad: $this->stringField($data, 'claridad'),
+            estructura: $this->stringField($data, 'estructura'),
+            completitudAparente: $this->stringField($data, 'completitud_aparente'),
+            correspondencia: $this->stringField($data, 'correspondencia'),
+            observaciones: $observaciones,
             recomendaciones: $this->stringList($data, 'recomendaciones'),
             conclusion: $this->stringField($data, 'conclusion'),
-            prioridades: $this->priorities($data),
-            confianza: $this->optionalFloat($data, 'confianza'),
-            puntajeOrientativo: $this->optionalIntScore($data, 'puntaje_orientativo'),
         );
     }
 
@@ -83,73 +96,5 @@ final class EvaluationResultParser
         }
 
         return $items;
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     * @return list<array{item: string, criticidad: string}>
-     */
-    private function priorities(array $data): array
-    {
-        $value = $data['prioridades'] ?? [];
-
-        if (! is_array($value)) {
-            return [];
-        }
-
-        $items = [];
-
-        foreach ($value as $row) {
-            if (! is_array($row)) {
-                continue;
-            }
-            $item = isset($row['item']) && is_string($row['item']) ? trim($row['item']) : '';
-            $criticidad = isset($row['criticidad']) && is_string($row['criticidad'])
-                ? strtolower(trim($row['criticidad']))
-                : 'media';
-
-            if ($item === '') {
-                continue;
-            }
-
-            if (! in_array($criticidad, ['alta', 'media', 'baja'], true)) {
-                $criticidad = 'media';
-            }
-            $items[] = ['item' => $item, 'criticidad' => $criticidad];
-        }
-
-        return $items;
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    private function optionalFloat(array $data, string $key): ?float
-    {
-        if (! array_key_exists($key, $data) || $data[$key] === null) {
-            return null;
-        }
-
-        if (! is_numeric($data[$key])) {
-            return null;
-        }
-
-        return max(0.0, min(1.0, (float) $data[$key]));
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    private function optionalIntScore(array $data, string $key): ?int
-    {
-        if (! array_key_exists($key, $data) || $data[$key] === null) {
-            return null;
-        }
-
-        if (! is_numeric($data[$key])) {
-            return null;
-        }
-
-        return max(0, min(100, (int) $data[$key]));
     }
 }

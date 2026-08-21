@@ -71,7 +71,7 @@ export default function SeleccionEntregaAnalisisIA() {
             <PageHeader
                 eyebrow="IA"
                 title="Evaluador Inteligente"
-                subtitle="Selecciona una entrega para analizar un borrador DOCX antes del envío oficial"
+                subtitle="Selecciona una entrega para un análisis preliminar de un borrador DOCX (no reemplaza al director)"
             />
 
             <div className="rounded-xl border border-[#e5e5e5] bg-white p-5 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">

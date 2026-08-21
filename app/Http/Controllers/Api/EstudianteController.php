@@ -146,7 +146,6 @@ class EstudianteController extends Controller
                     'estado' => $statusValue,
                     'nota' => $entrega->consolidated_grade,
                     'criterios' => $entrega->acceptance_criteria,
-                    'metricas_evaluacion' => $entrega->evaluation_metrics,
                     'archivos_requeridos' => $entrega->archivos_requeridos,
                     'total_versiones' => $versiones->count(),
                     'ultima_version' => $versiones->last()['numero_version'] ?? null,

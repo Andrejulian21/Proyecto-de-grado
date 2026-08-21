@@ -12,52 +12,34 @@ import {
     FileText,
     Brain,
     AlertTriangle,
-    CheckCircle2,
-    XCircle,
     Loader2,
     Upload,
 } from 'lucide-react';
 
-interface Prioridad {
-    item: string;
-    criticidad: string;
-}
-
-interface ResultadoEvaluacion {
+interface ResultadoAnalisis {
     resumen: string;
-    fortalezas: string[];
-    aspectos_mejorar: string[];
-    errores: string[];
-    recomendaciones: string[];
+    coherencia?: string;
+    claridad?: string;
+    estructura?: string;
+    completitud_aparente?: string;
+    correspondencia?: string;
+    observaciones?: string[];
+    recomendaciones?: string[];
     conclusion: string;
-    prioridades?: Prioridad[];
-    confianza?: number | null;
-    puntaje_orientativo?: number | null;
-}
-
-interface ChecklistItem {
-    id: string;
-    label: string;
-    passed: boolean | null;
-    details: string;
 }
 
 interface LocationState {
     entrega?: EntregaAnalisisContext;
 }
 
-function buildChecklist(resultado: ResultadoEvaluacion): ChecklistItem[] {
-    const items: ChecklistItem[] = [];
-    resultado.fortalezas.forEach((text, index) => {
-        items.push({ id: `f-${index}`, label: text, passed: true, details: 'Fortaleza detectada' });
-    });
-    resultado.aspectos_mejorar.forEach((text, index) => {
-        items.push({ id: `m-${index}`, label: text, passed: false, details: 'Aspecto por mejorar' });
-    });
-    resultado.errores.forEach((text, index) => {
-        items.push({ id: `e-${index}`, label: text, passed: false, details: 'Error detectado' });
-    });
-    return items;
+function AspectBlock({ title, text }: { title: string; text?: string }) {
+    if (!text) return null;
+    return (
+        <div>
+            <p className="mb-1 text-xs font-semibold text-[#1c1917]">{title}</p>
+            <p className="text-sm text-[#44403c]">{text}</p>
+        </div>
+    );
 }
 
 export default function AnalisisAutomaticoEntregas() {
@@ -73,7 +55,7 @@ export default function AnalisisAutomaticoEntregas() {
     const [processing, setProcessing] = useState(false);
     const [actionError, setActionError] = useState<string | null>(null);
     const [aiUnavailable, setAiUnavailable] = useState(false);
-    const [resultado, setResultado] = useState<ResultadoEvaluacion | null>(null);
+    const [resultado, setResultado] = useState<ResultadoAnalisis | null>(null);
 
     const entregaId = Number(entregaIdParam);
 
@@ -113,10 +95,7 @@ export default function AnalisisAutomaticoEntregas() {
         };
     }, [entregaId, entregaIdParam, navigate, state.entrega]);
 
-    const checklist = resultado ? buildChecklist(resultado) : [];
-    const passedCount = checklist.filter((c) => c.passed === true).length;
-    const totalCount = checklist.length;
-    const coherenceScore = resultado?.puntaje_orientativo ?? null;
+    const observaciones = resultado?.observaciones ?? [];
 
     const fileLabel = useMemo(() => {
         if (!file) return null;
@@ -178,8 +157,8 @@ export default function AnalisisAutomaticoEntregas() {
         <div className="flex flex-col gap-6">
             <PageHeader
                 eyebrow="IA"
-                title="Análisis Automático de Entregas"
-                subtitle="Evaluación preventiva con un borrador DOCX (no modifica la entrega oficial)"
+                title="Análisis preliminar de IA"
+                subtitle="Retroalimentación preliminar con un borrador DOCX (no modifica la entrega oficial ni reemplaza al director)"
                 actions={
                     <button
                         onClick={() => navigate('/analisis-entregas')}
@@ -216,18 +195,12 @@ export default function AnalisisAutomaticoEntregas() {
                             <p className="text-sm font-semibold text-[#1c1917]">{entrega.faseLabel}</p>
                         </div>
                         <div className="sm:col-span-2">
-                            <p className="text-xs text-[#78716c]">Métricas de evaluación</p>
+                            <p className="text-xs text-[#78716c]">Lo esperado en esta entrega</p>
                             <p className="text-sm text-[#44403c] whitespace-pre-wrap">
-                                {entrega.metricas_evaluacion || 'Sin métricas configuradas.'}
+                                {entrega.descripcion || 'Esta entrega no tiene una descripción definida.'}
                             </p>
                         </div>
                     </div>
-                    {entrega.descripcion && (
-                        <div className="mt-4 border-t border-[#e5e5e5] pt-3">
-                            <p className="text-xs text-[#78716c]">Descripción</p>
-                            <p className="mt-1 text-sm text-[#44403c] whitespace-pre-wrap">{entrega.descripcion}</p>
-                        </div>
-                    )}
                 </div>
             )}
 
@@ -296,64 +269,44 @@ export default function AnalisisAutomaticoEntregas() {
                                 <div className="rounded-xl border border-[#e5e5e5] bg-white p-5 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                                     <div className="mb-3 flex items-center gap-2">
                                         <Brain className="h-5 w-5 text-[#c2410c]" />
-                                        <h3 className="text-sm font-bold text-[#1c1917]">Puntaje orientativo</h3>
+                                        <h3 className="text-sm font-bold text-[#1c1917]">
+                                            Retroalimentación preliminar de IA
+                                        </h3>
                                     </div>
-                                    {coherenceScore !== null ? (
-                                        <>
-                                            <div className="flex items-baseline gap-1">
-                                                <span className="text-4xl font-bold tabular-nums text-[#c2410c]">
-                                                    {coherenceScore}
-                                                </span>
-                                                <span className="text-sm text-[#78716c]">/ 100</span>
-                                            </div>
-                                            <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-[#e7e5e4]">
-                                                <div
-                                                    className="h-full rounded-full bg-[#c2410c]"
-                                                    style={{ width: `${coherenceScore}%` }}
-                                                />
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <p className="text-sm text-[#57534e]">Sin puntaje numérico en esta evaluación.</p>
-                                    )}
                                     {resultado.resumen && (
-                                        <p className="mt-2 text-xs text-[#57534e]">{resultado.resumen}</p>
+                                        <p className="text-sm text-[#44403c]">{resultado.resumen}</p>
                                     )}
-                                </div>
-
-                                <div className="rounded-xl border border-[#e5e5e5] bg-white p-5 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
-                                    <div className="mb-3 flex items-center justify-between">
-                                        <h3 className="text-sm font-bold text-[#1c1917]">Checklist de Calidad</h3>
-                                        <span className="text-xs font-semibold tabular-nums text-[#1c1917]">
-                                            {passedCount}/{totalCount || 0}
-                                        </span>
+                                    <div className="mt-4 flex flex-col gap-3">
+                                        <AspectBlock title="Coherencia" text={resultado.coherencia} />
+                                        <AspectBlock title="Claridad" text={resultado.claridad} />
+                                        <AspectBlock title="Estructura" text={resultado.estructura} />
+                                        <AspectBlock
+                                            title="Completitud aparente"
+                                            text={resultado.completitud_aparente}
+                                        />
+                                        <AspectBlock
+                                            title="Correspondencia con lo solicitado"
+                                            text={resultado.correspondencia}
+                                        />
                                     </div>
-                                    {checklist.length === 0 ? (
-                                        <p className="text-xs text-[#78716c]">No se generaron ítems de checklist.</p>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            {checklist.map((item) => (
-                                                <div key={item.id} className="flex items-start gap-2.5">
-                                                    {item.passed === true ? (
-                                                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#16a34a]" />
-                                                    ) : (
-                                                        <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#dc2626]" />
-                                                    )}
-                                                    <div>
-                                                        <p className="text-sm text-[#1c1917]">{item.label}</p>
-                                                        <p className="mt-0.5 text-xs text-[#78716c]">{item.details}</p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
                                 </div>
 
-                                {resultado.recomendaciones.length > 0 && (
+                                {observaciones.length > 0 && (
+                                    <div className="rounded-xl border border-[#e5e5e5] bg-white p-5 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
+                                        <h3 className="mb-2 text-sm font-bold text-[#1c1917]">Observaciones</h3>
+                                        <ul className="list-disc space-y-1 pl-4 text-xs text-[#57534e]">
+                                            {observaciones.map((item, index) => (
+                                                <li key={`o-${index}`}>{item}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+
+                                {(resultado.recomendaciones ?? []).length > 0 && (
                                     <div className="rounded-xl border border-[#e5e5e5] bg-white p-5 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                                         <h3 className="mb-2 text-sm font-bold text-[#1c1917]">Recomendaciones</h3>
                                         <ul className="list-disc space-y-1 pl-4 text-xs text-[#57534e]">
-                                            {resultado.recomendaciones.map((item, index) => (
+                                            {(resultado.recomendaciones ?? []).map((item, index) => (
                                                 <li key={`r-${index}`}>{item}</li>
                                             ))}
                                         </ul>
@@ -374,11 +327,11 @@ export default function AnalisisAutomaticoEntregas() {
                                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#d97706]" />
                                 <div>
                                     <p className="text-xs font-semibold text-[#78350f]">
-                                        Análisis asistido por inteligencia artificial
+                                        La evaluación de IA es orientativa
                                     </p>
                                     <p className="mt-1 text-xs text-[#78350f]">
-                                        Herramienta preventiva. No reemplaza la revisión del director. El archivo
-                                        analizado no se convierte en entrega oficial.
+                                        Este análisis preliminar no reemplaza la evaluación académica del director.
+                                        El archivo analizado no se convierte en entrega oficial.
                                     </p>
                                 </div>
                             </div>

@@ -35,7 +35,6 @@ export interface Entrega extends EntregaPeso {
     start_date?: string | null;
     start_time?: string | null;
     acceptance_criteria?: string;
-    evaluation_metrics?: string | null;
     hora_maxima?: string;
     status?: string;
     created_at?: string;
@@ -57,7 +56,6 @@ export interface CreateEntregaPayload {
     fecha_inicio?: string;
     hora_inicio?: string;
     criterios?: string;
-    metricas_evaluacion?: string;
     hora_maxima?: string;
     grade_percentage?: number | null;
     archivos_requeridos?: ArchivoRequeridoConfig[];
@@ -70,8 +68,6 @@ export interface UpdateEntregaPayload {
     fecha_inicio?: string | null;
     hora_inicio?: string | null;
     criterios?: string | null;
-    metricas_evaluacion?: string | null;
-    evaluation_metrics?: string | null;
     hora_maxima?: string | null;
     fase?: string;
     proyecto_id?: number;

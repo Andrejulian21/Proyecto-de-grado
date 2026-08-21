@@ -13,15 +13,14 @@ use App\Http\Controllers\Controller;
 use App\Models\AiDocumentEvaluation;
 use App\Services\Evaluation\Access\DirectorEntregaAccessResolver;
 use App\Services\Evaluation\DocumentEvaluationService;
-use App\Services\Evaluation\Interpreters\AbetEvaluationResultInterpreter;
-use App\Services\Evaluation\Metrics\PlaceholderAbetMetricsDefinition;
+use App\Services\Evaluation\Interpreters\PreSubmissionResultInterpreter;
 use App\Services\Evaluation\Strategies\AbetDirectorEvaluationStrategy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * Director-facing ABET-oriented document evaluation.
- * Reuses DocumentEvaluationService; never talks to AI vendors.
+ * Director-facing preliminary document analysis.
+ * Reuses DocumentEvaluationService and the shared preliminary prompt; never talks to AI vendors.
  */
 class EvaluacionAbetController extends Controller
 {
@@ -29,12 +28,12 @@ class EvaluacionAbetController extends Controller
         private readonly DocumentEvaluationService $evaluationService,
         private readonly AbetDirectorEvaluationStrategy $strategy,
         private readonly DirectorEntregaAccessResolver $access,
-        private readonly PlaceholderAbetMetricsDefinition $metrics,
+        private readonly PreSubmissionResultInterpreter $interpreter,
     ) {}
 
     /**
      * GET /api/director/entregas/{entrega}/evaluacion-abet
-     * Latest completed ABET evaluation for the entrega (director-scoped).
+     * Latest completed analysis for the entrega (director-scoped).
      */
     public function show(Request $request, int $entrega): JsonResponse
     {
@@ -72,15 +71,13 @@ class EvaluacionAbetController extends Controller
             'version_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
         ]);
 
-        $interpreter = new AbetEvaluationResultInterpreter($this->metrics);
-
         try {
             $outcome = $this->evaluationService->evaluate(
                 user: $request->user(),
                 entregaId: $entrega,
                 strategy: $this->strategy,
                 access: $this->access,
-                interpreter: $interpreter,
+                interpreter: $this->interpreter,
                 versionId: isset($validated['version_id']) ? (int) $validated['version_id'] : null,
             );
 
@@ -124,9 +121,6 @@ class EvaluacionAbetController extends Controller
             'estado' => $evaluation->status->value,
             'proveedor' => $evaluation->provider,
             'tiempo_ms' => $evaluation->processing_ms,
-            'perfil_metricas' => is_array($result)
-                ? ($result['perfil_metricas'] ?? null)
-                : (is_array($evaluation->result_json) ? ($evaluation->result_json['perfil_metricas'] ?? null) : null),
             'resultado' => $result ?? $evaluation->result_json,
         ];
     }

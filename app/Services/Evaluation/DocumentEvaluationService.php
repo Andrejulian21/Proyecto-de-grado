@@ -97,8 +97,7 @@ final class DocumentEvaluationService
                     phase: (string) ($entrega->phase?->value ?? $entrega->phase ?? ''),
                     proyectoTitle: (string) $proyecto->title,
                     proyectoCode: (string) ($proyecto->code ?? ''),
-                    evaluationMetrics: $entrega->evaluation_metrics,
-                    acceptanceCriteria: $entrega->acceptance_criteria,
+                    description: $entrega->description,
                     originalFileName: $originalName,
                 );
 

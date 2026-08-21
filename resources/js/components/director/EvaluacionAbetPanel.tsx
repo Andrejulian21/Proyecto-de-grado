@@ -1,25 +1,18 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/utils';
-import { AlertTriangle, Brain, CheckCircle2, Loader2 } from 'lucide-react';
+import { AlertTriangle, Brain, Loader2 } from 'lucide-react';
 
-interface CriterioEvaluado {
-    id: string;
-    nombre: string;
-    cumplimiento: string;
-    evidencias: string[];
-    observaciones: string;
-}
-
-interface ResultadoAbet {
-    resumen_ejecutivo: string;
-    criterios_evaluados: CriterioEvaluado[];
-    fortalezas: string[];
-    oportunidades_mejora: string[];
-    observaciones: string[];
-    recomendaciones: string[];
-    riesgos: string[];
-    conclusion: string;
-    perfil_metricas?: string;
+interface ResultadoPreliminar {
+    resumen?: string;
+    resumen_ejecutivo?: string;
+    coherencia?: string;
+    claridad?: string;
+    estructura?: string;
+    completitud_aparente?: string;
+    correspondencia?: string;
+    observaciones?: string[];
+    recomendaciones?: string[];
+    conclusion?: string;
 }
 
 interface Props {
@@ -45,21 +38,20 @@ function ListBlock({ title, items }: { title: string; items: string[] }) {
     );
 }
 
-function cumplimientoLabel(value: string): string {
-    const map: Record<string, string> = {
-        alto: 'Alto',
-        medio: 'Medio',
-        bajo: 'Bajo',
-        no_evidencia: 'Sin evidencia',
-    };
-    return map[value] ?? value;
+function AspectBlock({ title, text }: { title: string; text?: string }) {
+    if (!text) return null;
+    return (
+        <div>
+            <p className="mb-1 text-xs font-semibold text-[#1c1917]">{title}</p>
+            <p className="text-sm text-[#44403c]">{text}</p>
+        </div>
+    );
 }
 
 export function EvaluacionAbetPanel({ entregaId, versionId, versionLabel, isDocx }: Props) {
     const [processing, setProcessing] = useState(false);
     const [loadingLatest, setLoadingLatest] = useState(true);
-    const [resultado, setResultado] = useState<ResultadoAbet | null>(null);
-    const [perfil, setPerfil] = useState<string | null>(null);
+    const [resultado, setResultado] = useState<ResultadoPreliminar | null>(null);
     const [actionError, setActionError] = useState<string | null>(null);
     const [aiUnavailable, setAiUnavailable] = useState(false);
 
@@ -74,8 +66,7 @@ export function EvaluacionAbetPanel({ entregaId, versionId, versionLabel, isDocx
                 if (!res.ok || cancelled) return;
                 const data = payload?.data;
                 if (data?.resultado) {
-                    setResultado(data.resultado as ResultadoAbet);
-                    setPerfil(data.perfil_metricas ?? data.resultado.perfil_metricas ?? null);
+                    setResultado(data.resultado as ResultadoPreliminar);
                 }
             } catch {
                 // Optional preload — ignore
@@ -92,11 +83,11 @@ export function EvaluacionAbetPanel({ entregaId, versionId, versionLabel, isDocx
 
     async function handleEvaluate() {
         if (!versionId) {
-            setActionError('Selecciona una versión DOCX para evaluar.');
+            setActionError('Selecciona una versión DOCX para analizar.');
             return;
         }
         if (!isDocx) {
-            setActionError('Solo se pueden evaluar documentos en formato DOCX.');
+            setActionError('Solo se pueden analizar documentos en formato DOCX.');
             return;
         }
 
@@ -122,21 +113,22 @@ export function EvaluacionAbetPanel({ entregaId, versionId, versionLabel, isDocx
             }
 
             if (!res.ok) {
-                setActionError(payload?.error ?? 'No fue posible completar la evaluación ABET.');
+                setActionError(payload?.error ?? 'No fue posible completar el análisis preliminar.');
                 return;
             }
 
-            const result = payload?.data?.resultado as ResultadoAbet | undefined;
+            const result = payload?.data?.resultado as ResultadoPreliminar | undefined;
             if (result) {
                 setResultado(result);
-                setPerfil(payload?.data?.perfil_metricas ?? result.perfil_metricas ?? null);
             }
         } catch {
-            setActionError('No fue posible contactar al servicio de evaluación. Inténtalo de nuevo.');
+            setActionError('No fue posible contactar al servicio de análisis. Inténtalo de nuevo.');
         } finally {
             setProcessing(false);
         }
     }
+
+    const resumen = resultado?.resumen || resultado?.resumen_ejecutivo;
 
     return (
         <div className="rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
@@ -144,11 +136,10 @@ export function EvaluacionAbetPanel({ entregaId, versionId, versionLabel, isDocx
                 <div className="flex items-center gap-2">
                     <Brain className="h-5 w-5 text-[#c2410c]" />
                     <div>
-                        <h3 className="text-base font-bold text-[#1c1917]">Evaluación Inteligente ABET</h3>
+                        <h3 className="text-base font-bold text-[#1c1917]">Análisis preliminar de IA</h3>
                         <p className="text-xs text-[#78716c]">
-                            Usa únicamente el documento oficial seleccionado (sin carga manual)
+                            Retroalimentación preliminar sobre el documento oficial seleccionado
                             {versionLabel ? ` · ${versionLabel}` : ''}
-                            {perfil ? ` · ${perfil}` : ''}
                         </p>
                     </div>
                 </div>
@@ -159,7 +150,7 @@ export function EvaluacionAbetPanel({ entregaId, versionId, versionLabel, isDocx
                     className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                     {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
-                    {processing ? 'Evaluando…' : 'Ejecutar evaluación ABET'}
+                    {processing ? 'Analizando…' : 'Ejecutar análisis preliminar'}
                 </button>
             </div>
 
@@ -179,65 +170,34 @@ export function EvaluacionAbetPanel({ entregaId, versionId, versionLabel, isDocx
 
             {!isDocx && versionId && (
                 <p className="mb-4 text-xs text-[#78716c]">
-                    La versión seleccionada no es DOCX. Selecciona un documento Word para evaluar.
+                    La versión seleccionada no es DOCX. Selecciona un documento Word para analizar.
                 </p>
             )}
 
             {loadingLatest && !resultado && (
                 <div className="flex items-center gap-2 text-xs text-[#78716c]">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Cargando última evaluación…
+                    Cargando último análisis…
                 </div>
             )}
 
             {resultado && (
                 <div className="flex flex-col gap-4">
-                    {resultado.resumen_ejecutivo && (
+                    {resumen && (
                         <div>
-                            <p className="mb-1 text-xs font-semibold text-[#1c1917]">Resumen ejecutivo</p>
-                            <p className="text-sm text-[#44403c]">{resultado.resumen_ejecutivo}</p>
+                            <p className="mb-1 text-xs font-semibold text-[#1c1917]">Resumen</p>
+                            <p className="text-sm text-[#44403c]">{resumen}</p>
                         </div>
                     )}
 
-                    {(resultado.criterios_evaluados ?? []).length > 0 && (
-                        <div>
-                            <p className="mb-2 text-xs font-semibold text-[#1c1917]">Criterios evaluados</p>
-                            <div className="flex flex-col gap-2">
-                                {resultado.criterios_evaluados.map((c) => (
-                                    <div key={`${c.id}-${c.nombre}`} className="rounded-lg border border-[#e5e5e5] p-3">
-                                        <div className="flex flex-wrap items-center justify-between gap-2">
-                                            <p className="text-xs font-semibold text-[#1c1917]">
-                                                {c.id ? `[${c.id}] ` : ''}
-                                                {c.nombre}
-                                            </p>
-                                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-[#57534e]">
-                                                <CheckCircle2 className="h-3 w-3 text-[#c2410c]" />
-                                                {cumplimientoLabel(c.cumplimiento)}
-                                            </span>
-                                        </div>
-                                        {c.observaciones && (
-                                            <p className="mt-1 text-[11px] text-[#57534e]">{c.observaciones}</p>
-                                        )}
-                                        {(c.evidencias ?? []).length > 0 && (
-                                            <ul className="mt-1 list-disc space-y-0.5 pl-4">
-                                                {c.evidencias.map((ev, idx) => (
-                                                    <li key={idx} className="text-[11px] text-[#78716c]">
-                                                        {ev}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
+                    <AspectBlock title="Coherencia" text={resultado.coherencia} />
+                    <AspectBlock title="Claridad" text={resultado.claridad} />
+                    <AspectBlock title="Estructura" text={resultado.estructura} />
+                    <AspectBlock title="Completitud aparente" text={resultado.completitud_aparente} />
+                    <AspectBlock title="Correspondencia con lo solicitado" text={resultado.correspondencia} />
 
-                    <ListBlock title="Fortalezas" items={resultado.fortalezas ?? []} />
-                    <ListBlock title="Oportunidades de mejora" items={resultado.oportunidades_mejora ?? []} />
                     <ListBlock title="Observaciones" items={resultado.observaciones ?? []} />
                     <ListBlock title="Recomendaciones" items={resultado.recomendaciones ?? []} />
-                    <ListBlock title="Riesgos" items={resultado.riesgos ?? []} />
 
                     {resultado.conclusion && (
                         <div>
@@ -250,10 +210,16 @@ export function EvaluacionAbetPanel({ entregaId, versionId, versionLabel, isDocx
 
             {!loadingLatest && !resultado && !actionError && !aiUnavailable && (
                 <p className="text-xs text-[#78716c]">
-                    Ejecuta la evaluación para obtener un análisis orientativo por criterios ABET
-                    (perfil placeholder). No sustituye tu criterio como Director.
+                    Ejecuta el análisis para obtener una orientación preliminar. No sustituye tu evaluación
+                    académica como director.
                 </p>
             )}
+
+            <div className="mt-4 rounded-lg border border-[#fef3c7] bg-[#fef3c7] px-3 py-2">
+                <p className="text-xs text-[#78350f]">
+                    La evaluación de IA es orientativa y no reemplaza la evaluación académica del director.
+                </p>
+            </div>
         </div>
     );
 }

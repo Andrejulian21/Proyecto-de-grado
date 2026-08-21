@@ -65,7 +65,21 @@ it('POST rejects a non-UNAB email with 422', function () {
             'role' => UserRole::Estudiante->value,
         ])
         ->assertStatus(422)
-        ->assertJsonValidationErrors(['email']);
+        ->assertJsonValidationErrors(['email'])
+        ->assertJsonPath('errors.email.0', 'El correo debe ser institucional (@unab.edu.co).');
+});
+
+it('POST accepts a case-insensitive institutional email', function () {
+    $coord = User::factory()->coordinador()->create();
+
+    $this->actingAs($coord)
+        ->postJson('/api/admin/whitelist', [
+            'email' => 'Nuevo.Estudiante@UNAB.EDU.CO',
+            'name' => 'Nuevo Estudiante',
+            'role' => UserRole::Estudiante->value,
+        ])
+        ->assertStatus(201)
+        ->assertJsonPath('email', 'nuevo.estudiante@unab.edu.co');
 });
 
 it('POST rejects a duplicate email with 422', function () {

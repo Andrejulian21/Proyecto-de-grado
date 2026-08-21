@@ -48,6 +48,18 @@ const ROLE_LABELS: Record<string, string> = {
     EvaluadorExterno: 'Evaluador Externo',
 };
 
+/** Same institutional domain used by Google OAuth and StoreWhitelistRequest. */
+const INSTITUTIONAL_EMAIL_SUFFIX = '@unab.edu.co';
+const INSTITUTIONAL_EMAIL_MESSAGE = 'El correo debe ser institucional (@unab.edu.co).';
+
+function isInstitutionalEmail(email: string): boolean {
+    return email.trim().toLowerCase().endsWith(INSTITUTIONAL_EMAIL_SUFFIX);
+}
+
+function validationErrorMessage(body: { message?: string; errors?: Record<string, string[]> } | null, fallback: string): string {
+    return body?.errors?.email?.[0] || body?.message || fallback;
+}
+
 function formatDate(dateStr: string | null | undefined) {
     if (!dateStr) return '—';
     const d = new Date(dateStr);
@@ -91,6 +103,7 @@ export default function GestionUsuarios() {
 
     // ── Sección 3: Agregar correos ──
     const [estCorreo, setEstCorreo] = useState('');
+    const [estCorreoError, setEstCorreoError] = useState<string | null>(null);
     const [estNombre, setEstNombre] = useState('');
     const [estCodigo, setEstCodigo] = useState('');
     const [dirCorreo, setDirCorreo] = useState('');
@@ -195,6 +208,10 @@ export default function GestionUsuarios() {
     useEffect(() => {
         setPage(1);
     }, [searchQuery, roleFilter]);
+
+    useEffect(() => {
+        setPage((current) => Math.min(current, totalPages));
+    }, [totalPages]);
 
     function resetForm() {
         setModalOpen(false);
@@ -302,20 +319,19 @@ export default function GestionUsuarios() {
     async function handleDelete() {
         if (!deleteTarget || deleting) return;
         setDeleting(true);
+        const target = deleteTarget;
+        const isUser = Boolean(target._isUser);
+        const emailKey = String(target.email).toLowerCase();
         try {
-            const isUser = deleteTarget._isUser;
-
-            // Primary delete
             const primaryEndpoint = isUser
-                ? `/api/admin/usuarios/${deleteTarget.id}`
-                : `/api/admin/whitelist/${deleteTarget.id}`;
+                ? `/api/admin/usuarios/${target.id}`
+                : `/api/admin/whitelist/${target.id}`;
 
             const res = await apiFetch(primaryEndpoint, { method: 'DELETE' });
             if (!res.ok) throw new Error('Error al eliminar');
 
-            // If it was a user, also try to remove from whitelist by email
             if (isUser) {
-                const whitelistEntry = whitelistEntries.find((w: any) => w.email === deleteTarget.email);
+                const whitelistEntry = whitelistEntries.find((w: any) => w.email.toLowerCase() === emailKey);
                 if (whitelistEntry) {
                     try {
                         await apiFetch(`/api/admin/whitelist/${whitelistEntry.id}`, { method: 'DELETE' });
@@ -325,13 +341,14 @@ export default function GestionUsuarios() {
                 }
             }
 
+            setUsers((prev) => prev.filter((u) => u.email.toLowerCase() !== emailKey));
+            setWhitelistEntries((prev) => prev.filter((w) => w.email.toLowerCase() !== emailKey));
+
             showMsg('success', isUser ? 'Usuario eliminado' : 'Correo eliminado de la whitelist');
             setDeleteTarget(null);
             setDeleteIsWhitelist(false);
 
-            // Always refresh both lists regardless of type
-            fetchWhitelist();
-            fetchUsers();
+            await Promise.all([fetchUsers(), fetchWhitelist()]);
         } catch {
             showMsg('error', 'Error al eliminar');
         } finally {
@@ -446,20 +463,32 @@ export default function GestionUsuarios() {
 
     async function handleAgregarEstudiante(e: React.FormEvent) {
         e.preventDefault();
+        const email = estCorreo.trim();
+        if (!isInstitutionalEmail(email)) {
+            setEstCorreoError(INSTITUTIONAL_EMAIL_MESSAGE);
+            showMsg('error', INSTITUTIONAL_EMAIL_MESSAGE);
+            return;
+        }
+        setEstCorreoError(null);
         try {
             const res = await apiFetch('/api/admin/whitelist', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: estCorreo.trim(), name: estNombre.trim() || null, role: 'Estudiante', codigo_estudiante: estCodigo.trim() || null }),
+                body: JSON.stringify({ email, name: estNombre.trim() || null, role: 'Estudiante', codigo_estudiante: estCodigo.trim() || null }),
             });
             if (!res.ok) {
                 const err = await res.json().catch(() => null);
-                throw new Error(err?.message || 'Error al agregar estudiante');
+                const message = validationErrorMessage(err, 'Error al agregar estudiante');
+                if (err?.errors?.email?.[0]) {
+                    setEstCorreoError(err.errors.email[0]);
+                }
+                throw new Error(message);
             }
             showMsg('success', 'Estudiante agregado');
             setEstCorreo('');
             setEstNombre('');
             setEstCodigo('');
+            setEstCorreoError(null);
             fetchWhitelist();
             fetchUsers();
         } catch (err: any) {
@@ -879,11 +908,27 @@ export default function GestionUsuarios() {
                                     id="correo-est"
                                     type="email"
                                     value={estCorreo}
-                                    onChange={(e) => setEstCorreo(e.target.value)}
-                                    className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-text outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                                    onChange={(e) => {
+                                        setEstCorreo(e.target.value);
+                                        if (estCorreoError) setEstCorreoError(null);
+                                    }}
+                                    className={`w-full min-h-[40px] rounded-lg border bg-white px-3 py-2 text-sm text-text outline-none transition-colors placeholder:text-[#78716c] focus:shadow-[0_0_0_3px_#fed7aa] ${
+                                        estCorreoError
+                                            ? 'border-[#dc2626] focus:border-[#dc2626]'
+                                            : 'border-[#e5e5e5] focus:border-[#c2410c]'
+                                    }`}
                                     placeholder="ejemplo@unab.edu.co"
+                                    aria-invalid={estCorreoError ? true : undefined}
+                                    aria-describedby="correo-est-hint"
+                                    required
                                 />
-                                <span className="text-xs text-[#57534e]">El correo debe ser institucional @unab.edu.co</span>
+                                <span
+                                    id="correo-est-hint"
+                                    role={estCorreoError ? 'alert' : undefined}
+                                    className={`text-xs ${estCorreoError ? 'text-[#dc2626]' : 'text-[#57534e]'}`}
+                                >
+                                    {estCorreoError || 'El correo debe ser institucional @unab.edu.co'}
+                                </span>
                             </div>
                             <div className="flex flex-col gap-1.5 mb-4">
                                 <label htmlFor="nombre-est" className="text-sm font-semibold text-text">Nombre completo</label>

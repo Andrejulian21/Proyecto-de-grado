@@ -35,6 +35,20 @@ class StoreWhitelistRequest extends FormRequest
     }
 
     /**
+     * Institutional domain used by Google OAuth (AuthController) and whitelist.
+     */
+    private const INSTITUTIONAL_EMAIL_SUFFIX = '@unab.edu.co';
+
+    protected function prepareForValidation(): void
+    {
+        if (is_string($this->input('email'))) {
+            $this->merge([
+                'email' => strtolower(trim((string) $this->input('email'))),
+            ]);
+        }
+    }
+
+    /**
      * @return array<string, list<string>>
      */
     public function rules(): array
@@ -45,7 +59,7 @@ class StoreWhitelistRequest extends FormRequest
                 'string',
                 'email:rfc',
                 'max:255',
-                'ends_with:@unab.edu.co',
+                'ends_with:'.self::INSTITUTIONAL_EMAIL_SUFFIX,
                 Rule::unique('authorized_emails', 'email')->whereNull('deleted_at'),
             ],
             'name' => ['nullable', 'string', 'max:255'],
@@ -68,6 +82,16 @@ class StoreWhitelistRequest extends FormRequest
             'methodologies_text' => ['nullable', 'string', 'max:4000'],
             'academic_experience' => ['nullable', 'string', 'max:5000'],
             'years_of_experience' => ['nullable', 'integer', 'min:0', 'max:80'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'email.ends_with' => 'El correo debe ser institucional (@unab.edu.co).',
         ];
     }
 }

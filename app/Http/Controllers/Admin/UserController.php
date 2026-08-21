@@ -12,6 +12,7 @@ use App\Http\Requests\StoreWhitelistRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Models\AuthorizedEmail;
 use App\Models\User;
+use App\Services\Directors\DirectorAcademicProfileWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -46,10 +47,10 @@ class UserController extends Controller
         $query = User::query()->orderByDesc('id');
 
         if ($search) {
-            $op = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'lik' . 'e';
+            $op = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'lik'.'e';
             $query->where(function ($q) use ($search, $op) {
                 $q->where('email', $op, "%{$search}%")
-                  ->orWhere('name', $op, "%{$search}%");
+                    ->orWhere('name', $op, "%{$search}%");
             });
         }
 
@@ -285,7 +286,7 @@ class UserController extends Controller
      * Validates that the email is well-formed, ends in
      * `@unab.edu.co`, and is not already in the whitelist.
      */
-    public function store(StoreWhitelistRequest $request): JsonResponse
+    public function store(StoreWhitelistRequest $request, DirectorAcademicProfileWriter $profileWriter): JsonResponse
     {
         $payload = $request->validated();
 
@@ -310,15 +311,27 @@ class UserController extends Controller
         // Also create a User record so the person appears in user listings,
         // director cupos, etc. before their first login.
         // Password is null → they must use Google OAuth or institutional login.
-        $existingUser = User::where('email', $email)->first();
-        if (! $existingUser) {
-            User::create([
+        $user = User::where('email', $email)->first();
+
+        if (! $user) {
+            $user = User::create([
                 'email' => $email,
                 'name' => $payload['name'] ?? explode('@', $email)[0],
                 'password' => null,
                 'role' => $payload['role'],
                 'areas' => $areas,
                 'codigo_estudiante' => $codigo,
+            ]);
+        }
+
+        if ($payload['role'] === UserRole::Director->value) {
+            $profileWriter->upsert($user, [
+                'areas' => $areas,
+                'research_lines' => $payload['research_lines_text'] ?? $payload['research_lines'] ?? null,
+                'technologies' => $payload['technologies_text'] ?? $payload['technologies'] ?? null,
+                'methodologies' => $payload['methodologies_text'] ?? $payload['methodologies'] ?? null,
+                'academic_experience' => $payload['academic_experience'] ?? null,
+                'years_of_experience' => $payload['years_of_experience'] ?? null,
             ]);
         }
 
@@ -336,6 +349,7 @@ class UserController extends Controller
             'id' => $entry->id,
             'email' => $entry->email,
             'role' => $entry->role->value,
+            'user_id' => $user->id,
         ], 201);
     }
 

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Admin\AuditLogController;
+use App\Http\Controllers\Admin\DirectorAcademicProfileController;
 use App\Http\Controllers\Admin\DirectorCupoController;
 use App\Http\Controllers\Admin\EntregaController;
 use App\Http\Controllers\Admin\EvaluadorProyectoController;
@@ -12,11 +13,14 @@ use App\Http\Controllers\Admin\SeguimientoController;
 use App\Http\Controllers\Admin\SemestreController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Api\AnuncioController;
+use App\Http\Controllers\Api\AsistenteAcademicoController;
 use App\Http\Controllers\Api\BitacoraController;
 use App\Http\Controllers\Api\DirectorController;
 use App\Http\Controllers\Api\EntregaEstudianteController;
 use App\Http\Controllers\Api\EstudianteController;
+use App\Http\Controllers\Api\EvaluacionAbetController;
 use App\Http\Controllers\Api\EvaluacionController;
+use App\Http\Controllers\Api\EvaluacionInteligenteController;
 use App\Http\Controllers\Api\EvaluadorAsignacionesController;
 use App\Http\Controllers\Api\NotificacionController;
 use App\Http\Controllers\Api\RecursoController;
@@ -103,6 +107,13 @@ Route::middleware([
         ->name('estudiante.proyecto.update');
     Route::get('/estudiante/entregas', [EstudianteController::class, 'entregas'])
         ->name('estudiante.entregas');
+    Route::post('/estudiante/entregas/{entrega}/evaluacion-inteligente', [EvaluacionInteligenteController::class, 'store'])
+        ->whereNumber('entrega')
+        ->name('estudiante.entregas.evaluacion_inteligente');
+    Route::get('/estudiante/asistente/conversacion', [AsistenteAcademicoController::class, 'show'])
+        ->name('estudiante.asistente.conversacion');
+    Route::post('/estudiante/asistente/mensajes', [AsistenteAcademicoController::class, 'store'])
+        ->name('estudiante.asistente.mensajes');
 
     // Estudiante — subir archivos por slug y consultar estado de completitud (PR 2)
     Route::post('/entregas/{entrega}/archivos/{slug}', [EntregaEstudianteController::class, 'subirArchivoPorSlug'])
@@ -174,6 +185,12 @@ Route::middleware([
         Route::get('/evaluaciones', [DirectorController::class, 'evaluaciones']);
         Route::get('/proyectos/{proyecto}/entrega-fase', [DirectorController::class, 'entregaFase'])
             ->whereNumber('proyecto');
+        Route::get('/entregas/{entrega}/evaluacion-abet', [EvaluacionAbetController::class, 'show'])
+            ->whereNumber('entrega')
+            ->name('entregas.evaluacion_abet.show');
+        Route::post('/entregas/{entrega}/evaluacion-abet', [EvaluacionAbetController::class, 'store'])
+            ->whereNumber('entrega')
+            ->name('entregas.evaluacion_abet');
 
         // PR 1 — Cartas de aval (solo director)
         Route::middleware('role:Director')->group(function () {
@@ -289,6 +306,12 @@ Route::middleware(['auth:sanctum', 'single_session', 'activity', 'role:Coordinad
         Route::put('/directores/{director}/cupo', [DirectorCupoController::class, 'update'])
             ->whereNumber('director')
             ->name('directores.cupo.update');
+        Route::get('/directores/{director}/perfil-academico', [DirectorAcademicProfileController::class, 'show'])
+            ->whereNumber('director')
+            ->name('directores.perfil_academico.show');
+        Route::put('/directores/{director}/perfil-academico', [DirectorAcademicProfileController::class, 'update'])
+            ->whereNumber('director')
+            ->name('directores.perfil_academico.update');
 
         // Directores list + sus proyectos (para la página /directores).
         Route::get('/directores', [DirectorCupoController::class, 'directores'])

@@ -9,6 +9,7 @@ use App\Models\Entrega;
 use App\Models\Proyecto;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Validator;
 
 class EstudianteController extends Controller
@@ -106,21 +107,50 @@ class EstudianteController extends Controller
         }
 
         $entregas = Entrega::paraProyecto($proyecto->id)
-            ->with('versiones')
+            ->with(['versiones' => fn ($q) => $q->orderBy('version_number')])
             ->orderBy('due_date')
             ->get()
             ->map(function ($entrega) {
+                $statusValue = $entrega->status?->value ?? $entrega->status;
+
+                $versiones = $entrega->versiones->map(function ($version) use ($statusValue) {
+                    $hasNotes = filled($version->director_notes);
+                    $estadoVersion = 'pendiente';
+
+                    if ($hasNotes) {
+                        $estadoVersion = $statusValue === 'aprobada' ? 'aprobado' : 'rechazado';
+                    }
+
+                    $uploadedAt = $version->uploaded_at ?? $version->created_at;
+
+                    return [
+                        'id' => $version->id,
+                        'numero_version' => $version->version_number,
+                        'nombre_archivo' => $version->original_name,
+                        'ruta_archivo' => $version->file_path,
+                        'archivo_requerido_id' => $version->archivo_requerido_id,
+                        'subido_en' => $uploadedAt
+                            ? Carbon::parse($uploadedAt)->toIso8601String()
+                            : null,
+                        'observacion' => $version->director_notes,
+                        'estado' => $estadoVersion,
+                    ];
+                })->values();
+
                 return [
-                    'id'               => $entrega->id,
-                    'fase'             => $entrega->phase?->value ?? $entrega->phase,
-                    'titulo'           => $entrega->title,
-                    'descripcion'      => $entrega->description,
-                    'fecha_limite'     => $entrega->due_date?->toDateString(),
-                    'estado'           => $entrega->status?->value ?? $entrega->status,
-                    'nota'             => $entrega->consolidated_grade,
-                    'criterios'        => $entrega->acceptance_criteria,
-                    'total_versiones'  => $entrega->versiones->count(),
-                    'ultima_version'   => $entrega->versiones->last()?->version_number,
+                    'id' => $entrega->id,
+                    'fase' => $entrega->phase?->value ?? $entrega->phase,
+                    'titulo' => $entrega->title,
+                    'descripcion' => $entrega->description,
+                    'fecha_limite' => $entrega->due_date?->toDateString(),
+                    'estado' => $statusValue,
+                    'nota' => $entrega->consolidated_grade,
+                    'criterios' => $entrega->acceptance_criteria,
+                    'metricas_evaluacion' => $entrega->evaluation_metrics,
+                    'archivos_requeridos' => $entrega->archivos_requeridos,
+                    'total_versiones' => $versiones->count(),
+                    'ultima_version' => $versiones->last()['numero_version'] ?? null,
+                    'versiones' => $versiones,
                 ];
             });
 

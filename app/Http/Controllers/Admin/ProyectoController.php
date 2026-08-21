@@ -7,7 +7,7 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\EstadoProyecto;
 use App\Events\AuditEvent;
 use App\Http\Controllers\Controller;
-use App\Models\Entrega;
+use App\Http\Requests\UpdateProyectoRequest;
 use App\Models\Evaluacion;
 use App\Models\Proyecto;
 use App\Models\Semestre;
@@ -30,11 +30,17 @@ class ProyectoController extends Controller
             $query->enSemestresActivos();
         }
 
+        $grupoId = $request->input('grupo_id') ?? $request->input('semester_id');
+
+        if ($grupoId !== null && $grupoId !== '') {
+            $query->where('semester_id', (int) $grupoId);
+        }
+
         // Search by keyword (code or title)
         if ($search = $request->query('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('code', 'like', "%{$search}%")
-                  ->orWhere('title', 'like', "%{$search}%");
+                    ->orWhere('title', 'like', "%{$search}%");
             });
         }
 
@@ -94,6 +100,7 @@ class ProyectoController extends Controller
 
         if (! empty($alreadyAssigned)) {
             $names = User::whereIn('id', $alreadyAssigned)->pluck('name')->join(', ');
+
             return response()->json([
                 'errors' => ['student_ids' => ["Los siguientes estudiantes ya tienen un proyecto asignado: {$names}"]],
             ], 422);
@@ -117,6 +124,33 @@ class ProyectoController extends Controller
         $proyecto->load(['semestre', 'director', 'estudiantes']);
 
         return response()->json(['data' => $proyecto], 201);
+    }
+
+    public function update(UpdateProyectoRequest $request, Proyecto $proyecto): JsonResponse
+    {
+        $data = $request->validated();
+
+        if (array_key_exists('title', $data)) {
+            $proyecto->title = $data['title'];
+        }
+
+        if (array_key_exists('director_id', $data)) {
+            $proyecto->director_id = $data['director_id'];
+        }
+
+        if (array_key_exists('status', $data)) {
+            $proyecto->status = $data['status'];
+        }
+
+        $proyecto->save();
+
+        if (array_key_exists('student_ids', $data)) {
+            $proyecto->estudiantes()->sync($data['student_ids']);
+        }
+
+        $proyecto->load(['semestre', 'director:id,name,email', 'estudiantes:id,name,email']);
+
+        return response()->json(['data' => $proyecto]);
     }
 
     public function kpis(): JsonResponse
@@ -157,8 +191,8 @@ class ProyectoController extends Controller
             ->where('proyecto_id', $proyecto->id)
             ->whereExists(function ($q) {
                 $q->select(\DB::raw(1))
-                  ->from('versiones_documento')
-                  ->whereColumn('versiones_documento.entrega_proyecto_id', 'entrega_proyecto.id');
+                    ->from('versiones_documento')
+                    ->whereColumn('versiones_documento.entrega_proyecto_id', 'entrega_proyecto.id');
             })
             ->exists();
 

@@ -234,6 +234,8 @@ Route::middleware(['auth:sanctum', 'single_session', 'activity', 'role:Coordinad
             ->name('usuarios.reset-password');
         Route::delete('/usuarios/{user}', [UserController::class, 'destroyUsuario'])
             ->name('usuarios.destroy');
+        Route::post('/usuarios/{user}/eliminar-con-reasignacion', [UserController::class, 'destroyDirectorWithReassignment'])
+            ->name('usuarios.destroy-with-reassignment');
 
         Route::post('/evaluadores', [UserController::class, 'storeExternal'])
             ->name('evaluadores.store');
@@ -260,7 +262,7 @@ Route::middleware(['auth:sanctum', 'single_session', 'activity', 'role:Coordinad
 
         // Proyectos CRUD (T-002).
         Route::apiResource('proyectos', ProyectoController::class)
-            ->only(['index', 'store', 'show', 'destroy']);
+            ->only(['index', 'store', 'show', 'update', 'destroy']);
 
         // Semestres CRUD (T-001).
         Route::apiResource('semestres', SemestreController::class)

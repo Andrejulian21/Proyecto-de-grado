@@ -20,6 +20,7 @@ import {
     listToTextarea,
     type DirectorAcademicFormValues,
 } from '@/components/coordinador/DirectorAcademicFields';
+import { DirectorReassignDeleteDialog } from '@/components/coordinador/DirectorReassignDeleteDialog';
 
 interface User {
     id: number;
@@ -131,6 +132,13 @@ export default function GestionUsuarios() {
     const [deleteTarget, setDeleteTarget] = useState<any>(null);
     const [deleteIsWhitelist, setDeleteIsWhitelist] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const [reassignTarget, setReassignTarget] = useState<{
+        userId: number;
+        email: string;
+        count: number;
+        message: string;
+    } | null>(null);
+    const [reassigning, setReassigning] = useState(false);
 
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [savingRoles, setSavingRoles] = useState(false);
@@ -275,7 +283,7 @@ export default function GestionUsuarios() {
 
             if (!res.ok) {
                 const err = await res.json().catch(() => null);
-                throw new Error(err?.message || 'Error al guardar');
+                throw new Error(err?.message || err?.error || 'Error al guardar');
             }
 
             if (
@@ -328,7 +336,30 @@ export default function GestionUsuarios() {
                 : `/api/admin/whitelist/${target.id}`;
 
             const res = await apiFetch(primaryEndpoint, { method: 'DELETE' });
-            if (!res.ok) throw new Error('Error al eliminar');
+            if (!res.ok) {
+                const err = await res.json().catch(() => null);
+                if (err?.error === 'director_has_projects') {
+                    const userId = isUser
+                        ? target.id
+                        : users.find((u) => u.email.toLowerCase() === emailKey)?.id;
+                    if (err.can_reassign && typeof userId === 'number') {
+                        setReassignTarget({
+                            userId,
+                            email: target.email,
+                            count: Number(err.proyectos_count) || 0,
+                            message: err.message || 'El director tiene proyectos asignados.',
+                        });
+                        setDeleteTarget(null);
+                        setDeleteIsWhitelist(false);
+                        return;
+                    }
+                    throw new Error(
+                        err.message ||
+                            'No se puede eliminar al director mientras tenga proyectos asignados.',
+                    );
+                }
+                throw new Error(err?.message || 'Error al eliminar');
+            }
 
             if (isUser) {
                 const whitelistEntry = whitelistEntries.find((w: any) => w.email.toLowerCase() === emailKey);
@@ -349,10 +380,40 @@ export default function GestionUsuarios() {
             setDeleteIsWhitelist(false);
 
             await Promise.all([fetchUsers(), fetchWhitelist()]);
-        } catch {
-            showMsg('error', 'Error al eliminar');
+        } catch (err: unknown) {
+            const text = err instanceof Error ? err.message : 'Error al eliminar';
+            showMsg('error', text);
         } finally {
             setDeleting(false);
+        }
+    }
+
+    async function handleReassignDelete() {
+        if (!reassignTarget || reassigning) return;
+        setReassigning(true);
+        try {
+            const res = await apiFetch(
+                `/api/admin/usuarios/${reassignTarget.userId}/eliminar-con-reasignacion`,
+                { method: 'POST' },
+            );
+            const body = await res.json().catch(() => null);
+            if (!res.ok) {
+                throw new Error(
+                    body?.message ||
+                        'No se pudo eliminar al director ni reasignar los proyectos.',
+                );
+            }
+            showMsg('success', body?.message || 'Director eliminado y proyectos reasignados');
+            setReassignTarget(null);
+            await Promise.all([fetchUsers(), fetchWhitelist()]);
+        } catch (err: unknown) {
+            const text =
+                err instanceof Error
+                    ? err.message
+                    : 'No se pudo eliminar al director ni reasignar los proyectos.';
+            showMsg('error', text);
+        } finally {
+            setReassigning(false);
         }
     }
 
@@ -420,13 +481,19 @@ export default function GestionUsuarios() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ role: newRole }),
                 });
-                if (!res.ok) throw new Error(`Error al actualizar usuario ${userId}`);
+                if (!res.ok) {
+                    const err = await res.json().catch(() => null);
+                    throw new Error(err?.message || `Error al actualizar usuario ${userId}`);
+                }
             }
             showMsg('success', 'Roles actualizados correctamente');
             setRoleChanges({});
             fetchUsers();
-        } catch {
-            showMsg('error', 'Error al guardar cambios de roles');
+        } catch (err: unknown) {
+            showMsg(
+                'error',
+                err instanceof Error ? err.message : 'Error al guardar cambios de roles',
+            );
         } finally {
             setSavingRoles(false);
         }
@@ -1159,6 +1226,18 @@ export default function GestionUsuarios() {
                     </div>
                 </div>
             )}
+
+            <DirectorReassignDeleteDialog
+                open={reassignTarget !== null}
+                email={reassignTarget?.email ?? ''}
+                projectCount={reassignTarget?.count ?? 0}
+                message={reassignTarget?.message ?? ''}
+                loading={reassigning}
+                onConfirm={handleReassignDelete}
+                onCancel={() => {
+                    if (!reassigning) setReassignTarget(null);
+                }}
+            />
 
             {/* ═══ MODAL: Confirmar eliminación ═══ */}
             {deleteTarget && (

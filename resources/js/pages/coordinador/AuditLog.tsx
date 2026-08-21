@@ -26,6 +26,7 @@ const ACTION_LABELS: Record<string, string> = {
     'user.created': 'Usuario creado',
     'user.updated': 'Usuario actualizado',
     'user.deleted': 'Usuario eliminado',
+    'director.projects_reassigned': 'Proyectos de director reasignados',
     'password.changed': 'Cambio de contraseña',
     'account.locked': 'Cuenta bloqueada',
 };

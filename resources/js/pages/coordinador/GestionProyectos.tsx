@@ -113,6 +113,7 @@ export default function GestionProyectos() {
     /* ── Edit modal state ──────────────────────────────────────────── */
     const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
     const [editStudents, setEditStudents] = useState<{ id: number; name: string; email: string }[]>([]);
+    const [editError, setEditError] = useState<string | null>(null);
 
     /* ── Delete confirm state ──────────────────────────────────────── */
     const [deleteTarget, setDeleteTarget] = useState<Proyecto | null>(null);
@@ -169,6 +170,7 @@ export default function GestionProyectos() {
 
     /* ── Edit project ──────────────────────────────────────────────── */
     const handleEditOpen = useCallback((proyecto: Proyecto) => {
+        setEditError(null);
         setEditTarget({
             proyecto,
             title: proyecto.title,
@@ -181,6 +183,7 @@ export default function GestionProyectos() {
 
     const handleEditSave = useCallback(async () => {
         if (!editTarget) return;
+        setEditError(null);
         try {
             await actualizarProyecto(editTarget.proyecto.id, {
                 title: editTarget.title,
@@ -188,8 +191,9 @@ export default function GestionProyectos() {
                 student_ids: editStudents.map((s) => s.id),
             });
             setEditTarget(null);
-        } catch {
-            // error handled by hook
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Error al guardar el proyecto';
+            setEditError(msg);
         }
     }, [editTarget, editStudents, actualizarProyecto]);
 
@@ -303,8 +307,11 @@ export default function GestionProyectos() {
         },
     ];
 
-    /* ── Local filter ──────────────────────────────────────────────── */
+    /* ── Local filter (group = real semester_id, then search) ──────── */
     const filtered = proyectos.filter((p) => {
+        if (selectedGroupId != null && p.semester_id !== selectedGroupId) {
+            return false;
+        }
         if (!search.trim()) return true;
         const q = search.toLowerCase();
         return (
@@ -765,6 +772,12 @@ export default function GestionProyectos() {
                                 sinProyecto={true}
                             />
                         </div>
+
+                        {editError && (
+                            <p className="mt-3 text-xs font-medium text-[#dc2626]" role="alert">
+                                {editError}
+                            </p>
+                        )}
 
                         <div className="mt-6 flex items-center justify-end gap-2">
                             <button

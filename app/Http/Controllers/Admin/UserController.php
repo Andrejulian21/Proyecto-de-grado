@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Admin;
 
+use App\Actions\Directors\DeleteDirectorWithReassignmentAction;
 use App\Enums\UserRole;
 use App\Events\AuditEvent;
+use App\Exceptions\DirectorAssignmentException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CreateEvaluadorRequest;
 use App\Http\Requests\StoreWhitelistRequest;
@@ -13,6 +15,7 @@ use App\Http\Requests\UpdateUserRequest;
 use App\Models\AuthorizedEmail;
 use App\Models\User;
 use App\Services\Directors\DirectorAcademicProfileWriter;
+use App\Services\Directors\DirectorAssignmentGuard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -77,11 +80,19 @@ class UserController extends Controller
      *
      * Updates a user's role. Only Coordinador can do this.
      */
-    public function updateUsuario(UpdateUserRequest $request, User $user): JsonResponse
+    public function updateUsuario(UpdateUserRequest $request, User $user, DirectorAssignmentGuard $guard): JsonResponse
     {
         $payload = $request->validated();
+        $newRole = UserRole::from($payload['role']);
+
+        try {
+            $guard->assertCanChangeRole($user, $newRole);
+        } catch (DirectorAssignmentException $e) {
+            return response()->json($e->toArray(), $e->httpStatus);
+        }
+
         $oldRole = $user->role->value;
-        $user->role = $payload['role'];
+        $user->role = $newRole;
 
         if (array_key_exists('codigo_estudiante', $payload)) {
             $user->codigo_estudiante = $payload['codigo_estudiante'];
@@ -162,8 +173,14 @@ class UserController extends Controller
      *
      * Soft-delete or remove a user from the system.
      */
-    public function destroyUsuario(Request $request, User $user): JsonResponse
+    public function destroyUsuario(Request $request, User $user, DirectorAssignmentGuard $guard): JsonResponse
     {
+        try {
+            $guard->assertCanDelete($user);
+        } catch (DirectorAssignmentException $e) {
+            return response()->json($e->toArray(), $e->httpStatus);
+        }
+
         $email = $user->email;
         $id = $user->id;
         $user->delete();
@@ -179,6 +196,26 @@ class UserController extends Controller
         );
 
         return response()->json(['message' => 'Usuario eliminado']);
+    }
+
+    /**
+     * POST /api/admin/usuarios/{user}/eliminar-con-reasignacion
+     *
+     * Reassigns the director's projects at random among remaining directors
+     * and then deletes the user. Atomic: any failure rolls back.
+     */
+    public function destroyDirectorWithReassignment(
+        Request $request,
+        User $user,
+        DeleteDirectorWithReassignmentAction $action,
+    ): JsonResponse {
+        try {
+            $result = $action->handle($user, $request->user());
+        } catch (DirectorAssignmentException $e) {
+            return response()->json($e->toArray(), $e->httpStatus);
+        }
+
+        return response()->json($result);
     }
 
     /**
@@ -379,6 +416,16 @@ class UserController extends Controller
         $previousRole = $entry->role;
         $newRole = UserRole::from($payload['role']);
 
+        $matchingUser = User::query()->where('email', $entry->email)->first();
+
+        if ($matchingUser instanceof User) {
+            try {
+                app(DirectorAssignmentGuard::class)->assertCanChangeRole($matchingUser, $newRole);
+            } catch (DirectorAssignmentException $e) {
+                return response()->json($e->toArray(), $e->httpStatus);
+            }
+        }
+
         $entry->role = $newRole;
         $entry->save();
 
@@ -422,6 +469,16 @@ class UserController extends Controller
         }
 
         $email = $entry->email;
+
+        $matchingUser = User::query()->where('email', $email)->first();
+
+        if ($matchingUser instanceof User) {
+            try {
+                app(DirectorAssignmentGuard::class)->assertCanDelete($matchingUser);
+            } catch (DirectorAssignmentException $e) {
+                return response()->json($e->toArray(), $e->httpStatus);
+            }
+        }
 
         // Also remove the corresponding user account if one exists,
         // so re-adding the email creates a clean slate.

@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Api\AnuncioController;
 use App\Http\Controllers\Api\AsistenteAcademicoController;
 use App\Http\Controllers\Api\BitacoraController;
+use App\Http\Controllers\Api\ConsultaNotasController;
 use App\Http\Controllers\Api\DirectorController;
 use App\Http\Controllers\Api\EntregaEstudianteController;
 use App\Http\Controllers\Api\EstudianteController;
@@ -107,6 +108,9 @@ Route::middleware([
         ->name('estudiante.proyecto.update');
     Route::get('/estudiante/entregas', [EstudianteController::class, 'entregas'])
         ->name('estudiante.entregas');
+    Route::get('/notas', [ConsultaNotasController::class, 'index'])
+        ->middleware('role:Coordinador,Director,Estudiante,EvaluadorExterno')
+        ->name('notas.index');
     Route::get('/estudiante/entregas/{entrega}/evaluacion-inteligente', [EvaluacionInteligenteController::class, 'index'])
         ->whereNumber('entrega')
         ->name('estudiante.entregas.evaluacion_inteligente.index');

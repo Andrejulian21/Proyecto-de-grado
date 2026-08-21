@@ -50,6 +50,7 @@ const AsistenteOrientacion = lazy(() => import('@/pages/estudiante/AsistenteOrie
 const EvaluacionesDirector = lazy(() => import('@/pages/director/EvaluacionesDirector'));
 const CartasAvalDirector = lazy(() => import('@/pages/director/CartasAval'));
 const DetalleEntregaCoordinador = lazy(() => import('@/pages/coordinador/DetalleEntregaCoordinador'));
+const ConsultaNotas = lazy(() => import('@/pages/shared/ConsultaNotas'));
 
 function SuspenseWrapper({ children }: { children: React.ReactNode }) {
     return (
@@ -166,6 +167,7 @@ function App() {
                                 <Route path="/analisis-entregas" element={<ProtectedRoute allowedRoles={['Estudiante']}><SuspenseWrapper><SeleccionEntregaAnalisisIA /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/analisis-entregas/:entregaId" element={<ProtectedRoute allowedRoles={['Estudiante']}><SuspenseWrapper><AnalisisAutomaticoEntregas /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="/asistente" element={<ProtectedRoute allowedRoles={['Estudiante']}><SuspenseWrapper><AsistenteOrientacion /></SuspenseWrapper></ProtectedRoute>} />
+                                <Route path="/notas" element={<ProtectedRoute allowedRoles={['Coordinador', 'Director', 'Estudiante', 'EvaluadorExterno']}><SuspenseWrapper><ConsultaNotas /></SuspenseWrapper></ProtectedRoute>} />
                                 <Route path="*" element={<Navigate to="/" replace />} />
                             </Routes>
                         </AppShell>

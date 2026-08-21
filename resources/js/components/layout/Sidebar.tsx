@@ -13,6 +13,7 @@ import {
     Bell,
     BarChart3,
     FileText,
+    Star,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -32,6 +33,7 @@ const navConfig: Record<string, { to: string; icon: typeof LayoutDashboard; labe
         { to: '/anuncios/admin', label: 'Anuncios Admin', icon: Megaphone },
         { to: '/alertas', label: 'Alertas', icon: Bell },
         { to: '/coordinador/entregas', label: 'Entregas', icon: FolderKanban },
+        { to: '/notas', label: 'Notas', icon: Star },
 
         { to: '/recursos/admin', label: 'Recursos Admin', icon: FolderKanban },
     ],
@@ -40,6 +42,7 @@ const navConfig: Record<string, { to: string; icon: typeof LayoutDashboard; labe
         { to: '/supervision', label: 'Supervisión', icon: FolderKanban },
         { to: '/evaluador/mis-asignaciones', label: 'Evaluaciones', icon: ClipboardCheck },
         { to: '/dashboard/director/cartas', label: 'Cartas de Aval', icon: FileText },
+        { to: '/notas', label: 'Notas', icon: Star },
         { to: '/anuncios', label: 'Anuncios', icon: Megaphone },
         { to: '/recursos', label: 'Recursos', icon: FolderKanban },
     ],
@@ -49,11 +52,13 @@ const navConfig: Record<string, { to: string; icon: typeof LayoutDashboard; labe
         { to: '/anuncios', label: 'Anuncios', icon: Megaphone },
         { to: '/recursos', label: 'Recursos', icon: FolderKanban },
         { to: '/analisis-entregas', label: 'Análisis de Entregas', icon: BarChart3 },
+        { to: '/notas', label: 'Notas', icon: Star },
         { to: '/asistente', label: 'Asistente', icon: UserCheck },
     ],
     EvaluadorExterno: [
         { to: '/', label: 'Panel de Control', icon: LayoutDashboard },
         { to: '/evaluador/mis-asignaciones', label: 'Mis Asignaciones', icon: ClipboardCheck },
+        { to: '/notas', label: 'Notas', icon: Star },
         { to: '/anuncios', label: 'Anuncios', icon: Megaphone },
         { to: '/recursos', label: 'Recursos', icon: FolderKanban },
     ],

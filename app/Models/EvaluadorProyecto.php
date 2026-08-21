@@ -8,6 +8,7 @@ use App\Enums\EstadoInvitacionEvaluador;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class EvaluadorProyecto extends Model
 {
@@ -47,5 +48,10 @@ class EvaluadorProyecto extends Model
     public function evaluador(): BelongsTo
     {
         return $this->belongsTo(User::class, 'evaluador_id');
+    }
+
+    public function evaluacion(): HasOne
+    {
+        return $this->hasOne(EvaluacionEvaluador::class, 'evaluador_proyecto_id');
     }
 }

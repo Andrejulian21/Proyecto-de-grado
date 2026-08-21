@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\EstadoEntrega;
 use App\Enums\EstadoProyecto;
 use App\Enums\FaseProyecto;
 use Illuminate\Database\Eloquent\Builder;
@@ -82,6 +83,16 @@ class Proyecto extends Model
         return $this->hasMany(Bitacora::class);
     }
 
+    public function entregaProyectos(): HasMany
+    {
+        return $this->hasMany(EntregaProyecto::class, 'proyecto_id');
+    }
+
+    public function evaluadores(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'evaluador_proyecto', 'proyecto_id', 'evaluador_id');
+    }
+
     // -- scopes --------------------------------------------------------
 
     public function scopeEnSemestresActivos(Builder $query): Builder
@@ -97,20 +108,20 @@ class Proyecto extends Model
             $semestre = Semestre::find($proyecto->semester_id);
             $semestreCode = str_replace('-', '', $semestre->name);
             $count = static::where('semester_id', $proyecto->semester_id)->count() + 1;
-            $proyecto->code = 'PG-' . $semestreCode . str_pad((string) $count, 3, '0', STR_PAD_LEFT);
+            $proyecto->code = 'PG-'.$semestreCode.str_pad((string) $count, 3, '0', STR_PAD_LEFT);
         });
 
         // Auto-vincular proyecto a todas las entregas existentes del semestre
         // cuando se crea un nuevo proyecto.
         static::created(function ($proyecto) {
-            $entregas = \App\Models\Entrega::where('semester_id', $proyecto->semester_id)
+            $entregas = Entrega::where('semester_id', $proyecto->semester_id)
                 ->whereIn('status', [
-                    \App\Enums\EstadoEntrega::Pendiente->value,
-                    \App\Enums\EstadoEntrega::Enviada->value,
-                    \App\Enums\EstadoEntrega::Creada->value,
-                    \App\Enums\EstadoEntrega::Solicitada->value,
-                    \App\Enums\EstadoEntrega::Revisada->value,
-                    \App\Enums\EstadoEntrega::Aprobada->value,
+                    EstadoEntrega::Pendiente->value,
+                    EstadoEntrega::Enviada->value,
+                    EstadoEntrega::Creada->value,
+                    EstadoEntrega::Solicitada->value,
+                    EstadoEntrega::Revisada->value,
+                    EstadoEntrega::Aprobada->value,
                 ])
                 ->pluck('id');
 

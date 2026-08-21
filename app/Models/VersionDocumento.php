@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\AiEvaluationStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class VersionDocumento extends Model
 {
@@ -40,6 +42,13 @@ class VersionDocumento extends Model
     public function entregaProyecto(): BelongsTo
     {
         return $this->belongsTo(EntregaProyecto::class, 'entrega_proyecto_id');
+    }
+
+    public function analisisIa(): HasMany
+    {
+        return $this->hasMany(AiDocumentEvaluation::class, 'version_documento_id')
+            ->where('status', AiEvaluationStatus::Completed->value)
+            ->orderByDesc('created_at');
     }
 
     public function scopeUltima(Builder $query): Builder

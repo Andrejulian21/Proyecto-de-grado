@@ -1,3 +1,29 @@
+export interface ResultadoAnalisisPreliminar {
+    resumen?: string;
+    resumen_ejecutivo?: string;
+    coherencia?: string;
+    claridad?: string;
+    estructura?: string;
+    completitud_aparente?: string;
+    correspondencia?: string;
+    observaciones?: string[];
+    recomendaciones?: string[];
+    conclusion?: string;
+}
+
+/** One AI analysis run, always attached to a requested document and optionally a version. */
+export interface AnalisisIa {
+    id: number;
+    entrega_id: number;
+    documento_id: string | null;
+    version_id: number | null;
+    temporal: boolean;
+    tipo?: string;
+    estado?: string;
+    resultado: ResultadoAnalisisPreliminar | null;
+    analizado_en: string | null;
+}
+
 export interface DocumentoSolicitado {
     /**
      * Canonical identity of the requested document (`id` in the builder,

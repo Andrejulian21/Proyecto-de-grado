@@ -66,6 +66,8 @@ final class DocumentEvaluationService
         $version = null;
 
         try {
+            $documentoId = $entrega->idDocumentoAnalizableIa();
+
             if ($temporaryFile !== null) {
                 [$absolutePath, $originalName, $documentHash, $tempRelativePath] = $this->storeTemporaryDocx(
                     $user->id,
@@ -79,12 +81,14 @@ final class DocumentEvaluationService
                 $documentHash = is_file($absolutePath) ? hash_file('sha256', $absolutePath) : null;
                 $originalName = (string) ($version->original_name ?? basename($version->file_path));
                 $versionDocumentoId = $version->id;
+                $documentoId = $version->archivo_requerido_id ?: $documentoId;
             }
 
             $record = AiDocumentEvaluation::create([
                 'user_id' => $user->id,
                 'entrega_id' => $entrega->id,
                 'version_documento_id' => $versionDocumentoId,
+                'archivo_requerido_id' => $documentoId,
                 'type' => $strategy->type(),
                 'status' => AiEvaluationStatus::Pending,
                 'document_hash' => $documentHash,

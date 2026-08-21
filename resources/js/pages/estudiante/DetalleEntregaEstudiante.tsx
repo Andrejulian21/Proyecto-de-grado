@@ -7,11 +7,12 @@ import {
     AlertTriangle, Trash2, Lock, Upload,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
-import type { DocumentoSolicitado } from '@/types/entregas';
+import type { AnalisisIa, DocumentoSolicitado } from '@/types/entregas';
 import {
     agruparVersionesPorArchivo,
     type DocumentoConVersiones,
 } from '@/lib/entregas';
+import { RetroalimentacionIa } from '@/components/entregas/RetroalimentacionIa';
 
 /* ── Types ── */
 
@@ -25,6 +26,7 @@ interface Version {
     uploaded_at: string;
     created_at: string;
     archivo_requerido_id: string | null;
+    analisis_ia?: AnalisisIa[];
 }
 
 interface EntregaDetail {
@@ -652,6 +654,13 @@ export default function DetalleEntregaEstudiante() {
                                                             <p className="text-xs text-[#a8a29e] italic">
                                                                 Sin observación del director.
                                                             </p>
+                                                        )}
+                                                        {doc.config.analizable_ia && (
+                                                            <div className="mt-3">
+                                                                <RetroalimentacionIa
+                                                                    analisis={selectedVersion.analisis_ia ?? []}
+                                                                />
+                                                            </div>
                                                         )}
                                                     </div>
                                                 </div>

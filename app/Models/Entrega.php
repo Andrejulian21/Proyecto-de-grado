@@ -106,6 +106,11 @@ class Entrega extends Model
         return $this->hasMany(VersionDocumento::class, 'entrega_id');
     }
 
+    public function analisisIa(): HasMany
+    {
+        return $this->hasMany(AiDocumentEvaluation::class, 'entrega_id');
+    }
+
     public function evaluaciones(): HasMany
     {
         return $this->hasMany(Evaluacion::class, 'entrega_id');

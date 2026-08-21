@@ -1,75 +1,87 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/utils';
+import { RetroalimentacionIa } from '@/components/entregas/RetroalimentacionIa';
+import type { AnalisisIa, ResultadoAnalisisPreliminar } from '@/types/entregas';
 import { AlertTriangle, Brain, Loader2 } from 'lucide-react';
-
-interface ResultadoPreliminar {
-    resumen?: string;
-    resumen_ejecutivo?: string;
-    coherencia?: string;
-    claridad?: string;
-    estructura?: string;
-    completitud_aparente?: string;
-    correspondencia?: string;
-    observaciones?: string[];
-    recomendaciones?: string[];
-    conclusion?: string;
-}
 
 interface Props {
     entregaId: number;
     versionId: number | null;
     versionLabel?: string;
     isDocx: boolean;
+    analisisInicial?: AnalisisIa[];
 }
 
-function ListBlock({ title, items }: { title: string; items: string[] }) {
-    if (!items.length) return null;
-    return (
-        <div>
-            <p className="mb-1.5 text-xs font-semibold text-[#1c1917]">{title}</p>
-            <ul className="list-disc space-y-1 pl-4">
-                {items.map((item, index) => (
-                    <li key={`${title}-${index}`} className="text-xs text-[#44403c]">
-                        {item}
-                    </li>
-                ))}
-            </ul>
-        </div>
-    );
+function toAnalisis(payload: Record<string, unknown> | null | undefined): AnalisisIa | null {
+    if (!payload || typeof payload.id !== 'number') {
+        return null;
+    }
+
+    return {
+        id: payload.id as number,
+        entrega_id: (payload.entrega_id as number) ?? 0,
+        documento_id: (payload.documento_id as string | null) ?? null,
+        version_id: (payload.version_id as number | null) ?? null,
+        temporal: Boolean(payload.temporal),
+        tipo: payload.tipo as string | undefined,
+        estado: payload.estado as string | undefined,
+        resultado: (payload.resultado as ResultadoAnalisisPreliminar | null) ?? null,
+        analizado_en: (payload.analizado_en as string | null) ?? null,
+    };
 }
 
-function AspectBlock({ title, text }: { title: string; text?: string }) {
-    if (!text) return null;
-    return (
-        <div>
-            <p className="mb-1 text-xs font-semibold text-[#1c1917]">{title}</p>
-            <p className="text-sm text-[#44403c]">{text}</p>
-        </div>
-    );
-}
-
-export function EvaluacionAbetPanel({ entregaId, versionId, versionLabel, isDocx }: Props) {
+export function EvaluacionAbetPanel({
+    entregaId,
+    versionId,
+    versionLabel,
+    isDocx,
+    analisisInicial = [],
+}: Props) {
     const [processing, setProcessing] = useState(false);
     const [loadingLatest, setLoadingLatest] = useState(true);
-    const [resultado, setResultado] = useState<ResultadoPreliminar | null>(null);
+    const [historial, setHistorial] = useState<AnalisisIa[]>(analisisInicial);
     const [actionError, setActionError] = useState<string | null>(null);
     const [aiUnavailable, setAiUnavailable] = useState(false);
+
+    useEffect(() => {
+        setHistorial(analisisInicial);
+        setActionError(null);
+        setAiUnavailable(false);
+        // Reset when the selected version changes; do not depend on array identity.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [versionId]);
 
     useEffect(() => {
         let cancelled = false;
 
         async function loadLatest() {
+            if (!versionId) {
+                setLoadingLatest(false);
+                return;
+            }
+
             setLoadingLatest(true);
             try {
-                const res = await apiFetch(`/api/director/entregas/${entregaId}/evaluacion-abet`);
+                const res = await apiFetch(
+                    `/api/director/entregas/${entregaId}/evaluacion-abet?version_id=${versionId}`,
+                );
                 const payload = await res.json().catch(() => ({}));
                 if (!res.ok || cancelled) return;
-                const data = payload?.data;
-                if (data?.resultado) {
-                    setResultado(data.resultado as ResultadoPreliminar);
+                const items = Array.isArray(payload?.historial)
+                    ? (payload.historial as Record<string, unknown>[])
+                        .map((row) => toAnalisis(row))
+                        .filter((row): row is AnalisisIa => row !== null)
+                    : [];
+                const latest = toAnalisis(payload?.data);
+                if (items.length > 0) {
+                    setHistorial(items);
+                } else if (latest) {
+                    setHistorial([latest]);
+                } else {
+                    setHistorial([]);
                 }
             } catch {
-                // Optional preload — ignore
+                // Optional preload — keep analisisInicial
             } finally {
                 if (!cancelled) setLoadingLatest(false);
             }
@@ -79,7 +91,7 @@ export function EvaluacionAbetPanel({ entregaId, versionId, versionLabel, isDocx
         return () => {
             cancelled = true;
         };
-    }, [entregaId]);
+    }, [entregaId, versionId]);
 
     async function handleEvaluate() {
         if (!versionId) {
@@ -117,9 +129,9 @@ export function EvaluacionAbetPanel({ entregaId, versionId, versionLabel, isDocx
                 return;
             }
 
-            const result = payload?.data?.resultado as ResultadoPreliminar | undefined;
-            if (result) {
-                setResultado(result);
+            const created = toAnalisis(payload?.data);
+            if (created) {
+                setHistorial((prev) => [created, ...prev.filter((item) => item.id !== created.id)]);
             }
         } catch {
             setActionError('No fue posible contactar al servicio de análisis. Inténtalo de nuevo.');
@@ -127,8 +139,6 @@ export function EvaluacionAbetPanel({ entregaId, versionId, versionLabel, isDocx
             setProcessing(false);
         }
     }
-
-    const resumen = resultado?.resumen || resultado?.resumen_ejecutivo;
 
     return (
         <div className="rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
@@ -138,8 +148,8 @@ export function EvaluacionAbetPanel({ entregaId, versionId, versionLabel, isDocx
                     <div>
                         <h3 className="text-base font-bold text-[#1c1917]">Análisis preliminar de IA</h3>
                         <p className="text-xs text-[#78716c]">
-                            Retroalimentación preliminar sobre el documento oficial seleccionado
-                            {versionLabel ? ` · ${versionLabel}` : ''}
+                            Retroalimentación informativa sobre el documento oficial seleccionado
+                            {versionLabel ? ` · ${versionLabel}` : ''}. No es una calificación académica.
                         </p>
                     </div>
                 </div>
@@ -174,52 +184,21 @@ export function EvaluacionAbetPanel({ entregaId, versionId, versionLabel, isDocx
                 </p>
             )}
 
-            {loadingLatest && !resultado && (
+            {loadingLatest && historial.length === 0 && (
                 <div className="flex items-center gap-2 text-xs text-[#78716c]">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    Cargando último análisis…
+                    Cargando análisis de esta versión…
                 </div>
             )}
 
-            {resultado && (
-                <div className="flex flex-col gap-4">
-                    {resumen && (
-                        <div>
-                            <p className="mb-1 text-xs font-semibold text-[#1c1917]">Resumen</p>
-                            <p className="text-sm text-[#44403c]">{resumen}</p>
-                        </div>
-                    )}
+            <RetroalimentacionIa analisis={historial} />
 
-                    <AspectBlock title="Coherencia" text={resultado.coherencia} />
-                    <AspectBlock title="Claridad" text={resultado.claridad} />
-                    <AspectBlock title="Estructura" text={resultado.estructura} />
-                    <AspectBlock title="Completitud aparente" text={resultado.completitud_aparente} />
-                    <AspectBlock title="Correspondencia con lo solicitado" text={resultado.correspondencia} />
-
-                    <ListBlock title="Observaciones" items={resultado.observaciones ?? []} />
-                    <ListBlock title="Recomendaciones" items={resultado.recomendaciones ?? []} />
-
-                    {resultado.conclusion && (
-                        <div>
-                            <p className="mb-1 text-xs font-semibold text-[#1c1917]">Conclusión</p>
-                            <p className="text-sm text-[#44403c]">{resultado.conclusion}</p>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {!loadingLatest && !resultado && !actionError && !aiUnavailable && (
+            {!loadingLatest && historial.length === 0 && !actionError && !aiUnavailable && (
                 <p className="text-xs text-[#78716c]">
-                    Ejecuta el análisis para obtener una orientación preliminar. No sustituye tu evaluación
-                    académica como director.
+                    Ejecuta el análisis para obtener una orientación preliminar de esta versión. No sustituye
+                    tu evaluación académica como director.
                 </p>
             )}
-
-            <div className="mt-4 rounded-lg border border-[#fef3c7] bg-[#fef3c7] px-3 py-2">
-                <p className="text-xs text-[#78350f]">
-                    La evaluación de IA es orientativa y no reemplaza la evaluación académica del director.
-                </p>
-            </div>
         </div>
     );
 }

@@ -17,6 +17,7 @@ class AiDocumentEvaluation extends Model
         'user_id',
         'entrega_id',
         'version_documento_id',
+        'archivo_requerido_id',
         'type',
         'status',
         'provider',

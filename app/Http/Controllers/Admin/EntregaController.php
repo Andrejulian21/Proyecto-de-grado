@@ -13,8 +13,10 @@ use App\Actions\Entrega\UpdateEntregaAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreEntregaRequest;
 use App\Http\Requests\UpdateEntregaRequest;
+use App\Models\AiDocumentEvaluation;
 use App\Models\Entrega;
 use App\Models\VersionDocumento;
+use App\Services\Evaluation\AiFeedbackPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -184,6 +186,7 @@ class EntregaController extends Controller
             'semestre:id,name',
             'versiones' => fn ($q) => $q->orderByDesc('version_number'),
             'versiones.entregaProyecto',
+            'versiones.analisisIa',
         ])->findOrFail($id);
 
         // Authorize: director of linked project, student of linked project, or coordinator
@@ -214,9 +217,14 @@ class EntregaController extends Controller
         $data['versiones'] = $entrega->versiones->map(function (VersionDocumento $version) {
             $pivot = $version->entregaProyecto;
             $array = $version->toArray();
+            unset($array['analisis_ia']);
             $array['director_grade'] = $pivot?->director_grade !== null
                 ? (float) $pivot->director_grade
                 : null;
+            $array['analisis_ia'] = $version->analisisIa
+                ->map(fn (AiDocumentEvaluation $evaluation) => AiFeedbackPresenter::toArray($evaluation))
+                ->values()
+                ->all();
 
             return $array;
         })->values()->toArray();

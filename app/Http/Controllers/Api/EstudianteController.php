@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AiDocumentEvaluation;
 use App\Models\Entrega;
 use App\Models\Proyecto;
+use App\Services\Evaluation\AiFeedbackPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -107,7 +109,7 @@ class EstudianteController extends Controller
         }
 
         $entregas = Entrega::paraProyecto($proyecto->id)
-            ->with(['versiones' => fn ($q) => $q->orderBy('version_number')])
+            ->with(['versiones' => fn ($q) => $q->orderBy('version_number')->with('analisisIa')])
             ->orderBy('due_date')
             ->get()
             ->map(function ($entrega) {
@@ -134,6 +136,10 @@ class EstudianteController extends Controller
                             : null,
                         'observacion' => $version->director_notes,
                         'estado' => $estadoVersion,
+                        'analisis_ia' => $version->analisisIa
+                            ->map(fn (AiDocumentEvaluation $evaluation) => AiFeedbackPresenter::toArray($evaluation))
+                            ->values()
+                            ->all(),
                     ];
                 })->values();
 

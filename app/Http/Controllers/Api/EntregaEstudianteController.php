@@ -10,13 +10,18 @@ use App\Models\Entrega;
 use App\Models\EntregaProyecto;
 use App\Models\Proyecto;
 use App\Models\VersionDocumento;
+use App\Services\Evaluation\AttachTemporaryAiFeedbackToVersion;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 class EntregaEstudianteController extends Controller
 {
+    public function __construct(
+        private readonly AttachTemporaryAiFeedbackToVersion $attachTemporaryAiFeedback,
+    ) {}
+
     private const ALLOWED_MIME_TYPES = [
         'application/pdf',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -40,6 +45,7 @@ class EntregaEstudianteController extends Controller
 
         // 2. Buscar el archivo requerido en archivos_requeridos por slug
         $archivoRequerido = $this->findArchivoRequerido($entrega, $slug);
+
         if ($archivoRequerido === null) {
             return response()->json(['error' => 'Archivo requerido no encontrado.'], 404);
         }
@@ -55,6 +61,7 @@ class EntregaEstudianteController extends Controller
 
         // Verificar que la entrega está vinculada al proyecto
         $tieneVinculo = $entrega->proyectos()->where('proyecto_id', $proyecto->id)->exists();
+
         if (! $tieneVinculo && $entrega->proyecto_id !== $proyecto->id) {
             return response()->json(['error' => 'Esta entrega no está asignada a tu proyecto.'], 403);
         }
@@ -66,6 +73,7 @@ class EntregaEstudianteController extends Controller
 
         // Verify time window
         $timeCheck = $this->verificarVentanaTiempo($entrega);
+
         if ($timeCheck !== null) {
             return $timeCheck;
         }
@@ -89,7 +97,7 @@ class EntregaEstudianteController extends Controller
 
         if ($currentCount >= self::MAX_VERSIONS) {
             return response()->json([
-                'error' => "Máximo " . self::MAX_VERSIONS . " versiones por archivo requerido.",
+                'error' => 'Máximo '.self::MAX_VERSIONS.' versiones por archivo requerido.',
             ], 422);
         }
 
@@ -98,8 +106,8 @@ class EntregaEstudianteController extends Controller
             'file' => [
                 'required',
                 'file',
-                'mimetypes:' . implode(',', self::ALLOWED_MIME_TYPES),
-                'max:' . (self::MAX_FILE_SIZE / 1024),
+                'mimetypes:'.implode(',', self::ALLOWED_MIME_TYPES),
+                'max:'.(self::MAX_FILE_SIZE / 1024),
             ],
         ]);
 
@@ -148,6 +156,8 @@ class EntregaEstudianteController extends Controller
             'descontinuado' => false,
         ]);
 
+        $this->attachTemporaryAiFeedback->handle($version);
+
         // Update entrega status to 'enviada'
         $entrega->update(['status' => EstadoEntrega::Enviada->value]);
 
@@ -195,6 +205,7 @@ class EntregaEstudianteController extends Controller
             }
 
             $tieneVersion = false;
+
             if ($pivot) {
                 $tieneVersion = VersionDocumento::where('entrega_proyecto_id', $pivot->id)
                     ->where('archivo_requerido_id', $slug)
@@ -249,6 +260,7 @@ class EntregaEstudianteController extends Controller
 
         foreach ($archivos as $archivo) {
             $id = $archivo['slug'] ?? $archivo['id'] ?? null;
+
             if ($id === $slug) {
                 return $archivo;
             }
@@ -269,37 +281,37 @@ class EntregaEstudianteController extends Controller
 
         // Check start date constraint
         if ($entrega->start_date) {
-            $startDate = $entrega->start_date instanceof \Carbon\Carbon
+            $startDate = $entrega->start_date instanceof Carbon
                 ? $entrega->start_date->format('Y-m-d')
                 : $entrega->start_date;
 
             if ($today < $startDate) {
                 return response()->json([
-                    'error' => 'La entrega aún no está disponible. La fecha de inicio es ' . $startDate . '.',
+                    'error' => 'La entrega aún no está disponible. La fecha de inicio es '.$startDate.'.',
                 ], 422);
             }
 
             if ($today === $startDate && $entrega->start_time && $currentTime < $entrega->start_time) {
                 return response()->json([
-                    'error' => 'La entrega aún no está disponible. La hora de inicio es las ' . $entrega->start_time . '.',
+                    'error' => 'La entrega aún no está disponible. La hora de inicio es las '.$entrega->start_time.'.',
                 ], 422);
             }
         }
 
         // Check due date constraint
-        $dueDate = $entrega->due_date instanceof \Carbon\Carbon
+        $dueDate = $entrega->due_date instanceof Carbon
             ? $entrega->due_date->format('Y-m-d')
             : $entrega->due_date;
 
         if ($today > $dueDate) {
             return response()->json([
-                'error' => 'La fecha límite de la entrega ya pasó (' . $dueDate . ').',
+                'error' => 'La fecha límite de la entrega ya pasó ('.$dueDate.').',
             ], 422);
         }
 
         if ($today === $dueDate && $entrega->hora_maxima && $currentTime > $entrega->hora_maxima) {
             return response()->json([
-                'error' => 'La hora máxima para esta entrega era las ' . $entrega->hora_maxima . '.',
+                'error' => 'La hora máxima para esta entrega era las '.$entrega->hora_maxima.'.',
             ], 422);
         }
 

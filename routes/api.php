@@ -107,6 +107,9 @@ Route::middleware([
         ->name('estudiante.proyecto.update');
     Route::get('/estudiante/entregas', [EstudianteController::class, 'entregas'])
         ->name('estudiante.entregas');
+    Route::get('/estudiante/entregas/{entrega}/evaluacion-inteligente', [EvaluacionInteligenteController::class, 'index'])
+        ->whereNumber('entrega')
+        ->name('estudiante.entregas.evaluacion_inteligente.index');
     Route::post('/estudiante/entregas/{entrega}/evaluacion-inteligente', [EvaluacionInteligenteController::class, 'store'])
         ->whereNumber('entrega')
         ->name('estudiante.entregas.evaluacion_inteligente');

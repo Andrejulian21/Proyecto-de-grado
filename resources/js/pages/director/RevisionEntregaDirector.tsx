@@ -8,7 +8,7 @@ import {
     CheckCircle2, Send,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
-import type { DocumentoSolicitado } from '@/types/entregas';
+import type { AnalisisIa, DocumentoSolicitado } from '@/types/entregas';
 import {
     agruparVersionesPorArchivo,
     esDocumentoAnalizableIa,
@@ -33,6 +33,7 @@ interface Version {
      * (D3-rev). The general delivery template never stores the note.
      */
     director_grade?: number | null;
+    analisis_ia?: AnalisisIa[];
 }
 
 interface EntregaDetail {
@@ -565,6 +566,9 @@ export default function RevisionEntregaDirector() {
                                         </div>
                                         {selectedVersion.director_notes ? (
                                             <div className="rounded-md bg-white p-3">
+                                                <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.05em] text-[#57534e]">
+                                                    Observación del director
+                                                </p>
                                                 <p className="whitespace-pre-wrap text-xs leading-relaxed text-[#1c1917]">
                                                     {selectedVersion.director_notes}
                                                 </p>
@@ -596,6 +600,7 @@ export default function RevisionEntregaDirector() {
                         isDocx={(selectedVersion.original_name || selectedVersion.file_path || '')
                             .toLowerCase()
                             .endsWith('.docx')}
+                        analisisInicial={selectedVersion.analisis_ia ?? []}
                     />
                 )}
 

@@ -228,8 +228,9 @@ export default function AnalisisAutomaticoEntregas() {
                                 {fileLabel ?? 'Selecciona un borrador DOCX'}
                             </p>
                             <p className="max-w-md text-xs text-[#78716c]">
-                                Este archivo se usa solo para el análisis. No se guarda como versión oficial ni
-                                altera el historial de la entrega.
+                                Este archivo no se guarda como versión oficial. La retroalimentación de IA sí
+                                se conserva asociada al documento analizable y, si más adelante subes el mismo
+                                archivo, a esa versión.
                             </p>
                             <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[#e5e5e5] bg-white px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:border-[#c2410c] hover:bg-[#fed7aa]">
                                 <Upload className="h-4 w-4" />

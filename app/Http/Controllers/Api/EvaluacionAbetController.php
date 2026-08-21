@@ -6,12 +6,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\AiErrorCode;
 use App\Enums\AiEvaluationStatus;
-use App\Enums\AiEvaluationType;
 use App\Exceptions\AiException;
 use App\Exceptions\DocumentEvaluationException;
 use App\Http\Controllers\Controller;
 use App\Models\AiDocumentEvaluation;
+use App\Models\VersionDocumento;
 use App\Services\Evaluation\Access\DirectorEntregaAccessResolver;
+use App\Services\Evaluation\AiFeedbackPresenter;
 use App\Services\Evaluation\DocumentEvaluationService;
 use App\Services\Evaluation\Interpreters\PreSubmissionResultInterpreter;
 use App\Services\Evaluation\Strategies\AbetDirectorEvaluationStrategy;
@@ -33,7 +34,6 @@ class EvaluacionAbetController extends Controller
 
     /**
      * GET /api/director/entregas/{entrega}/evaluacion-abet
-     * Latest completed analysis for the entrega (director-scoped).
      */
     public function show(Request $request, int $entrega): JsonResponse
     {
@@ -46,19 +46,42 @@ class EvaluacionAbetController extends Controller
             ], $exception->httpStatus);
         }
 
-        $evaluation = AiDocumentEvaluation::query()
-            ->where('entrega_id', $entrega)
-            ->where('type', AiEvaluationType::Abet)
-            ->where('status', AiEvaluationStatus::Completed)
-            ->orderByDesc('created_at')
-            ->first();
+        $versionId = $request->query('version_id');
+        $versionId = $versionId !== null && $versionId !== '' ? (int) $versionId : null;
 
-        if (! $evaluation) {
-            return response()->json(['data' => null]);
+        if ($versionId !== null) {
+            $exists = VersionDocumento::query()
+                ->where('entrega_id', $entrega)
+                ->where('id', $versionId)
+                ->exists();
+
+            if (! $exists) {
+                return response()->json([
+                    'error' => 'No se encontró la versión del documento.',
+                    'code' => 'not_found',
+                ], 404);
+            }
+        }
+
+        $historial = AiDocumentEvaluation::query()
+            ->where('entrega_id', $entrega)
+            ->where('status', AiEvaluationStatus::Completed)
+            ->when($versionId !== null, fn ($query) => $query->where('version_documento_id', $versionId))
+            ->orderByDesc('created_at')
+            ->get();
+
+        $latest = $historial->first();
+
+        if (! $latest) {
+            return response()->json([
+                'data' => null,
+                'historial' => [],
+            ]);
         }
 
         return response()->json([
-            'data' => $this->mapEvaluation($evaluation),
+            'data' => AiFeedbackPresenter::toArray($latest),
+            'historial' => $historial->map(fn (AiDocumentEvaluation $row) => AiFeedbackPresenter::toArray($row))->values(),
         ]);
     }
 
@@ -82,7 +105,7 @@ class EvaluacionAbetController extends Controller
             );
 
             return response()->json([
-                'data' => $this->mapEvaluation($outcome['evaluation'], $outcome['result']),
+                'data' => AiFeedbackPresenter::toArray($outcome['evaluation'], $outcome['result']),
             ]);
         } catch (DocumentEvaluationException $exception) {
             return response()->json([
@@ -105,23 +128,5 @@ class EvaluacionAbetController extends Controller
                 'code' => $exception->error->value,
             ], 502);
         }
-    }
-
-    /**
-     * @param  array<string, mixed>|null  $result
-     * @return array<string, mixed>
-     */
-    private function mapEvaluation(AiDocumentEvaluation $evaluation, ?array $result = null): array
-    {
-        return [
-            'id' => $evaluation->id,
-            'entrega_id' => $evaluation->entrega_id,
-            'version_id' => $evaluation->version_documento_id,
-            'tipo' => $evaluation->type->value,
-            'estado' => $evaluation->status->value,
-            'proveedor' => $evaluation->provider,
-            'tiempo_ms' => $evaluation->processing_ms,
-            'resultado' => $result ?? $evaluation->result_json,
-        ];
     }
 }

@@ -5,10 +5,14 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Enums\AiErrorCode;
+use App\Enums\AiEvaluationStatus;
 use App\Exceptions\AiException;
 use App\Exceptions\DocumentEvaluationException;
 use App\Http\Controllers\Controller;
+use App\Models\AiDocumentEvaluation;
+use App\Models\VersionDocumento;
 use App\Services\Evaluation\Access\StudentProjectAccessResolver;
+use App\Services\Evaluation\AiFeedbackPresenter;
 use App\Services\Evaluation\DocumentEvaluationService;
 use App\Services\Evaluation\Interpreters\PreSubmissionResultInterpreter;
 use App\Services\Evaluation\Strategies\PreSubmissionDeliveryStrategy;
@@ -27,6 +31,39 @@ class EvaluacionInteligenteController extends Controller
         private readonly StudentProjectAccessResolver $access,
         private readonly PreSubmissionResultInterpreter $interpreter,
     ) {}
+
+    /**
+     * GET /api/estudiante/entregas/{entrega}/evaluacion-inteligente
+     */
+    public function index(Request $request, int $entrega): JsonResponse
+    {
+        try {
+            $this->access->resolve($request->user(), $entrega);
+        } catch (DocumentEvaluationException $exception) {
+            return response()->json([
+                'error' => $exception->getMessage(),
+                'code' => $exception->errorCode,
+            ], $exception->httpStatus);
+        }
+
+        $versionId = $this->optionalVersionId($request->query('version_id'));
+
+        if ($versionId !== null) {
+            $exists = VersionDocumento::query()
+                ->where('entrega_id', $entrega)
+                ->where('id', $versionId)
+                ->exists();
+
+            if (! $exists) {
+                return response()->json([
+                    'error' => 'No se encontró la versión del documento.',
+                    'code' => 'not_found',
+                ], 404);
+            }
+        }
+
+        return $this->historialResponse($entrega, $versionId);
+    }
 
     /**
      * POST /api/estudiante/entregas/{entrega}/evaluacion-inteligente
@@ -66,21 +103,8 @@ class EvaluacionInteligenteController extends Controller
                 temporaryFile: $temporaryFile,
             );
 
-            $evaluation = $outcome['evaluation'];
-            $result = $outcome['result'];
-
             return response()->json([
-                'data' => [
-                    'id' => $evaluation->id,
-                    'entrega_id' => $evaluation->entrega_id,
-                    'version_id' => $evaluation->version_documento_id,
-                    'temporal' => $evaluation->version_documento_id === null,
-                    'tipo' => $evaluation->type->value,
-                    'estado' => $evaluation->status->value,
-                    'proveedor' => $evaluation->provider,
-                    'tiempo_ms' => $evaluation->processing_ms,
-                    'resultado' => $result,
-                ],
+                'data' => AiFeedbackPresenter::toArray($outcome['evaluation'], $outcome['result']),
             ]);
         } catch (DocumentEvaluationException $exception) {
             return response()->json([
@@ -103,5 +127,31 @@ class EvaluacionInteligenteController extends Controller
                 'code' => $exception->error->value,
             ], 502);
         }
+    }
+
+    private function historialResponse(int $entregaId, ?int $versionId): JsonResponse
+    {
+        $historial = AiDocumentEvaluation::query()
+            ->where('entrega_id', $entregaId)
+            ->where('status', AiEvaluationStatus::Completed)
+            ->when($versionId !== null, fn ($query) => $query->where('version_documento_id', $versionId))
+            ->orderByDesc('created_at')
+            ->get();
+
+        $latest = $historial->first();
+
+        return response()->json([
+            'data' => $latest ? AiFeedbackPresenter::toArray($latest) : null,
+            'historial' => $historial->map(fn (AiDocumentEvaluation $row) => AiFeedbackPresenter::toArray($row))->values(),
+        ]);
+    }
+
+    private function optionalVersionId(mixed $value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return (int) $value;
     }
 }

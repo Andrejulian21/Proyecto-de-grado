@@ -8,9 +8,13 @@ export interface GroupSelectorProps {
     error?: string;
     /** Optional: when true, show the selected group name as read-only text */
     readonly?: boolean;
+    /** Optional: when false, hide the "create group" option (select existing groups only) */
+    allowCreate?: boolean;
+    /** Optional: called with the newly created group right after a successful create */
+    onCreate?: (grupo: Grupo) => void;
 }
 
-export function GroupSelector({ value, onChange, error, readonly = false }: GroupSelectorProps) {
+export function GroupSelector({ value, onChange, error, readonly = false, allowCreate = true, onCreate }: GroupSelectorProps) {
     const { data: grupos, loading, error: fetchError, crear } = useGrupos();
     const [open, setOpen] = useState(false);
     const [showCreateForm, setShowCreateForm] = useState(false);
@@ -48,12 +52,13 @@ export function GroupSelector({ value, onChange, error, readonly = false }: Grou
             setNewIsActive(true);
             setShowCreateForm(false);
             onChange(nuevo.id);
+            onCreate?.(nuevo);
         } catch (err) {
             setCreateError(err instanceof Error ? err.message : 'Error al crear grupo');
         } finally {
             setCreating(false);
         }
-    }, [newName, newStartDate, newEndDate, newIsActive, crear, onChange]);
+    }, [newName, newStartDate, newEndDate, newIsActive, crear, onChange, onCreate]);
 
     // Read-only mode: just show the selected group name
     if (readonly) {
@@ -127,7 +132,8 @@ export function GroupSelector({ value, onChange, error, readonly = false }: Grou
                             </ul>
                         )}
 
-                        <div className="border-t border-[#e5e5e5] p-2">
+                        {allowCreate && (
+                            <div className="border-t border-[#e5e5e5] p-2">
                             {showCreateForm ? (
                                 <div className="flex flex-col gap-2">
                                     <input
@@ -205,7 +211,8 @@ export function GroupSelector({ value, onChange, error, readonly = false }: Grou
                                     Crear grupo
                                 </button>
                             )}
-                        </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

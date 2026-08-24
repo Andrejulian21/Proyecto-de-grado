@@ -275,6 +275,7 @@ export default function CoordinadorEntregas() {
                     value={selectedGroup}
                     onChange={setSelectedGroup}
                     error={undefined}
+                    allowCreate={false}
                 />
 
                 {!showCreateForm && (
@@ -325,6 +326,7 @@ export default function CoordinadorEntregas() {
                                 value={selectedGroup}
                                 onChange={setSelectedGroup}
                                 error={undefined}
+                                allowCreate={false}
                             />
                         </div>
 

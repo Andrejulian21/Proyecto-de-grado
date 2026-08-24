@@ -44,23 +44,23 @@ test('versiones_documento has foreign key on entrega_id', function () {
     expect($fk['foreign_table'] ?? $fk['foreignTable'] ?? null)->toBe('entregas');
 });
 
-test('versiones_documento has unique on (entrega_id, version_number)', function () {
+test('versiones_documento has unique on (entrega_proyecto_id, archivo_requerido_id, version_number)', function () {
     $indexes = Schema::getIndexes('versiones_documento');
     $uniqueIndexes = array_filter($indexes, fn ($i) => ($i['unique'] ?? false));
 
     $match = collect($uniqueIndexes)->first(function ($idx) {
-        return $idx['columns'] === ['entrega_id', 'version_number'];
+        return $idx['columns'] === ['entrega_proyecto_id', 'archivo_requerido_id', 'version_number'];
     });
 
-    expect($match)->not->toBeNull('missing unique index on (entrega_id, version_number)');
+    expect($match)->not->toBeNull('missing unique index on (entrega_proyecto_id, archivo_requerido_id, version_number)');
 });
 
-test('versiones_documento has indexes on entrega_id and (entrega_id, version_number)', function () {
+test('versiones_documento has indexes on entrega_id and the per-document unique', function () {
     $indexes = Schema::getIndexes('versiones_documento');
     $indexNames = array_map(fn ($i) => $i['name'], $indexes);
 
     expect($indexNames)->toContain('versiones_documento_entrega_id_index');
-    expect($indexNames)->toContain('versiones_documento_entrega_id_version_number_index');
+    expect($indexNames)->toContain('versiones_documento_ep_archivo_version_unique');
 });
 
 test('versiones_documento is reversible (down drops it)', function () {

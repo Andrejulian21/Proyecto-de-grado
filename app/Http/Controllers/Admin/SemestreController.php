@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Entrega;
 use App\Models\Semestre;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -78,6 +79,20 @@ class SemestreController extends Controller
 
     public function destroy(Semestre $semestre): JsonResponse
     {
+        // Regla de negocio: solo se puede eliminar un grupo (semestre) que no
+        // tenga nada ligado. Se verifican las tablas que referencian semester_id.
+        if ($semestre->proyectos()->exists()) {
+            return response()->json([
+                'error' => 'No se puede eliminar el grupo porque tiene proyectos vinculados.',
+            ], 422);
+        }
+
+        if (Entrega::where('semester_id', $semestre->id)->exists()) {
+            return response()->json([
+                'error' => 'No se puede eliminar el grupo porque tiene entregas vinculadas.',
+            ], 422);
+        }
+
         $semestre->delete();
 
         return response()->json(['message' => 'Semestre eliminado']);

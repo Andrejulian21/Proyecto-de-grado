@@ -7,7 +7,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { GroupSelector } from '@/components/forms/GroupSelector';
 import { StudentAutocomplete } from '@/components/forms/StudentAutocomplete';
 import { useProyectos, type Proyecto, type CreateProyectoPayload } from '@/hooks/useProyectos';
-import { useGrupos } from '@/hooks/useGrupos';
+import { useGrupos, type Grupo } from '@/hooks/useGrupos';
 import { useCupos, type DirectorCupo } from '@/hooks/useCupos';
 import {
     Plus,
@@ -93,7 +93,7 @@ export default function GestionProyectos() {
     } = useProyectos(selectedGroupId);
 
     // We need grupos for create-form group display & GroupSelector
-    const { data: grupos, refetch: refetchGrupos, actualizar } = useGrupos();
+    const { data: grupos, refetch: refetchGrupos, actualizar, eliminar: eliminarGrupo } = useGrupos();
 
     const {
         data: cupos,
@@ -118,6 +118,11 @@ export default function GestionProyectos() {
     /* ── Delete confirm state ──────────────────────────────────────── */
     const [deleteTarget, setDeleteTarget] = useState<Proyecto | null>(null);
     const [deleteError, setDeleteError] = useState<string | null>(null);
+
+    /* ── Group delete confirm state ────────────────────────────────── */
+    const [deleteGrupoTarget, setDeleteGrupoTarget] = useState<Grupo | null>(null);
+    const [deleteGrupoError, setDeleteGrupoError] = useState<string | null>(null);
+    const [deleteGrupoLoading, setDeleteGrupoLoading] = useState(false);
 
     /* ── Cupo editing state ────────────────────────────────────────── */
     const [editingCupoId, setEditingCupoId] = useState<number | null>(null);
@@ -209,6 +214,26 @@ export default function GestionProyectos() {
             setDeleteError(msg);
         }
     }, [deleteTarget, eliminarProyecto]);
+
+    /* ── Delete group ──────────────────────────────────────────────── */
+    const handleDeleteGrupo = useCallback(async () => {
+        if (!deleteGrupoTarget || deleteGrupoLoading) return;
+        setDeleteGrupoLoading(true);
+        setDeleteGrupoError(null);
+        try {
+            await eliminarGrupo(deleteGrupoTarget.id);
+            setDeleteGrupoTarget(null);
+            await refetchGrupos();
+            if (selectedGroupId === deleteGrupoTarget.id) {
+                setSelectedGroupId(null);
+            }
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Error al eliminar el grupo';
+            setDeleteGrupoError(msg);
+        } finally {
+            setDeleteGrupoLoading(false);
+        }
+    }, [deleteGrupoTarget, deleteGrupoLoading, eliminarGrupo, refetchGrupos, selectedGroupId]);
 
     /* ── Cupo save ─────────────────────────────────────────────────── */
     const handleCupoSave = useCallback(
@@ -336,7 +361,11 @@ export default function GestionProyectos() {
                     <FolderKanban className="h-5 w-5 text-[#c2410c]" />
                     <h3 className="text-base font-bold text-[#1c1917]">Grupo de proyectos</h3>
                 </div>
-                <GroupSelector value={selectedGroupId} onChange={setSelectedGroupId} />
+                <GroupSelector
+                    value={selectedGroupId}
+                    onChange={setSelectedGroupId}
+                    onCreate={() => refetchGrupos()}
+                />
                 {!selectedGroupId && (
                     <p className="mt-2 text-xs text-[#78716c]">
                         Seleccione un grupo para ver sus proyectos.
@@ -364,34 +393,49 @@ export default function GestionProyectos() {
                                 {selectedGroup.is_active ? 'Activo' : 'Inactivo'}
                             </span>
                         </div>
-                        <button
-                            onClick={async () => {
-                                if (toggleLoading) return;
-                                setToggleLoading(true);
-                                setToggleError(null);
-                                try {
-                                    await actualizar(selectedGroup.id, {
-                                        is_active: !selectedGroup.is_active,
-                                    });
-                                    await refetchGrupos();
-                                } catch (err) {
-                                    setToggleError(
-                                        err instanceof Error ? err.message : 'Error al cambiar estado',
-                                    );
-                                } finally {
-                                    setToggleLoading(false);
-                                }
-                            }}
-                            disabled={toggleLoading}
-                            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors active:scale-[0.98] disabled:opacity-60 ${
-                                selectedGroup.is_active
-                                    ? 'border border-[#e5e5e5] text-[#dc2626] hover:bg-[#fef2f2]'
-                                    : 'bg-[#c2410c] text-white hover:bg-[#9a330a]'
-                            }`}
-                        >
-                            {toggleLoading && <Loader2 className="h-3 w-3 animate-spin" />}
-                            {selectedGroup.is_active ? 'Desactivar' : 'Activar'}
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={async () => {
+                                    if (toggleLoading) return;
+                                    setToggleLoading(true);
+                                    setToggleError(null);
+                                    try {
+                                        await actualizar(selectedGroup.id, {
+                                            is_active: !selectedGroup.is_active,
+                                        });
+                                        await refetchGrupos();
+                                    } catch (err) {
+                                        setToggleError(
+                                            err instanceof Error ? err.message : 'Error al cambiar estado',
+                                        );
+                                    } finally {
+                                        setToggleLoading(false);
+                                    }
+                                }}
+                                disabled={toggleLoading}
+                                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors active:scale-[0.98] disabled:opacity-60 ${
+                                    selectedGroup.is_active
+                                        ? 'border border-[#e5e5e5] text-[#dc2626] hover:bg-[#fef2f2]'
+                                        : 'bg-[#c2410c] text-white hover:bg-[#9a330a]'
+                                }`}
+                            >
+                                {toggleLoading && <Loader2 className="h-3 w-3 animate-spin" />}
+                                {selectedGroup.is_active ? 'Desactivar' : 'Activar'}
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setDeleteGrupoError(null);
+                                    setDeleteGrupoTarget(selectedGroup);
+                                }}
+                                disabled={deleteGrupoLoading}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-[#e5e5e5] px-3 py-1.5 text-xs font-semibold text-[#dc2626] transition-colors hover:bg-[#fef2f2] active:scale-[0.98] disabled:opacity-60"
+                                aria-label={`Eliminar grupo ${selectedGroup.name}`}
+                                title="Eliminar grupo"
+                            >
+                                <Trash2 className="h-3 w-3" />
+                                Eliminar
+                            </button>
+                        </div>
                     </div>
                 )}
 
@@ -823,6 +867,28 @@ export default function GestionProyectos() {
                     }
                 }}
                 onCancel={() => { setDeleteError(null); setDeleteTarget(null); }}
+            />
+
+            {/* ════ Group Delete Confirmation ════ */}
+            <ConfirmDialog
+                open={deleteGrupoTarget !== null}
+                title="Eliminar grupo"
+                message={
+                    deleteGrupoError
+                        ? `No se pudo eliminar: ${deleteGrupoError}`
+                        : `Se eliminará el grupo ${deleteGrupoTarget?.name}. Solo se puede eliminar si no tiene proyectos vinculados ni nada ligado. Esta acción no se puede deshacer.`
+                }
+                confirmLabel={deleteGrupoError ? 'Cerrar' : 'Eliminar'}
+                variant={deleteGrupoError ? 'default' : 'danger'}
+                onConfirm={() => {
+                    if (deleteGrupoError) {
+                        setDeleteGrupoError(null);
+                        setDeleteGrupoTarget(null);
+                    } else {
+                        handleDeleteGrupo();
+                    }
+                }}
+                onCancel={() => { setDeleteGrupoError(null); setDeleteGrupoTarget(null); }}
             />
         </div>
     );

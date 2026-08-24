@@ -10,6 +10,7 @@ import { ResultsTable } from '@/components/tables/ResultsTable';
 import { useEvaluadorProyecto, useEvaluadorUsers, type EvaluadorProyecto, type EvaluadorUser, type CreateEvaluadorPayload, type UpdateEvaluadorPayload } from '@/hooks/useEvaluadorProyecto';
 import { useEvaluaciones } from '@/hooks/useEvaluaciones';
 import { ProjectAutocomplete, type ProjectOption } from '@/components/forms/ProjectAutocomplete';
+import { GroupSelector } from '@/components/forms/GroupSelector';
 import { cn } from '@/lib/utils';
 
 export type FaseAsignacion = 'presentacion_anteproyecto' | 'presentacion_final';
@@ -365,6 +366,7 @@ export default function AsignacionEvaluadores() {
     const [deleteTarget, setDeleteTarget] = useState<EvaluadorProyecto | null>(null);
 
     // Registration form
+    const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
     const [selectedProyecto, setSelectedProyecto] = useState<ProjectOption | null>(null);
     const [formFase, setFormFase] = useState<FaseAsignacion>('presentacion_anteproyecto');
     const [formEvalIds, setFormEvalIds] = useState<number[]>([]);
@@ -433,6 +435,11 @@ export default function AsignacionEvaluadores() {
         e.preventDefault();
         setFormError(null);
 
+        if (!selectedGroupId) {
+            setFormError('Seleccione un grupo de proyectos.');
+            return;
+        }
+
         if (!selectedProyecto || formEvalIds.length < 2 || !formFecha || !formHoraInicio || !formHoraFin) {
             setFormError('Complete todos los campos obligatorios (proyecto, mínimo 2 evaluadores, fecha, hora inicio y hora fin).');
             return;
@@ -474,6 +481,7 @@ export default function AsignacionEvaluadores() {
 
         try {
             await crear(payload);
+            setSelectedGroupId(null);
             setSelectedProyecto(null);
             setFormFase('presentacion_anteproyecto');
             setFormEvalIds([]);
@@ -484,7 +492,7 @@ export default function AsignacionEvaluadores() {
         } catch {
             // error is handled by mutationError in the hook
         }
-    }, [selectedProyecto, formEvalIds, formFecha, formHoraInicio, formHoraFin, formFase, crear]);
+    }, [selectedGroupId, selectedProyecto, formEvalIds, formFecha, formHoraInicio, formHoraFin, formFase, crear]);
 
     const handleEdit = useCallback(async (id: number, payload: UpdateEvaluadorPayload) => {
         try {
@@ -634,14 +642,30 @@ export default function AsignacionEvaluadores() {
                     )}
 
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {/* Project selector */}
+                        {/* Group selector (required first: scopes the project autocomplete) */}
                         <div className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-1">
+                            <GroupSelector
+                                value={selectedGroupId}
+                                onChange={(groupId) => {
+                                    setSelectedGroupId(groupId);
+                                    // Never keep a project selected from a different group.
+                                    setSelectedProyecto(null);
+                                    setFormError(null);
+                                }}
+                                error={formError && !selectedGroupId ? 'Seleccione un grupo' : undefined}
+                                allowCreate={false}
+                            />
+                        </div>
+
+                        {/* Project selector (filtered to the selected group) */}
+                        <div className="flex flex-col gap-1.5">
                             <ProjectAutocomplete
                                 value={selectedProyecto}
                                 onChange={(p) => {
                                     setSelectedProyecto(p);
                                     setFormError(null);
                                 }}
+                                groupId={selectedGroupId}
                                 error={formError && !selectedProyecto ? 'Seleccione un proyecto' : undefined}
                             />
                         </div>

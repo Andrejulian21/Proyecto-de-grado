@@ -6,6 +6,8 @@ export interface ProjectOption {
     id: number;
     code: string;
     title: string;
+    /** Identifica el grupo/semestre al que pertenece el proyecto (proyectos.semester_id). */
+    semester_id?: number;
     director?: { id: number; name: string } | null;
     estudiantes?: { id: number; name: string }[];
 }
@@ -14,6 +16,8 @@ interface ProjectAutocompleteProps {
     value: ProjectOption | null;
     onChange: (p: ProjectOption | null) => void;
     error?: string;
+    /** Optional: when set, only projects belonging to this group are searched/shown. */
+    groupId?: number | null;
 }
 
 const CACHE_KEY = 'project-search-cache';
@@ -41,7 +45,7 @@ function writeCache(entries: CacheEntry) {
     }
 }
 
-export function ProjectAutocomplete({ value, onChange, error }: ProjectAutocompleteProps) {
+export function ProjectAutocomplete({ value, onChange, error, groupId }: ProjectAutocompleteProps) {
     const [inputValue, setInputValue] = useState('');
     const [open, setOpen] = useState(false);
     const [results, setResults] = useState<ProjectOption[]>([]);
@@ -67,6 +71,23 @@ export function ProjectAutocomplete({ value, onChange, error }: ProjectAutocompl
         };
     }, []);
 
+    // When the selected group changes, reset the internal search state so
+    // stale results/input from the previous group never leak into the new one.
+    useEffect(() => {
+        if (timerRef.current) clearTimeout(timerRef.current);
+        if (abortRef.current) abortRef.current.abort();
+        setInputValue('');
+        setResults([]);
+        setOpen(false);
+    }, [groupId]);
+
+    /** Defensive client-side scope: keeps only projects of the active group. */
+    const scopeResults = useCallback(
+        (data: ProjectOption[]): ProjectOption[] =>
+            groupId != null ? data.filter((p) => p.semester_id === groupId) : data,
+        [groupId],
+    );
+
     const search = useCallback((query: string) => {
         if (timerRef.current) clearTimeout(timerRef.current);
 
@@ -76,11 +97,14 @@ export function ProjectAutocomplete({ value, onChange, error }: ProjectAutocompl
             return;
         }
 
+        // Cache is scoped per group so switching groups never reuses another group's results.
+        const cacheKey = `${groupId ?? 'all'}:${query.trim().toLowerCase()}`;
+
         // Check cache first
         const cache = readCache();
-        const cached = cache[query.trim().toLowerCase()];
+        const cached = cache[cacheKey];
         if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-            setResults(cached.data);
+            setResults(scopeResults(cached.data));
             setLoading(false);
             return;
         }
@@ -93,8 +117,16 @@ export function ProjectAutocomplete({ value, onChange, error }: ProjectAutocompl
             abortRef.current = controller;
 
             try {
+                const params = new URLSearchParams({ search: query.trim() });
+                if (groupId != null) {
+                    // Group is the authoritative filter: show every project of the group,
+                    // regardless of whether the group is currently marked active.
+                    params.set('grupo_id', String(groupId));
+                } else {
+                    params.set('semestre_activo', '1');
+                }
                 const res = await apiFetch(
-                    `/api/admin/proyectos?search=${encodeURIComponent(query.trim())}&semestre_activo=1`,
+                    `/api/admin/proyectos?${params.toString()}`,
                     { signal: controller.signal },
                 );
                 if (!res.ok) throw new Error(`Error ${res.status}`);
@@ -103,10 +135,10 @@ export function ProjectAutocomplete({ value, onChange, error }: ProjectAutocompl
 
                 // Update cache
                 const newCache = readCache();
-                newCache[query.trim().toLowerCase()] = { data, timestamp: Date.now() };
+                newCache[cacheKey] = { data, timestamp: Date.now() };
                 writeCache(newCache);
 
-                setResults(data);
+                setResults(scopeResults(data));
             } catch (err) {
                 if ((err as Error).name === 'AbortError') return;
                 setResults([]);
@@ -114,7 +146,7 @@ export function ProjectAutocomplete({ value, onChange, error }: ProjectAutocompl
                 setLoading(false);
             }
         }, DEBOUNCE_MS);
-    }, []);
+    }, [groupId, scopeResults]);
 
     const handleInputChange = useCallback(
         (e: React.ChangeEvent<HTMLInputElement>) => {

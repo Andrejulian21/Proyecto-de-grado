@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { GruposProvider } from '@/contexts/GruposContext';
 
 interface AppShellProps {
     children: ReactNode;
@@ -72,16 +73,18 @@ export function AppShell({ children }: AppShellProps) {
     const title = usePageTitle();
 
     return (
-        <div className="flex h-screen overflow-hidden bg-[#fafaf9]">
-            <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <GruposProvider>
+            <div className="flex h-screen overflow-hidden bg-[#fafaf9]">
+                <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-            <div className="flex flex-1 flex-col lg:ml-64 min-w-0">
-                <Header onMenuClick={() => setSidebarOpen(true)} title={title} />
+                <div className="flex flex-1 flex-col lg:ml-64 min-w-0">
+                    <Header onMenuClick={() => setSidebarOpen(true)} title={title} />
 
-                <main className="flex-1 overflow-y-auto p-4 lg:p-8">
-                    {children}
-                </main>
+                    <main className="flex-1 overflow-y-auto p-4 lg:p-8">
+                        {children}
+                    </main>
+                </div>
             </div>
-        </div>
+        </GruposProvider>
     );
 }

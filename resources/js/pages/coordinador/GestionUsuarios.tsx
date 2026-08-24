@@ -958,10 +958,10 @@ export default function GestionUsuarios() {
                     Registre los correos institucionales para crear cuentas de estudiantes y directores. Podrán acceder al sistema usando su correo institucional (Google OAuth).
                 </p>
 
-                <div className="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <div className="mt-5 flex flex-col gap-6">
                     {/* Estudiantes */}
-                    <form onSubmit={handleAgregarEstudiante} className="rounded-2xl bg-[#e7e5e4] p-[2px]">
-                        <div className="rounded-[22px] bg-white p-5" style={{ borderRadius: 'calc(24px - 2px)' }}>
+                    <form onSubmit={handleAgregarEstudiante} className="flex flex-col rounded-2xl bg-[#e7e5e4] p-[2px]">
+                        <div className="flex flex-col rounded-[22px] bg-white p-5" style={{ borderRadius: 'calc(24px - 2px)' }}>
                             <div className="mb-4 flex items-center gap-2">
                                 <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#c2410c]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
@@ -1031,8 +1031,8 @@ export default function GestionUsuarios() {
                     </form>
 
                     {/* Directores */}
-                    <form onSubmit={handleAgregarDirector} className="rounded-2xl bg-[#e7e5e4] p-[2px]">
-                        <div className="rounded-[22px] bg-white p-5" style={{ borderRadius: 'calc(24px - 2px)' }}>
+                    <form onSubmit={handleAgregarDirector} className="flex flex-col rounded-2xl bg-[#e7e5e4] p-[2px]">
+                        <div className="flex flex-col rounded-[22px] bg-white p-5" style={{ borderRadius: 'calc(24px - 2px)' }}>
                             <div className="mb-4 flex items-center gap-2">
                                 <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#4f46e5]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M6 9a6 6 0 0 1 12 0v6a6 6 0 0 1-12 0V9Z" />

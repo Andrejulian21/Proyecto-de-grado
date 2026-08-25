@@ -100,3 +100,59 @@ it('un director no puede eliminar la versión de un estudiante (403)', function 
 
     expect(VersionDocumento::find($version->id))->not->toBeNull();
 });
+
+/**
+ * Issue #46 — la entrega es una plantilla compartida por todos los proyectos
+ * del semestre. La versión pertenece a UN proyecto concreto (a través del
+ * pivote entrega_proyecto). Un estudiante de otro proyecto de la misma
+ * entrega no puede eliminarla: 404 (no 403) para no confirmar la existencia
+ * de un documento ajeno.
+ */
+it('un estudiante de otro proyecto no puede eliminar una versión ajena (404)', function () {
+    $estudianteB = User::factory()->create(['role' => UserRole::Estudiante->value]);
+    $proyectoB = Proyecto::factory()->create(['semester_id' => $this->semestre->id]);
+    $proyectoB->estudiantes()->attach($estudianteB);
+
+    // Idempotente: el boot hook de Proyecto ya auto-vincula al semestre, pero
+    // el attach explícito hace el escenario determinista (unique entrega+proyecto).
+    if (! $this->entrega->proyectos()->where('proyecto_id', $proyectoB->id)->exists()) {
+        $this->entrega->proyectos()->attach($proyectoB->id);
+    }
+
+    // La versión pertenece a la entrega del proyecto A (pivote A).
+    $pivotA = EntregaProyecto::where('entrega_id', $this->entrega->id)
+        ->where('proyecto_id', $this->proyecto->id)
+        ->firstOrFail();
+    Storage::disk('public')->put('entregas/ajena/v1.pdf', 'contenido');
+    $version = crearVersionEliminable($this->entrega, [
+        'entrega_proyecto_id' => $pivotA->id,
+        'file_path' => 'entregas/ajena/v1.pdf',
+    ]);
+
+    $this->actingAs($estudianteB)
+        ->deleteJson("/api/entregas/{$this->entrega->id}/versiones/{$version->id}")
+        ->assertStatus(404);
+
+    // La versión y su archivo permanecen intactos.
+    expect(VersionDocumento::find($version->id))->not->toBeNull();
+    expect(Storage::disk('public')->exists('entregas/ajena/v1.pdf'))->toBeTrue();
+});
+
+/**
+ * Issue #46 — la eliminación debe quedar registrada en audit_logs
+ * (acción `version.deleted`) con el identificador de la versión, la entrega
+ * y el proyecto al que pertenece.
+ */
+it('registra en audit_logs la eliminación de la versión', function () {
+    Storage::disk('public')->put('entregas/audit/v1.pdf', 'contenido');
+    $version = crearVersionEliminable($this->entrega, ['file_path' => 'entregas/audit/v1.pdf']);
+
+    $this->actingAs($this->estudiante)
+        ->deleteJson("/api/entregas/{$this->entrega->id}/versiones/{$version->id}")
+        ->assertOk();
+
+    $this->assertDatabaseHas('audit_logs', [
+        'user_id' => $this->estudiante->id,
+        'action' => 'version.deleted',
+    ]);
+});

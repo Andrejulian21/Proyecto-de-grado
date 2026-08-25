@@ -237,7 +237,10 @@ it('loginExterno emits login.locked (not account_locked) when the account is loc
         'password' => 'TempPass!2026',
     ]);
 
-    $response->assertStatus(423);
+    // Issue #56, defect 3: a locked account returns the unified 401 so its
+    // existence is not revealed; the canonical `login.locked` audit action
+    // still records the real reason.
+    $response->assertStatus(401);
 
     // The audit log records the canonical action, not the legacy one.
     expect(AuditLog::query()

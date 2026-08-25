@@ -116,19 +116,12 @@ test('admin routes in routes/api.php include activity middleware', function () {
         ->toContain("'role:Coordinador'")
         ->and($routes)->toContain("'single_session'");
 
-    // NOTE 2026-08-04 — H-005 spec gap, flagged for the project owner:
-    // The H-005 hardening intended `ensure_password_changed` to be applied
-    // to the admin group so coordinators with a temporary password would be
-    // forced to change it before reaching admin routes. The current
-    // `routes/api.php` admin group (line ~173) does NOT include it:
-    //
-    //   Route::middleware(['auth:sanctum', 'single_session', 'activity', 'role:Coordinador'])
-    //
-    // Test-only adjustment: we do not assert `'ensure_password_changed'`
-    // here because the middleware is intentionally absent (and we are
-    // explicitly NOT restoring production behavior in this fix batch).
-    // The decision to add (or keep it absent) belongs to the project
-    // owner; track as a separate decision in a future change.
+    // NOTE — issue #58, user decision (2026-08): `ensure_password_changed`
+    // (T-017) is intentionally REMOVED, not connected. The password the
+    // coordinator creates for an external evaluator is the DEFINITIVE one —
+    // there is no temporary password to force a change of. The alias was
+    // dropped from bootstrap/app.php. We assert absence to guard against
+    // re-registering a removed mechanism.
     expect($routes)->not->toContain("'ensure_password_changed'");
 });
 

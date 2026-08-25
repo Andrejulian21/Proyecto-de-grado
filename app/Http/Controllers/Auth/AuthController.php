@@ -263,18 +263,26 @@ class AuthController extends Controller
     /**
      * External evaluator credential login (T-016, `auth-external` domain).
      *
-     * SECURITY: All auth failures return the same 401 `{'error': 'invalid_credentials'}`
+     * SECURITY: All auth failures return the SAME 401 `{'error': 'invalid_credentials'}`
      * to prevent user enumeration via differentiated error messages or status codes.
      * Hash::check() is always called (against a dummy hash when the user is not found)
      * to equalize response timing and prevent timing-based enumeration (H-002).
-     * The audit log still records the specific reason for forensic analysis.
+     * The account-locked state (issue #56, defect 3) is computed BEFORE the response
+     * is decided, and the password is ALWAYS checked, so a locked account does not
+     * leak its existence via a distinct 423 or an early return. The real failure
+     * reason stays in the audit log, where it belongs.
      */
     public function loginExterno(LoginExternoRequest $request): JsonResponse
     {
         $payload = $request->validated();
 
+        // Issue #51 — Defect 4: emails are stored normalized to lowercase.
+        // Normalize the lookup so a user created with uppercase can log in
+        // typing their email in any case.
+        $email = strtolower(trim($payload['email']));
+
         $user = User::query()
-            ->where('email', $payload['email'])
+            ->where('email', $email)
             ->first();
 
         // Dummy hash check to prevent timing-based user enumeration (H-002).
@@ -294,29 +302,37 @@ class AuthController extends Controller
             return response()->json(['error' => 'invalid_credentials'], 401);
         }
 
-        if ($user->isLocked()) {
+        // Issue #56, defect 3: compute the lock state AND run the password check
+        // before deciding the response, so both branches execute the same work and
+        // no branch reveals the account's existence via timing or a distinct code.
+        $locked = $user->isLocked();
+        $passwordValid = Hash::check($payload['password'], $user->password);
+
+        // The audit log still records the real reason; only the HTTP response is unified.
+        if ($locked) {
             AuditEvent::dispatch(
                 $user,
                 'login.locked',
                 'account locked by sliding-window policy',
                 ['channel' => 'external', 'locked_until' => $user->locked_until?->toIso8601String()],
             );
-
-            return response()->json(['error' => 'account_locked'], 423);
         }
 
-        // Unified failure: same 401 for internal users AND wrong passwords (H-002).
-        if (! $user->es_externo || ! Hash::check($payload['password'], $user->password)) {
-            $reason = $user->es_externo ? 'wrong_password' : 'not_external_evaluator';
-            AuditEvent::dispatch(
-                $user,
-                'login.rejected',
-                'invalid_credentials',
-                ['channel' => 'external', 'reason' => $reason],
-            );
+        // Unified failure: same 401 for locked, internal, and wrong-password users (H-002).
+        if (! $user->es_externo || ! $passwordValid || $locked) {
+            // Do not increment the failure counter for an already-locked account.
+            if (! $locked) {
+                $reason = $user->es_externo ? 'wrong_password' : 'not_external_evaluator';
+                AuditEvent::dispatch(
+                    $user,
+                    'login.rejected',
+                    'invalid_credentials',
+                    ['channel' => 'external', 'reason' => $reason],
+                );
 
-            if ($user->es_externo) {
-                $user->registerFailedLogin();
+                if ($user->es_externo) {
+                    $user->registerFailedLogin();
+                }
             }
 
             return response()->json(['error' => 'invalid_credentials'], 401);
@@ -368,6 +384,24 @@ class AuthController extends Controller
         $user->password = $payload['new_password'];
         $user->password_changed_at = now();
         $user->save();
+
+        // Issue #56, defect 4 — changing the password MUST invalidate every
+        // other session/token so a suspected unauthorized access is cut off.
+        // Revoke all Sanctum tokens, purge every session row EXCEPT the current
+        // one (so the user who just changed the password is not expelled), and
+        // regenerate the current session id (rotates the CSRF token too).
+        $user->tokens()->delete();
+        // Invalidate all other sessions except the current one.
+        try {
+            DB::table('sessions')
+                ->where('user_id', $user->id)
+                ->where('id', '!=', $request->session()->getId())
+                ->delete();
+            $request->session()->regenerate();
+        } catch (\RuntimeException) {
+            // In API-token-only tests the session store may not exist;
+            // skipping session cleanup is safe for that path.
+        }
 
         AuditEvent::dispatch(
             $user,

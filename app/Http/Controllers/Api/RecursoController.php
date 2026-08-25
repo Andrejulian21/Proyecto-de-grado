@@ -8,11 +8,26 @@ use App\Http\Controllers\Controller;
 use App\Models\RecursoInformativo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class RecursoController extends Controller
 {
+    /**
+     * Whitelist of file types a coordinator may upload as an informative
+     * resource. Mirrors the entregas upload whitelist (issue #56, defect 1):
+     * resources are served from the public disk, so only document MIME types
+     * that are not script-capable in a browser context are accepted.
+     *
+     * @var list<string>
+     */
+    private const ALLOWED_MIME_TYPES = [
+        'application/pdf',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ];
+
     public function index(): JsonResponse
     {
         $recursos = RecursoInformativo::with('author:id,name')
@@ -36,7 +51,12 @@ class RecursoController extends Controller
             'title' => 'required|string|max:500',
             'category' => 'required|string|max:100',
             'description' => 'nullable|string',
-            'file' => 'nullable|file|max:10240', // max 10MB
+            'file' => [
+                'nullable',
+                'file',
+                'mimetypes:'.implode(',', self::ALLOWED_MIME_TYPES),
+                'max:10240', // max 10MB
+            ],
             'link' => 'nullable|string|max:500',
         ]);
 
@@ -48,7 +68,7 @@ class RecursoController extends Controller
         $data['author_id'] = $request->user()->id;
 
         if ($request->hasFile('file')) {
-            $data['file_path'] = $request->file('file')->storeAs('recursos', $request->file('file')->getClientOriginalName(), 'public');
+            $data['file_path'] = $request->file('file')->storeAs('recursos', $this->storedFileName($request->file('file')), 'public');
         }
 
         $recurso = RecursoInformativo::create($data);
@@ -62,7 +82,12 @@ class RecursoController extends Controller
             'title' => 'string|max:500',
             'category' => 'string|max:100',
             'description' => 'nullable|string',
-            'file' => 'nullable|file|max:10240', // max 10MB
+            'file' => [
+                'nullable',
+                'file',
+                'mimetypes:'.implode(',', self::ALLOWED_MIME_TYPES),
+                'max:10240', // max 10MB
+            ],
             'link' => 'nullable|string|max:500',
         ]);
 
@@ -77,7 +102,7 @@ class RecursoController extends Controller
             if ($recurso->file_path) {
                 Storage::disk('public')->delete($recurso->file_path);
             }
-            $data['file_path'] = $request->file('file')->storeAs('recursos', $request->file('file')->getClientOriginalName(), 'public');
+            $data['file_path'] = $request->file('file')->storeAs('recursos', $this->storedFileName($request->file('file')), 'public');
         }
 
         $recurso->update($data);
@@ -90,5 +115,26 @@ class RecursoController extends Controller
         $recurso->delete();
 
         return response()->json(['message' => 'Recurso eliminado']);
+    }
+
+    /**
+     * Generate a server-side file name for a resource (issue #56, defect 1).
+     *
+     * The extension is derived from the actual detected type (which has already
+     * passed the `mimetypes` whitelist), and the base is normalized with a slug
+     * plus a timestamp. The client-provided name is never used as the stored
+     * file name, which prevents path/name based attacks and keeps the stored
+     * name predictable and safe to serve from the public disk.
+     */
+    private function storedFileName(UploadedFile $file): string
+    {
+        $base = Str::slug(pathinfo((string) $file->getClientOriginalName(), PATHINFO_FILENAME));
+
+        return sprintf(
+            '%s_%s.%s',
+            $base !== '' ? $base : 'recurso',
+            now()->format('Ymd_His'),
+            $file->guessExtension() ?: 'pdf'
+        );
     }
 }

@@ -20,9 +20,10 @@ uses(RefreshDatabase::class);
  * Covers the `auth-external` domain from `spec.md`:
  *   - Successful login returns a Sanctum token.
  *   - Wrong password increments the failure counter, eventually locking.
- *   - 3 wrong attempts in 10 min → 423 Locked.
+ *   - 3 wrong attempts in 10 min lock the account (issue #56, defect 3:
+ *     every failure mode now returns the same 401, no 423).
  *   - Non-external users (Estudiante, Coordinador) cannot use this endpoint.
- *   - Locked accounts return 423 even with the right password.
+ *   - All four failure modes return an identical 401 (no user enumeration).
  *   - Audit log entries are written for every login attempt.
  *   - The first successful login sets `password_changed_at` only after
  *     the user calls the change-password endpoint.
@@ -93,7 +94,7 @@ it('rejects an internal user (no es_externo flag) with 401', function () {
         ->assertJson(['error' => 'invalid_credentials']);
 });
 
-it('locks the account after 3 failed attempts and returns 423', function () {
+it('locks the account after 3 failed attempts and returns the unified 401', function () {
     $user = User::factory()->external()->create([
         'email' => 'pedro@evaluador.com',
         'password' => Hash::make('TempPass!2026'),
@@ -107,14 +108,15 @@ it('locks the account after 3 failed attempts and returns 423', function () {
         ])->assertStatus(401);
     }
 
-    // 4th attempt — even with the right password — returns 423
+    // 4th attempt — even with the right password — returns the unified 401
+    // (issue #56, defect 3: locked accounts no longer leak via a 423).
     $response = $this->postJson('/api/auth/externo/login', [
         'email' => 'pedro@evaluador.com',
         'password' => 'TempPass!2026',
     ]);
 
-    $response->assertStatus(423)
-        ->assertJson(['error' => 'account_locked']);
+    $response->assertStatus(401)
+        ->assertJson(['error' => 'invalid_credentials']);
 
     $user = $user->fresh();
 
@@ -122,7 +124,7 @@ it('locks the account after 3 failed attempts and returns 423', function () {
         ->and($user->locked_until->isFuture())->toBeTrue();
 });
 
-it('returns 423 for a request against an already-locked account', function () {
+it('returns the unified 401 for a request against an already-locked account', function () {
     $user = User::factory()->external()->create([
         'email' => 'pedro@evaluador.com',
         'password' => Hash::make('TempPass!2026'),
@@ -135,7 +137,61 @@ it('returns 423 for a request against an already-locked account', function () {
         'password' => 'TempPass!2026',
     ]);
 
-    $response->assertStatus(423);
+    $response->assertStatus(401)
+        ->assertJson(['error' => 'invalid_credentials']);
+});
+
+it('returns an identical 401 across all four login failure modes', function () {
+    // Nonexistent email.
+    $nonexistent = $this->postJson('/api/auth/externo/login', [
+        'email' => 'inexistente@x.test',
+        'password' => 'x',
+    ]);
+
+    // Wrong password on a real external user.
+    $external = User::factory()->external()->create([
+        'email' => 'clave@evaluador.com',
+        'password' => Hash::make('TempPass!2026'),
+        'password_changed_at' => now(),
+    ]);
+    $wrongPassword = $this->postJson('/api/auth/externo/login', [
+        'email' => 'clave@evaluador.com',
+        'password' => 'incorrecta',
+    ]);
+
+    // Internal user (no es_externo flag) hitting the external endpoint.
+    $internal = User::factory()->create([
+        'email' => 'interno@unab.edu.co',
+        'role' => UserRole::Coordinador->value,
+        'es_externo' => false,
+        'password' => Hash::make('Password!2026'),
+    ]);
+    $internalUser = $this->postJson('/api/auth/externo/login', [
+        'email' => 'interno@unab.edu.co',
+        'password' => 'Password!2026',
+    ]);
+
+    // Already-locked external user with the correct password.
+    $locked = User::factory()->external()->create([
+        'email' => 'bloqueado@evaluador.com',
+        'password' => Hash::make('TempPass!2026'),
+        'password_changed_at' => now(),
+        'locked_until' => now()->addMinutes(10),
+    ]);
+    $lockedUser = $this->postJson('/api/auth/externo/login', [
+        'email' => 'bloqueado@evaluador.com',
+        'password' => 'TempPass!2026',
+    ]);
+
+    // All four MUST match in status code AND body (issue #56, defect 3):
+    // no mode may reveal whether the account exists.
+    foreach ([$wrongPassword, $internalUser, $lockedUser] as $response) {
+        expect($response->status())->toBe($nonexistent->status())
+            ->and($response->getContent())->toBe($nonexistent->getContent());
+    }
+
+    $nonexistent->assertStatus(401)
+        ->assertExactJson(['error' => 'invalid_credentials']);
 });
 
 it('resets the failure counter and lockout on a successful login', function () {

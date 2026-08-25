@@ -19,6 +19,18 @@ function handleSessionExpired(): void {
     window.location.href = '/login';
 }
 
+/** Window event fired when the API responds 403 Forbidden (no permission). */
+export const API_FORBIDDEN_EVENT = 'api:forbidden';
+
+/**
+ * Centralized 403 treatment. A 403 is not a session expiry, so we do not
+ * redirect: we notify the UI so pages can render a proper "no permissions"
+ * state via a reusable component or listener.
+ */
+function handleForbidden(): void {
+    window.dispatchEvent(new CustomEvent(API_FORBIDDEN_EVENT));
+}
+
 /**
  * Read the XSRF-TOKEN cookie set by `/sanctum/csrf-cookie`.
  * Returns the raw (URL-encoded) token value, or empty string.
@@ -62,6 +74,9 @@ export function apiFetch(url: string, options: RequestInit = {}): Promise<Respon
         // Session expired → redirect to login (skip auth endpoints).
         if (res.status === 401 && !url.includes('/api/auth/')) {
             handleSessionExpired();
+        } else if (res.status === 403) {
+            // Forbidden: distinct from auth expiry, notify the UI.
+            handleForbidden();
         }
         return res;
     });

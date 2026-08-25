@@ -1,8 +1,7 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { AlertTriangle, Eye, EyeOff } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
-import { useAuth } from '@/hooks/useAuth';
 
 interface FieldError {
     email?: string;
@@ -10,10 +9,21 @@ interface FieldError {
     general?: string;
 }
 
+/* Same role → route mapping as DashboardRouter (issue #54). */
+const DASHBOARD_ROUTE_BY_ROLE: Record<string, string> = {
+    estudiante: '/dashboard/estudiante',
+    director: '/dashboard/director',
+    coordinador: '/dashboard/coordinador',
+    evaluadorexterno: '/dashboard/evaluador-externo',
+};
+
+function dashboardRouteForRole(role: unknown): string {
+    const key = typeof role === 'string' ? role.toLowerCase() : 'estudiante';
+    return DASHBOARD_ROUTE_BY_ROLE[key] ?? '/dashboard/estudiante';
+}
+
 export function LoginExterno() {
-    const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const { sessionCheck } = useAuth();
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -48,8 +58,7 @@ export function LoginExterno() {
             if (res.ok) {
                 const data = await res.json();
                 sessionStorage.setItem('auth_user', JSON.stringify(data.user));
-                const role = data?.user?.role?.toLowerCase() ?? 'estudiante';
-                window.location.href = `/dashboard/${role}`;
+                window.location.href = dashboardRouteForRole(data?.user?.role);
                 return;
             }
 

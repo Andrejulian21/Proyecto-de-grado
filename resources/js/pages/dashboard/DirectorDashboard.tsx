@@ -4,6 +4,7 @@ import { DataTable, type Column } from '@/components/ui/DataTable';
 import { useDirectorProyectos } from '@/hooks/useDirectorProyectos';
 import { useDirectorKpis } from '@/hooks/useDirectorKpis';
 import { useDirectorEntregas, type DirectorEntrega } from '@/hooks/useDirectorEntregas';
+import { entregaStatusConfig } from '@/lib/entregas';
 import {
     ClipboardCheck,
     FileText,
@@ -47,11 +48,10 @@ const deliveryColumns: Column<DirectorEntrega>[] = [
     {
         key: 'status',
         label: 'Estado',
-        render: (row: DirectorEntrega) => (
-            <StatusBadge variant="warning">
-                Pendiente
-            </StatusBadge>
-        ),
+        render: (row: DirectorEntrega) => {
+            const cfg = entregaStatusConfig(row.status);
+            return <StatusBadge variant={cfg.variant}>{cfg.label}</StatusBadge>;
+        },
     },
     {
         key: 'actions',

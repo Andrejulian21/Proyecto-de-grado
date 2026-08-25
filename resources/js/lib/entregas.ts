@@ -60,3 +60,30 @@ export function agruparVersionesPorArchivo<T extends VersionAgrupable>(
         };
     });
 }
+
+/* ── Entrega status → label + badge variant ── */
+
+/**
+ * Canonical entrega status mapping shared by every view that renders a
+ * delivery state (student detail, director dashboard, coordinator detail).
+ */
+export const ENTREGA_STATUS_MAP: Record<
+    string,
+    { label: string; variant: 'success' | 'warning' | 'error' | 'info' | 'inactivo' }
+> = {
+    aprobada: { label: 'Aprobada', variant: 'success' },
+    aprobado: { label: 'Aprobada', variant: 'success' },
+    rechazada: { label: 'Necesita ajustes', variant: 'warning' },
+    rechazado: { label: 'Necesita ajustes', variant: 'warning' },
+    revisada: { label: 'Necesita ajustes', variant: 'warning' },
+    enviada: { label: 'En revisión', variant: 'info' },
+    pendiente: { label: 'Sin revisar', variant: 'warning' },
+    solicitada: { label: 'Sin entregar', variant: 'inactivo' },
+    creacion: { label: 'Sin entregar', variant: 'inactivo' },
+};
+
+/** Resolve the config for a status, falling back to the raw value. */
+export function entregaStatusConfig(status: string | null) {
+    if (!status) return { label: 'Sin revisar', variant: 'warning' as const };
+    return ENTREGA_STATUS_MAP[status] ?? { label: status, variant: 'inactivo' as const };
+}

@@ -10,6 +10,7 @@ import { apiFetch } from '@/lib/utils';
 import type { AnalisisIa, DocumentoSolicitado } from '@/types/entregas';
 import {
     agruparVersionesPorArchivo,
+    entregaStatusConfig,
     type DocumentoConVersiones,
 } from '@/lib/entregas';
 import { RetroalimentacionIa } from '@/components/entregas/RetroalimentacionIa';
@@ -54,23 +55,7 @@ interface EntregaDetail {
 
 const MAX_VERSIONS_PER_ARCHIVO = 4;
 
-const STATUS_MAP: Record<string, { label: string; variant: 'success' | 'warning' | 'error' | 'info' | 'inactivo' }> = {
-    aprobada: { label: 'Aprobada', variant: 'success' },
-    aprobado: { label: 'Aprobada', variant: 'success' },
-    rechazada: { label: 'Necesita ajustes', variant: 'warning' },
-    rechazado: { label: 'Necesita ajustes', variant: 'warning' },
-    revisada: { label: 'Necesita ajustes', variant: 'warning' },
-    enviada: { label: 'En revisión', variant: 'info' },
-    pendiente: { label: 'Sin revisar', variant: 'warning' },
-    solicitada: { label: 'Sin entregar', variant: 'inactivo' },
-    creacion: { label: 'Sin entregar', variant: 'inactivo' },
-};
-
 /* ── Helpers ── */
-
-function statusConfig(status: string) {
-    return STATUS_MAP[status] ?? { label: status, variant: 'inactivo' as const };
-}
 
 function formatDate(dateStr: string | null | undefined): string {
     if (!dateStr) return '—';
@@ -328,7 +313,7 @@ export default function DetalleEntregaEstudiante() {
     }
 
     /* ── Derived data ── */
-    const statusCfg = statusConfig(entrega.status);
+    const statusCfg = entregaStatusConfig(entrega.status);
     const mainProyecto = entrega.proyecto ?? (entrega.proyectos?.[0] ?? null);
     const projectCode = mainProyecto?.code ?? '';
     const projectTitle = mainProyecto?.title ?? '';

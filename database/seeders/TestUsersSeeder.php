@@ -19,6 +19,11 @@ class TestUsersSeeder extends Seeder
 {
     public function run(): void
     {
+        if (! app()->environment(['local', 'testing'])) {
+            $this->command?->warn('TestUsersSeeder omitido: el entorno no es local ni testing.');
+            return;
+        }
+
         // ── 1. Coordinadores (Google OAuth — via whitelist) ─────────────
         AuthorizedEmail::updateOrCreate(
             ['email' => 'jarteaga145@unab.edu.co'],

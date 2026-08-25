@@ -10,6 +10,7 @@ use App\Actions\Entrega\ReviewEntregaAction;
 use App\Actions\Entrega\SolicitarEntregaAction;
 use App\Actions\Entrega\StoreEntregaAction;
 use App\Actions\Entrega\UpdateEntregaAction;
+use App\Events\AuditEvent;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreEntregaRequest;
 use App\Http\Requests\UpdateEntregaRequest;
@@ -19,6 +20,7 @@ use App\Models\VersionDocumento;
 use App\Services\Evaluation\AiFeedbackPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
@@ -46,9 +48,9 @@ class EntregaController extends Controller
             'proyectos:id,code,title',
         ]);
 
-        // Role-based scoping — moved to the model scope (issue #38).
+        // Role-based scoping — moved to the model scope (issue #38, #47).
         // Coordinator unfiltered (intentional); Director/Estudiante see
-        // their projects; EvaluadorExterno branch pending issue #47.
+        // their projects; EvaluadorExterno sees only assigned projects.
         $query->paraUsuario($user);
 
         // Filter by grupo_id (semester): direct filter on semester_id
@@ -244,7 +246,19 @@ class EntregaController extends Controller
             ->orderByDesc('version_number')
             ->get();
 
-        return response()->json(['data' => $versiones]);
+        // Issue #47 (hallazgo 4): never expose file_path (a public-disk
+        // path downloadable without a session). Return the version id and
+        // the rest of the metadata instead.
+        $data = $versiones
+            ->map(function (VersionDocumento $version) {
+                $arr = $version->toArray();
+                unset($arr['file_path']);
+
+                return $arr;
+            })
+            ->values();
+
+        return response()->json(['data' => $data]);
     }
 
     /**
@@ -257,13 +271,27 @@ class EntregaController extends Controller
         $entrega = Entrega::findOrFail($entregaId);
 
         // Issue #38: only the student of a linked project may delete a
-        // version. Pivot-level ownership (entrega_proyecto_id) is pending
-        // the derived issue #46.
+        // version. Director/coordinador/evaluador are denied here (403).
         $this->authorize('deleteVersion', $entrega);
 
-        $version = VersionDocumento::where('entrega_id', $entregaId)
+        $user = $request->user();
+
+        // Issue #46: the entrega is a shared template, but the version
+        // belongs to ONE project delivery (entrega_proyecto_id). Resolve the
+        // owning project through the pivot and verify the authenticated
+        // student is a member of THAT project — not merely of any linked one.
+        $version = VersionDocumento::with('entregaProyecto.proyecto')
+            ->where('entrega_id', $entregaId)
             ->where('id', $versionId)
             ->firstOrFail();
+
+        $proyecto = $version->entregaProyecto?->proyecto;
+
+        if (! $proyecto || ! $proyecto->estudiantes()->where('user_id', $user->id)->exists()) {
+            // 404, not 403: do not confirm that a document belonging to
+            // another project exists (issue #46 acceptance criteria).
+            return response()->json(['error' => 'No autorizado.'], 404);
+        }
 
         // Can only delete if director hasn't made observations
         if ($version->director_notes && trim($version->director_notes) !== '') {
@@ -272,12 +300,30 @@ class EntregaController extends Controller
             ], 422);
         }
 
-        // Delete the stored file
-        if ($version->file_path && Storage::disk('public')->exists($version->file_path)) {
-            Storage::disk('public')->delete($version->file_path);
-        }
+        // Issue #46: leave an immutable trace before the irreversible
+        // deletion (version id, owning project and user).
+        AuditEvent::dispatch(
+            $user,
+            'version.deleted',
+            "Versión #{$version->id} de la entrega #{$entregaId} eliminada por su autor.",
+            [
+                'version_id' => $version->id,
+                'entrega_id' => $entregaId,
+                'entrega_proyecto_id' => $version->entrega_proyecto_id,
+                'proyecto_id' => $proyecto->id,
+            ],
+        );
 
-        $version->delete();
+        $filePath = $version->file_path;
+
+        // Delete the DB row first; the physical file is only removed after
+        // the transaction is confirmed, so a failed deletion never destroys
+        // the document while its record survives (issue #46 constraint).
+        DB::transaction(fn () => $version->delete());
+
+        if ($filePath && Storage::disk('public')->exists($filePath)) {
+            Storage::disk('public')->delete($filePath);
+        }
 
         return response()->json(['message' => 'Versión eliminada correctamente.']);
     }

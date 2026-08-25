@@ -200,13 +200,13 @@ class Entrega extends Model
     }
 
     /**
-     * Scope entregas by what the user may list (issue #38).
+     * Scope entregas by what the user may list (issue #38, #47).
      *
-     * Coordinador sees everything (intentional). Director and Estudiante
-     * are filtered to their projects. Unknown roles default to an empty
-     * result (default-deny). The EvaluadorExterno branch is pending the
-     * derived issue #47 (listing without evaluator filter); it stays
-     * unfiltered here to preserve the current behaviour.
+     * Coordinador sees everything (intentional). Director, Estudiante and
+     * EvaluadorExterno are filtered to their projects. Unknown roles
+     * default to an empty result (default-deny). An external evaluator
+     * lists only entregas linked to projects they are assigned to (issue
+     * #47, hallazgo 3).
      */
     public function scopeParaUsuario(Builder $query, User $user): Builder
     {
@@ -214,7 +214,10 @@ class Entrega extends Model
             UserRole::Coordinador => $query,
             UserRole::Director => $query->whereHas('proyectos', fn ($sq) => $sq->where('director_id', $user->id)),
             UserRole::Estudiante => $query->whereHas('proyectos.estudiantes', fn ($sq) => $sq->where('user_id', $user->id)),
-            UserRole::EvaluadorExterno => $query,
+            UserRole::EvaluadorExterno => $query->whereHas('proyectos', fn ($sq) => $sq->whereIn(
+                'proyectos.id',
+                EvaluadorProyecto::where('evaluador_id', $user->id)->select('proyecto_id')
+            )),
             default => $query->whereRaw('0 = 1'),
         };
     }

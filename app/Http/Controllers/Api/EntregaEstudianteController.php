@@ -15,6 +15,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class EntregaEstudianteController extends Controller
 {
@@ -117,7 +118,6 @@ class EntregaEstudianteController extends Controller
 
         $file = $request->file('file');
         $originalName = $file->getClientOriginalName();
-        $extension = $file->getClientOriginalExtension();
 
         $versionamiento = (bool) ($archivoRequerido['versionamiento'] ?? false);
 
@@ -137,10 +137,24 @@ class EntregaEstudianteController extends Controller
 
         $newVersionNumber = ($lastVersion ?? 0) + 1;
 
+        // Server-side file name (issue #56, defect 2): the base is normalized
+        // with a slug, the extension is derived from the actual detected type
+        // (already validated by the `mimetypes` whitelist), and a timestamp is
+        // appended for uniqueness. The client-provided name is preserved only
+        // in the `original_name` column below.
+        $storedBase = Str::slug(pathinfo((string) $originalName, PATHINFO_FILENAME));
+        $storedName = sprintf(
+            'v%d_%s_%s.%s',
+            $newVersionNumber,
+            $storedBase !== '' ? $storedBase : 'documento',
+            now()->format('Ymd_His'),
+            $file->guessExtension() ?: 'pdf'
+        );
+
         // Store file
         $path = $file->storeAs(
             "entregas/{$entrega->id}/{$slug}",
-            "v{$newVersionNumber}_{$originalName}",
+            $storedName,
             'public'
         );
 

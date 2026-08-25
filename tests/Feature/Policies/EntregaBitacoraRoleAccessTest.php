@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\UserRole;
 use App\Models\Bitacora;
 use App\Models\Entrega;
+use App\Models\EntregaProyecto;
 use App\Models\EvaluadorProyecto;
 use App\Models\Proyecto;
 use App\Models\Semestre;
@@ -81,8 +82,14 @@ function crearEntregaGuard(array $ctx, string $status = 'pendiente'): Entrega
 
 function crearVersionGuard(int $entregaId): VersionDocumento
 {
+    // Production shape (issue #46): every version belongs to ONE project
+    // delivery through the entrega_proyecto pivot; a version without it
+    // cannot be owned (and thus cannot be deleted by any student).
+    $pivot = EntregaProyecto::where('entrega_id', $entregaId)->firstOrFail();
+
     return VersionDocumento::create([
         'entrega_id' => $entregaId,
+        'entrega_proyecto_id' => $pivot->id,
         'version_number' => 1,
         'file_path' => 'entregas/guard/v1.pdf',
         'file_size' => 1024,

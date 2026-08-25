@@ -57,13 +57,11 @@ class DirectorController extends Controller
 
         $proyectosSupervisando = $proyectoIds->count();
 
-        $entregasPendientes = Entrega::where(function ($q) use ($proyectoIds) {
-            foreach ($proyectoIds as $pid) {
-                $q->orWhere(function ($sq) use ($pid) {
-                    $sq->paraProyecto($pid);
-                });
-            }
-        })
+        // Issue #47 (hallazgo 2): an empty $proyectoIds collection must
+        // still restrict. whereIn with an empty set yields `0 = 1`, so the
+        // filter never silently disappears (unlike building an OR-group via
+        // foreach over an empty collection).
+        $entregasPendientes = Entrega::whereHas('proyectos', fn ($q) => $q->whereIn('proyectos.id', $proyectoIds))
             ->where('status', 'enviada')
             ->count();
 
@@ -71,13 +69,7 @@ class DirectorController extends Controller
             ->where('status', 'en_riesgo')
             ->count();
 
-        $aprobadasMes = Entrega::where(function ($q) use ($proyectoIds) {
-            foreach ($proyectoIds as $pid) {
-                $q->orWhere(function ($sq) use ($pid) {
-                    $sq->paraProyecto($pid);
-                });
-            }
-        })
+        $aprobadasMes = Entrega::whereHas('proyectos', fn ($q) => $q->whereIn('proyectos.id', $proyectoIds))
             ->where('status', 'aprobada')
             ->whereMonth('created_at', now()->month)
             ->whereYear('created_at', now()->year)
@@ -107,13 +99,10 @@ class DirectorController extends Controller
             ->enSemestresActivos()
             ->pluck('id');
 
-        $entregas = Entrega::where(function ($q) use ($proyectoIds) {
-            foreach ($proyectoIds as $pid) {
-                $q->orWhere(function ($sq) use ($pid) {
-                    $sq->paraProyecto($pid);
-                });
-            }
-        })
+        // Issue #47 (hallazgo 2): whereIn over an empty $proyectoIds yields
+        // `0 = 1`, so a director with no projects gets zero deliveries
+        // instead of the whole system's (the filter must never disappear).
+        $entregas = Entrega::whereHas('proyectos', fn ($q) => $q->whereIn('proyectos.id', $proyectoIds))
             ->where('status', 'enviada')
             ->with([
                 'proyectos:id,code,title,director_id',

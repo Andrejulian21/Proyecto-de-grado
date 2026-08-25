@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\Entrega;
 use App\Models\Evaluacion;
@@ -32,9 +33,20 @@ class EvaluacionController extends Controller
             $query->where('entrega_id', $request->integer('entrega_id'));
         }
 
-        if ($user->role->value !== 'Coordinador') {
-            $query->where('evaluador_id', $user->id);
-        }
+        // Issue #47 (decision): default-deny by role. Coordinator sees
+        // everything; the rest see only their own evaluations. An external
+        // evaluator additionally only sees evaluations of projects they are
+        // assigned to (via evaluador_proyecto).
+        match ($user->role) {
+            UserRole::Coordinador => null,
+            UserRole::EvaluadorExterno => $query
+                ->where('evaluador_id', $user->id)
+                ->whereHas('entrega.proyectos', fn ($q) => $q->whereIn(
+                    'proyectos.id',
+                    EvaluadorProyecto::where('evaluador_id', $user->id)->select('proyecto_id')
+                )),
+            default => $query->where('evaluador_id', $user->id),
+        };
 
         $evaluaciones = $query->get();
 
@@ -153,7 +165,18 @@ class EvaluacionController extends Controller
 
     public function consolidado(Request $request, int $entregaId): JsonResponse
     {
+        $user = $request->user();
         $entrega = Entrega::findOrFail($entregaId);
+
+        // Issue #47 (decision): the general consolidado is for the
+        // Coordinador/Director. An EvaluadorExterno sees only the
+        // consolidado of an entrega linked to a project they are assigned
+        // to. Any other role (e.g. Estudiante) is denied.
+        match ($user->role) {
+            UserRole::Coordinador, UserRole::Director => null,
+            UserRole::EvaluadorExterno => $this->authorize('view', $entrega),
+            default => abort(403, 'No autorizado.'),
+        };
 
         $evaluaciones = Evaluacion::where('entrega_id', $entregaId)
             ->whereNotNull('grade')

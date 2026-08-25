@@ -1,0 +1,67 @@
+# ------------------------------------------------------------------
+# Build context exclusions — production Dockerfile (issue #55).
+# Keeps the context small and, critically, keeps secrets and the
+# local SQLite database out of any build (project hard rule).
+# ------------------------------------------------------------------
+
+# VCS
+.git
+
+# Local environment files — never ship secrets or local config
+.env
+.env.backup
+.env.bak
+.env.docker
+.env.docker.bak
+.env.production
+
+# Dependencies — rebuilt inside their own build stages
+node_modules
+vendor
+public/build
+
+# Local database — never include the dev SQLite database in a build context
+database/database.sqlite
+database/*.sqlite
+database/dump-completo.sql
+database/*.sql
+
+# Sail dev images — not part of the production image
+docker
+
+# Tests / CI / docs — not needed at runtime
+tests
+e2e
+test-results
+playwright-report
+.github
+openspec
+contexto
+docs
+sdd
+
+# Local agent / IDE state
+.engram
+.atl
+.idea
+.vscode
+.fleet
+.phpunit.cache
+.phpunit.result.cache
+Thumbs.db
+
+# Logs, caches and local artifacts
+*.log
+vite-out.log
+vite-err.log
+storage/logs/*
+storage/framework/cache/data/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/framework/testing/*
+coverage
+coverage.xml
+token-optimizer
+
+# Local convenience scripts
+start-vite.bat

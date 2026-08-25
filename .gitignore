@@ -65,7 +65,7 @@ $RECYCLE.BIN/
 *.swo
 *~
 
-testsprite_tests\tmp\config.json
+testsprite_tests/tmp/config.json
 
 # Sensitive / backup files (contain secrets)
 .env.bak

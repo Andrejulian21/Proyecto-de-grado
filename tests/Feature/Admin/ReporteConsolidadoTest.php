@@ -26,7 +26,8 @@ describe('T-018: Reporte consolidado', function () {
         $this->semestre = Semestre::create(['name' => '2026-1', 'start_date' => '2026-02-01', 'end_date' => '2026-06-30']);
         $this->proyecto = Proyecto::create(['title' => 'Proyecto Test', 'semester_id' => $this->semestre->id, 'director_id' => $this->director->id]);
         $this->proyecto->estudiantes()->attach($this->estudiante);
-        $this->entrega = Entrega::create(['proyecto_id' => $this->proyecto->id, 'phase' => 'anteproyecto', 'title' => 'Entrega 1', 'due_date' => '2026-03-01']);
+        $this->entrega = Entrega::create(['semester_id' => $this->semestre->id, 'phase' => 'anteproyecto', 'title' => 'Entrega 1', 'due_date' => '2026-03-01']);
+        $this->entrega->proyectos()->attach($this->proyecto->id);
 
         Evaluacion::create([
             'entrega_id' => $this->entrega->id,

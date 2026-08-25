@@ -35,31 +35,34 @@ beforeEach(function () {
         'director_id' => $this->director->id,
     ]);
 
-    // Crear entregas aprobadas
-    Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
+    // Crear entregas aprobadas (production shape: semester_id + pivot)
+    $finalA = Entrega::create([
+        'semester_id' => $this->semestre->id,
         'phase' => 'anteproyecto',
         'title' => 'Final A',
         'due_date' => '2026-03-01',
         'status' => 'aprobada',
     ]);
+    $finalA->proyectos()->attach($this->proyecto->id);
 
-    Entrega::create([
-        'proyecto_id' => $this->otroProyecto->id,
+    $finalB = Entrega::create([
+        'semester_id' => $this->semestre->id,
         'phase' => 'anteproyecto',
         'title' => 'Final B',
         'due_date' => '2026-04-01',
         'status' => 'aprobada',
     ]);
+    $finalB->proyectos()->attach($this->otroProyecto->id);
 
     // Crear entrega no aprobada (no debe aparecer)
-    Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
+    $noAprobada = Entrega::create([
+        'semester_id' => $this->semestre->id,
         'phase' => 'anteproyecto',
         'title' => 'No aprobada',
         'due_date' => '2026-03-01',
         'status' => 'pendiente',
     ]);
+    $noAprobada->proyectos()->attach($this->proyecto->id);
 });
 
 // -- Acceso coordinador -------------------------------------------------------
@@ -124,13 +127,14 @@ it('filtra por director_id', function () {
         'semester_id' => $this->semestre->id,
         'director_id' => $otroDirector->id,
     ]);
-    Entrega::create([
-        'proyecto_id' => $proyectoOtroDirector->id,
+    $otra = Entrega::create([
+        'semester_id' => $this->semestre->id,
         'phase' => 'anteproyecto',
         'title' => 'Final Otro Director',
         'due_date' => '2026-05-01',
         'status' => 'aprobada',
     ]);
+    $otra->proyectos()->attach($proyectoOtroDirector->id);
 
     $response = $this->actingAs($this->coordinador)
         ->getJson('/api/admin/entregas/finales?director_id=' . $this->director->id);

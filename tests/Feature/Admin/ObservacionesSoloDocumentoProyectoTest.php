@@ -28,7 +28,7 @@ beforeEach(function () {
 function crearEntregaConVersion(Proyecto $proyecto, array $archivos, string $archivoId, int $versionNumber = 1): array
 {
     $entrega = Entrega::create([
-        'proyecto_id' => $proyecto->id,
+        'semester_id' => $proyecto->semester_id,
         'phase' => 'anteproyecto',
         'title' => 'Entrega para revisar',
         'due_date' => now()->addMonths(2)->toDateString(),

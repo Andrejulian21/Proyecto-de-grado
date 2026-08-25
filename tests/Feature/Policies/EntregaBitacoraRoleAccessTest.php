@@ -66,13 +66,17 @@ function usuarioDelRolPolicy(array $ctx, UserRole $rol): User
 
 function crearEntregaGuard(array $ctx, string $status = 'pendiente'): Entrega
 {
-    return Entrega::create([
-        'proyecto_id' => $ctx['proyecto']->id,
+    $entrega = Entrega::create([
+        'semester_id' => $ctx['semestre']->id,
         'phase' => 'anteproyecto',
         'title' => 'Entrega guard',
         'due_date' => now()->addMonths(2)->toDateString(),
         'status' => $status,
     ]);
+    // Production shape (StoreEntregaAction): project linked via pivot.
+    $entrega->proyectos()->attach($ctx['proyecto']->id);
+
+    return $entrega;
 }
 
 function crearVersionGuard(int $entregaId): VersionDocumento

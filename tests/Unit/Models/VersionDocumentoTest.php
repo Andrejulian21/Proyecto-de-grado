@@ -14,21 +14,23 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $semestre = Semestre::create([
+    $this->semestre = Semestre::create([
         'name' => '2026-1',
         'start_date' => '2026-02-01',
         'end_date' => '2026-06-30',
     ]);
-    $proyecto = Proyecto::create([
+    $this->proyecto = Proyecto::create([
         'title' => 'Proyecto Test',
-        'semester_id' => $semestre->id,
+        'semester_id' => $this->semestre->id,
     ]);
     $this->entrega = Entrega::create([
-        'proyecto_id' => $proyecto->id,
+        'semester_id' => $this->semestre->id,
         'phase' => 'anteproyecto',
         'title' => 'Entrega Test',
         'due_date' => '2026-03-01',
     ]);
+    // Link via pivot — the shape StoreEntregaAction produces in production.
+    $this->entrega->proyectos()->attach($this->proyecto->id);
 });
 
 test('VersionDocumento model exists and extends Model', function () {
@@ -82,10 +84,10 @@ test('VersionDocumento scope ultima orders by version_number desc', function () 
 });
 
 test('VersionDocumento unique constraint is per document and project', function () {
-    $pivot = EntregaProyecto::create([
-        'entrega_id' => $this->entrega->id,
-        'proyecto_id' => $this->entrega->proyecto_id,
-    ]);
+    // The pivot row already exists (attached in beforeEach).
+    $pivot = EntregaProyecto::where('entrega_id', $this->entrega->id)
+        ->where('proyecto_id', $this->proyecto->id)
+        ->firstOrFail();
 
     VersionDocumento::create([
         'entrega_id' => $this->entrega->id,

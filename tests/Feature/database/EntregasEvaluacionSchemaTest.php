@@ -97,7 +97,7 @@ test('Entrega persists grade_percentage as decimal via cast', function () {
     $proyecto = Proyecto::create(['title' => 'P', 'semester_id' => $semestre->id]);
 
     $entrega = Entrega::create([
-        'proyecto_id' => $proyecto->id,
+        'semester_id' => $semestre->id,
         'phase' => 'anteproyecto',
         'title' => 'E1',
         'due_date' => '2026-03-15',
@@ -113,7 +113,7 @@ test('Entrega persists director_grade as decimal via cast', function () {
     $proyecto = Proyecto::create(['title' => 'P', 'semester_id' => $semestre->id]);
 
     $entrega = Entrega::create([
-        'proyecto_id' => $proyecto->id,
+        'semester_id' => $semestre->id,
         'phase' => 'anteproyecto',
         'title' => 'E1',
         'due_date' => '2026-03-15',

@@ -9,6 +9,7 @@ use App\Models\EvaluadorProyecto;
 use App\Models\Proyecto;
 use App\Models\Semestre;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -23,7 +24,8 @@ describe('T-015: Migraciones y modelos Evaluacion', function () {
         $director = User::factory()->director()->create();
         $semestre = Semestre::create(['name' => '2026-1', 'start_date' => '2026-02-01', 'end_date' => '2026-06-30']);
         $proyecto = Proyecto::create(['title' => 'Test', 'semester_id' => $semestre->id, 'director_id' => $director->id]);
-        $entrega = Entrega::create(['proyecto_id' => $proyecto->id, 'phase' => 'anteproyecto', 'title' => 'Entrega 1', 'due_date' => '2026-03-01']);
+        $entrega = Entrega::create(['semester_id' => $semestre->id, 'phase' => 'anteproyecto', 'title' => 'Entrega 1', 'due_date' => '2026-03-01']);
+        $entrega->proyectos()->attach($proyecto->id);
         $evaluador = User::factory()->external()->create();
 
         $evaluacion = Evaluacion::create([
@@ -50,7 +52,8 @@ describe('T-015: Migraciones y modelos Evaluacion', function () {
         $director = User::factory()->director()->create();
         $semestre = Semestre::create(['name' => '2026-1', 'start_date' => '2026-02-01', 'end_date' => '2026-06-30']);
         $proyecto = Proyecto::create(['title' => 'Test', 'semester_id' => $semestre->id, 'director_id' => $director->id]);
-        $entrega = Entrega::create(['proyecto_id' => $proyecto->id, 'phase' => 'anteproyecto', 'title' => 'Entrega 1', 'due_date' => '2026-03-01']);
+        $entrega = Entrega::create(['semester_id' => $semestre->id, 'phase' => 'anteproyecto', 'title' => 'Entrega 1', 'due_date' => '2026-03-01']);
+        $entrega->proyectos()->attach($proyecto->id);
         $evaluador = User::factory()->external()->create();
 
         Evaluacion::create([
@@ -65,14 +68,15 @@ describe('T-015: Migraciones y modelos Evaluacion', function () {
             'evaluador_id' => $evaluador->id,
             'criterio' => 'Estructura',
             'percentage' => 50.00,
-        ]))->toThrow(Illuminate\Database\QueryException::class);
+        ]))->toThrow(QueryException::class);
     });
 
     it('evaluacion cascade delete con entrega', function () {
         $director = User::factory()->director()->create();
         $semestre = Semestre::create(['name' => '2026-1', 'start_date' => '2026-02-01', 'end_date' => '2026-06-30']);
         $proyecto = Proyecto::create(['title' => 'Test', 'semester_id' => $semestre->id, 'director_id' => $director->id]);
-        $entrega = Entrega::create(['proyecto_id' => $proyecto->id, 'phase' => 'anteproyecto', 'title' => 'Entrega 1', 'due_date' => '2026-03-01']);
+        $entrega = Entrega::create(['semester_id' => $semestre->id, 'phase' => 'anteproyecto', 'title' => 'Entrega 1', 'due_date' => '2026-03-01']);
+        $entrega->proyectos()->attach($proyecto->id);
         $evaluador = User::factory()->external()->create();
 
         Evaluacion::create([
@@ -91,7 +95,8 @@ describe('T-015: Migraciones y modelos Evaluacion', function () {
         $director = User::factory()->director()->create();
         $semestre = Semestre::create(['name' => '2026-1', 'start_date' => '2026-02-01', 'end_date' => '2026-06-30']);
         $proyecto = Proyecto::create(['title' => 'Test', 'semester_id' => $semestre->id, 'director_id' => $director->id]);
-        $entrega = Entrega::create(['proyecto_id' => $proyecto->id, 'phase' => 'anteproyecto', 'title' => 'Entrega 1', 'due_date' => '2026-03-01']);
+        $entrega = Entrega::create(['semester_id' => $semestre->id, 'phase' => 'anteproyecto', 'title' => 'Entrega 1', 'due_date' => '2026-03-01']);
+        $entrega->proyectos()->attach($proyecto->id);
         $evaluador = User::factory()->external()->create();
 
         $evaluacion = Evaluacion::create([
@@ -110,7 +115,8 @@ describe('T-015: Migraciones y modelos Evaluacion', function () {
         $director = User::factory()->director()->create();
         $semestre = Semestre::create(['name' => '2026-1', 'start_date' => '2026-02-01', 'end_date' => '2026-06-30']);
         $proyecto = Proyecto::create(['title' => 'Test', 'semester_id' => $semestre->id, 'director_id' => $director->id]);
-        $entrega = Entrega::create(['proyecto_id' => $proyecto->id, 'phase' => 'anteproyecto', 'title' => 'Entrega 1', 'due_date' => '2026-03-01']);
+        $entrega = Entrega::create(['semester_id' => $semestre->id, 'phase' => 'anteproyecto', 'title' => 'Entrega 1', 'due_date' => '2026-03-01']);
+        $entrega->proyectos()->attach($proyecto->id);
         $evaluador = User::factory()->external()->create();
 
         $evaluacion = Evaluacion::create([
@@ -137,7 +143,8 @@ describe('T-016: CRUD evaluaciones', function () {
         $this->evaluador = User::factory()->external()->create(['password_changed_at' => now()]);
         $this->semestre = Semestre::create(['name' => '2026-1', 'start_date' => '2026-02-01', 'end_date' => '2026-06-30']);
         $this->proyecto = Proyecto::create(['title' => 'Proyecto Test', 'semester_id' => $this->semestre->id, 'director_id' => $this->director->id]);
-        $this->entrega = Entrega::create(['proyecto_id' => $this->proyecto->id, 'phase' => 'anteproyecto', 'title' => 'Entrega 1', 'due_date' => '2026-03-01']);
+        $this->entrega = Entrega::create(['semester_id' => $this->semestre->id, 'phase' => 'anteproyecto', 'title' => 'Entrega 1', 'due_date' => '2026-03-01']);
+        $this->entrega->proyectos()->attach($this->proyecto->id);
     });
 
     it('evaluador puede listar evaluaciones de una entrega', function () {
@@ -151,7 +158,7 @@ describe('T-016: CRUD evaluaciones', function () {
         ]);
 
         $response = $this->actingAs($this->evaluador)
-            ->getJson('/api/evaluaciones?entrega_id=' . $this->entrega->id);
+            ->getJson('/api/evaluaciones?entrega_id='.$this->entrega->id);
 
         $response->assertOk();
         expect($response->json('data'))->toHaveCount(1);
@@ -178,7 +185,7 @@ describe('T-016: CRUD evaluaciones', function () {
         ]);
 
         $response = $this->actingAs($this->evaluador)
-            ->getJson('/api/evaluaciones?entrega_id=' . $this->entrega->id);
+            ->getJson('/api/evaluaciones?entrega_id='.$this->entrega->id);
 
         $response->assertOk();
         expect($response->json('data'))->toHaveCount(1);
@@ -205,7 +212,7 @@ describe('T-016: CRUD evaluaciones', function () {
         ]);
 
         $response = $this->actingAs($this->coordinador)
-            ->getJson('/api/evaluaciones?entrega_id=' . $this->entrega->id);
+            ->getJson('/api/evaluaciones?entrega_id='.$this->entrega->id);
 
         $response->assertOk();
         expect($response->json('data'))->toHaveCount(2);
@@ -242,7 +249,8 @@ describe('T-016: CRUD evaluaciones', function () {
 
     it('evaluador no puede calificar entrega no asignada (403)', function () {
         $otroProyecto = Proyecto::create(['title' => 'Otro', 'semester_id' => $this->semestre->id]);
-        $otraEntrega = Entrega::create(['proyecto_id' => $otroProyecto->id, 'phase' => 'anteproyecto', 'title' => 'Otra entrega', 'due_date' => '2026-03-01']);
+        $otraEntrega = Entrega::create(['semester_id' => $this->semestre->id, 'phase' => 'anteproyecto', 'title' => 'Otra entrega', 'due_date' => '2026-03-01']);
+        $otraEntrega->proyectos()->attach($otroProyecto->id);
 
         $response = $this->actingAs($this->evaluador)
             ->postJson('/api/evaluaciones', [
@@ -268,7 +276,8 @@ describe('T-017: Evaluacion por criterio', function () {
         $this->evaluador = User::factory()->external()->create(['password_changed_at' => now()]);
         $this->semestre = Semestre::create(['name' => '2026-1', 'start_date' => '2026-02-01', 'end_date' => '2026-06-30']);
         $this->proyecto = Proyecto::create(['title' => 'Proyecto Test', 'semester_id' => $this->semestre->id, 'director_id' => $this->director->id]);
-        $this->entrega = Entrega::create(['proyecto_id' => $this->proyecto->id, 'phase' => 'anteproyecto', 'title' => 'Entrega 1', 'due_date' => '2026-03-01']);
+        $this->entrega = Entrega::create(['semester_id' => $this->semestre->id, 'phase' => 'anteproyecto', 'title' => 'Entrega 1', 'due_date' => '2026-03-01']);
+        $this->entrega->proyectos()->attach($this->proyecto->id);
     });
 
     it('valida que suma de porcentajes por entrega sea 100%', function () {

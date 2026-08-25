@@ -68,7 +68,6 @@ function evaluadorAsignacionContext(array $overrides = [], ?Semestre $semestre =
 function crearEntregaParaEvaluador(array $context, string $phase = 'anteproyecto', array $overrides = []): Entrega
 {
     return Entrega::create(array_merge([
-        'proyecto_id' => $context['proyecto']->id,
         'semester_id' => $context['semestre']->id,
         'phase' => $phase,
         'title' => 'Entrega '.$phase,

@@ -113,3 +113,8 @@ jobs:
 
       - name: Build frontend
         run: pnpm run build
+
+      # Issue #40: tsc --noEmit en CI. `vite build` no valida tipos; este
+      # paso bloquea el merge si TypeScript falla (strict: true).
+      - name: Typecheck frontend
+        run: pnpm run typecheck

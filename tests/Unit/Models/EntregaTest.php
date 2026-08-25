@@ -32,7 +32,7 @@ test('Entrega model exists and extends Model', function () {
 
 test('Entrega fillable fields are guarded correctly', function () {
     $entrega = Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
+        'semester_id' => $this->proyecto->semester_id,
         'phase' => 'anteproyecto',
         'title' => 'Entrega inicial',
         'due_date' => '2026-03-01',
@@ -44,7 +44,7 @@ test('Entrega fillable fields are guarded correctly', function () {
 
 test('Entrega casts status to EstadoEntrega enum', function () {
     $entrega = Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
+        'semester_id' => $this->proyecto->semester_id,
         'phase' => 'anteproyecto',
         'title' => 'Entrega con status',
         'due_date' => '2026-03-01',
@@ -61,7 +61,7 @@ test('Entrega casts status to EstadoEntrega enum', function () {
 
 test('Entrega casts due_date to date', function () {
     $entrega = Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
+        'semester_id' => $this->proyecto->semester_id,
         'phase' => 'anteproyecto',
         'title' => 'Fecha test',
         'due_date' => '2026-03-15',
@@ -73,7 +73,7 @@ test('Entrega casts due_date to date', function () {
 
 test('Entrega casts consolidated_grade to decimal', function () {
     $entrega = Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
+        'semester_id' => $this->proyecto->semester_id,
         'phase' => 'anteproyecto',
         'title' => 'Nota test',
         'due_date' => '2026-03-01',
@@ -83,21 +83,22 @@ test('Entrega casts consolidated_grade to decimal', function () {
     expect((float) $entrega->consolidated_grade)->toEqual(85.5);
 });
 
-test('Entrega belongs to Proyecto', function () {
+test('Entrega links to projects through the pivot (production shape)', function () {
     $entrega = Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
+        'semester_id' => $this->proyecto->semester_id,
         'phase' => 'anteproyecto',
         'title' => 'Relación test',
         'due_date' => '2026-03-01',
     ]);
+    $entrega->proyectos()->attach($this->proyecto->id);
 
-    expect($entrega->proyecto)->toBeInstanceOf(Proyecto::class);
-    expect($entrega->proyecto->id)->toBe($this->proyecto->id);
+    expect($entrega->proyectos)->toHaveCount(1);
+    expect($entrega->proyectos->first()->id)->toBe($this->proyecto->id);
 });
 
 test('Entrega has many VersionDocumento', function () {
     $entrega = Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
+        'semester_id' => $this->proyecto->semester_id,
         'phase' => 'anteproyecto',
         'title' => 'Versiones test',
         'due_date' => '2026-03-01',
@@ -115,8 +116,8 @@ test('Entrega has many VersionDocumento', function () {
 });
 
 test('Entrega scope porFase filters by phase', function () {
-    Entrega::create(['proyecto_id' => $this->proyecto->id, 'phase' => 'anteproyecto', 'title' => 'A', 'due_date' => '2026-03-01']);
-    Entrega::create(['proyecto_id' => $this->proyecto->id, 'phase' => 'desarrollo', 'title' => 'B', 'due_date' => '2026-04-01']);
+    Entrega::create(['semester_id' => $this->proyecto->semester_id, 'phase' => 'anteproyecto', 'title' => 'A', 'due_date' => '2026-03-01']);
+    Entrega::create(['semester_id' => $this->proyecto->semester_id, 'phase' => 'desarrollo', 'title' => 'B', 'due_date' => '2026-04-01']);
 
     expect(Entrega::porFase('anteproyecto')->count())->toBe(1);
     expect(Entrega::porFase('desarrollo')->count())->toBe(1);
@@ -124,8 +125,8 @@ test('Entrega scope porFase filters by phase', function () {
 });
 
 test('Entrega scope porEstado filters by status', function () {
-    Entrega::create(['proyecto_id' => $this->proyecto->id, 'phase' => 'anteproyecto', 'title' => 'A', 'due_date' => '2026-03-01', 'status' => 'pendiente']);
-    Entrega::create(['proyecto_id' => $this->proyecto->id, 'phase' => 'anteproyecto', 'title' => 'B', 'due_date' => '2026-03-01', 'status' => 'aprobada']);
+    Entrega::create(['semester_id' => $this->proyecto->semester_id, 'phase' => 'anteproyecto', 'title' => 'A', 'due_date' => '2026-03-01', 'status' => 'pendiente']);
+    Entrega::create(['semester_id' => $this->proyecto->semester_id, 'phase' => 'anteproyecto', 'title' => 'B', 'due_date' => '2026-03-01', 'status' => 'aprobada']);
 
     expect(Entrega::porEstado('pendiente')->count())->toBe(1);
     expect(Entrega::porEstado('aprobada')->count())->toBe(1);
@@ -157,8 +158,6 @@ test('grupo_id resolves to the canonical semester_id for pivot-linked entregas',
     // that was never selected; the canonical group is semester_id.
     $cargada = Entrega::with([
         'semestre:id,name',
-        'proyecto:id,code,title,semester_id',
-        'proyecto.semestre:id,name',
         'proyectos:id,code,title',
     ])->findOrFail($entrega->id);
 

@@ -47,13 +47,16 @@ function crearEntregaConContexto(): array
         'evaluado' => false,
     ]);
 
+    // Production shape (StoreEntregaAction): semester_id set, proyecto_id
+    // never assigned, project linked through the entrega_proyecto pivot.
     $entrega = Entrega::create([
-        'proyecto_id' => $proyecto->id,
+        'semester_id' => $semestre->id,
         'phase' => 'anteproyecto',
         'title' => 'Entrega',
         'due_date' => now()->addMonths(1)->toDateString(),
         'status' => 'pendiente',
     ]);
+    $entrega->proyectos()->attach($proyecto->id);
 
     return compact('semestre', 'director', 'estudiante', 'evaluador', 'coordinador', 'ajeno', 'proyecto', 'entrega');
 }

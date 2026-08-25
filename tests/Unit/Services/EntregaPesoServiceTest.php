@@ -27,7 +27,6 @@ function seedEntregas(int $semestreId, int $proyectoId, string $phase, array $pe
 {
     foreach ($percentages as $pct) {
         $e = Entrega::create([
-            'proyecto_id' => $proyectoId,
             'semester_id' => $semestreId,
             'phase' => $phase,
             'title' => 'Entrega ' . $phase,

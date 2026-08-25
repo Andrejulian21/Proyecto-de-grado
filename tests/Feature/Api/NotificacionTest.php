@@ -149,12 +149,13 @@ it('al crear entrega NO se genera notificacion automatica (ahora es por grupo)',
 
 it('al revisar entrega se genera notificacion para el estudiante', function () {
     $entrega = Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
+        'semester_id' => $this->semestre->id,
         'phase' => 'anteproyecto',
         'title' => 'Entrega a revisar',
         'due_date' => now()->addMonths(2)->toDateString(),
         'status' => 'enviada',
     ]);
+    $entrega->proyectos()->attach($this->proyecto->id);
 
     // The revisar endpoint requires version_id (the version being reviewed)
     // so the controller can persist consolidated_grade/director_notes against

@@ -65,7 +65,6 @@ it('ignora metricas_evaluacion enviadas al crear y no las persiste', function ()
 it('no borra evaluation_metrics históricas al actualizar la descripción', function () {
     $entrega = Entrega::create([
         'semester_id' => $this->semestre->id,
-        'proyecto_id' => $this->proyecto->id,
         'phase' => 'anteproyecto',
         'title' => 'Título original',
         'description' => 'Descripción original',

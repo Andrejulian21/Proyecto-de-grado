@@ -33,17 +33,19 @@ beforeEach(function () {
 // -- Listar entregas --------------------------------------------------------
 
 it('coordinador puede listar entregas', function () {
-    Entrega::create(['proyecto_id' => $this->proyecto->id, 'phase' => 'anteproyecto', 'title' => 'Entrega 1', 'due_date' => '2026-03-01']);
+    $entrega = Entrega::create(['semester_id' => $this->semestre->id, 'phase' => 'anteproyecto', 'title' => 'Entrega 1', 'due_date' => '2026-03-01']);
+    $entrega->proyectos()->attach($this->proyecto->id);
 
     $response = $this->actingAs($this->coordinador)
         ->getJson('/api/admin/entregas');
 
     $response->assertOk()
-        ->assertJsonStructure(['data' => [['id', 'proyecto_id', 'phase', 'title', 'status']]]);
+        ->assertJsonStructure(['data' => [['id', 'semester_id', 'phase', 'title', 'status', 'proyectos_count', 'proyectos_list']]]);
 });
 
 it('listar entregas filtra por proyecto_id', function () {
-    Entrega::create(['proyecto_id' => $this->proyecto->id, 'phase' => 'anteproyecto', 'title' => 'A', 'due_date' => '2026-03-01']);
+    $entrega = Entrega::create(['semester_id' => $this->semestre->id, 'phase' => 'anteproyecto', 'title' => 'A', 'due_date' => '2026-03-01']);
+    $entrega->proyectos()->attach($this->proyecto->id);
 
     $response = $this->actingAs($this->coordinador)
         ->getJson('/api/admin/entregas?proyecto_id='.$this->proyecto->id);
@@ -53,8 +55,10 @@ it('listar entregas filtra por proyecto_id', function () {
 });
 
 it('listar entregas filtra por fase', function () {
-    Entrega::create(['proyecto_id' => $this->proyecto->id, 'phase' => 'anteproyecto', 'title' => 'A', 'due_date' => '2026-03-01']);
-    Entrega::create(['proyecto_id' => $this->proyecto->id, 'phase' => 'desarrollo', 'title' => 'B', 'due_date' => '2026-04-01']);
+    $a = Entrega::create(['semester_id' => $this->semestre->id, 'phase' => 'anteproyecto', 'title' => 'A', 'due_date' => '2026-03-01']);
+    $b = Entrega::create(['semester_id' => $this->semestre->id, 'phase' => 'desarrollo', 'title' => 'B', 'due_date' => '2026-04-01']);
+    $a->proyectos()->attach($this->proyecto->id);
+    $b->proyectos()->attach($this->proyecto->id);
 
     $response = $this->actingAs($this->coordinador)
         ->getJson('/api/admin/entregas?fase=anteproyecto');
@@ -65,8 +69,10 @@ it('listar entregas filtra por fase', function () {
 
 it('estudiante ve solo sus entregas', function () {
     $otroProyecto = Proyecto::create(['title' => 'Otro', 'semester_id' => $this->semestre->id]);
-    Entrega::create(['proyecto_id' => $this->proyecto->id, 'phase' => 'anteproyecto', 'title' => 'Mi entrega', 'due_date' => '2026-03-01']);
-    Entrega::create(['proyecto_id' => $otroProyecto->id, 'phase' => 'anteproyecto', 'title' => 'No visible', 'due_date' => '2026-03-01']);
+    $mia = Entrega::create(['semester_id' => $this->semestre->id, 'phase' => 'anteproyecto', 'title' => 'Mi entrega', 'due_date' => '2026-03-01']);
+    $ajena = Entrega::create(['semester_id' => $this->semestre->id, 'phase' => 'anteproyecto', 'title' => 'No visible', 'due_date' => '2026-03-01']);
+    $mia->proyectos()->attach($this->proyecto->id);
+    $ajena->proyectos()->attach($otroProyecto->id);
 
     $response = $this->actingAs($this->estudiante)
         ->getJson('/api/admin/entregas');
@@ -137,11 +143,12 @@ it('estudiante NO puede crear entrega (403)', function () {
 
 it('estudiante puede ver historial de versiones', function () {
     $entrega = Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
+        'semester_id' => $this->semestre->id,
         'phase' => 'anteproyecto',
         'title' => 'Entrega',
         'due_date' => '2026-03-01',
     ]);
+    $entrega->proyectos()->attach($this->proyecto->id);
     VersionDocumento::create([
         'entrega_id' => $entrega->id,
         'version_number' => 1,
@@ -160,12 +167,13 @@ it('estudiante puede ver historial de versiones', function () {
 
 it('director puede aprobar entrega con nota y feedback', function () {
     $entrega = Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
+        'semester_id' => $this->semestre->id,
         'phase' => 'anteproyecto',
         'title' => 'Entrega',
         'due_date' => now()->addMonths(2)->toDateString(),
         'status' => 'enviada',
     ]);
+    $entrega->proyectos()->attach($this->proyecto->id);
 
     $version = VersionDocumento::create([
         'entrega_id' => $entrega->id,
@@ -193,12 +201,13 @@ it('director puede aprobar entrega con nota y feedback', function () {
 
 it('estudiante NO puede revisar entrega (403)', function () {
     $entrega = Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
+        'semester_id' => $this->semestre->id,
         'phase' => 'anteproyecto',
         'title' => 'Entrega',
         'due_date' => now()->addMonths(2)->toDateString(),
         'status' => 'enviada',
     ]);
+    $entrega->proyectos()->attach($this->proyecto->id);
 
     $version = VersionDocumento::create([
         'entrega_id' => $entrega->id,
@@ -222,8 +231,10 @@ it('estudiante NO puede revisar entrega (403)', function () {
 // -- Banco de documentos aprobados ------------------------------------------
 
 it('entregas finales endpoint devuelve documentos aprobados', function () {
-    Entrega::create(['proyecto_id' => $this->proyecto->id, 'phase' => 'anteproyecto', 'title' => 'Aprobada', 'due_date' => '2026-03-01', 'status' => 'aprobada']);
-    Entrega::create(['proyecto_id' => $this->proyecto->id, 'phase' => 'anteproyecto', 'title' => 'No aprobada', 'due_date' => '2026-03-01', 'status' => 'pendiente']);
+    $aprobada = Entrega::create(['semester_id' => $this->semestre->id, 'phase' => 'anteproyecto', 'title' => 'Aprobada', 'due_date' => '2026-03-01', 'status' => 'aprobada']);
+    $pendiente = Entrega::create(['semester_id' => $this->semestre->id, 'phase' => 'anteproyecto', 'title' => 'No aprobada', 'due_date' => '2026-03-01', 'status' => 'pendiente']);
+    $aprobada->proyectos()->attach($this->proyecto->id);
+    $pendiente->proyectos()->attach($this->proyecto->id);
 
     $response = $this->actingAs($this->coordinador)
         ->getJson('/api/admin/entregas/finales');
@@ -237,12 +248,13 @@ it('entregas finales endpoint devuelve documentos aprobados', function () {
 
 it('al aprobar ultima entrega de fase avanza proyecto a siguiente fase', function () {
     $entrega = Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
+        'semester_id' => $this->semestre->id,
         'phase' => 'anteproyecto',
         'title' => 'Única entrega anteproyecto',
         'due_date' => now()->addMonths(2)->toDateString(),
         'status' => 'enviada',
     ]);
+    $entrega->proyectos()->attach($this->proyecto->id);
 
     $version = VersionDocumento::create([
         'entrega_id' => $entrega->id,

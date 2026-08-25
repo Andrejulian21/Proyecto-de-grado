@@ -31,7 +31,7 @@ beforeEach(function () {
 function crearEntregaRevisable(Proyecto $proyecto, array $overrides = []): array
 {
     $entrega = Entrega::create(array_merge([
-        'proyecto_id' => $proyecto->id,
+        'semester_id' => $proyecto->semester_id,
         'phase' => 'anteproyecto',
         'title' => 'Entrega para revisar',
         'due_date' => now()->addMonths(2)->toDateString(),

@@ -62,7 +62,6 @@ beforeEach(function () {
 function crearEntregaConNota(Proyecto $proyecto, string $titulo, ?float $nota): array
 {
     $entrega = Entrega::create([
-        'proyecto_id' => $proyecto->id,
         'semester_id' => $proyecto->semester_id,
         'phase' => 'anteproyecto',
         'title' => $titulo,

@@ -35,7 +35,7 @@ beforeEach(function () {
 
 it('estudiante puede solicitar habilitación de entrega', function () {
     $entrega = Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
+        'semester_id' => $this->semestre->id,
         'phase' => 'anteproyecto',
         'title' => 'Entrega',
         // Future-dated so the controller's due_date check does not reject
@@ -43,6 +43,7 @@ it('estudiante puede solicitar habilitación de entrega', function () {
         'due_date' => now()->addMonths(2)->toDateString(),
         'status' => 'creacion',
     ]);
+    $entrega->proyectos()->attach($this->proyecto->id);
 
     $response = $this->actingAs($this->estudiante)
         ->postJson("/api/entregas/{$entrega->id}/solicitar");
@@ -54,12 +55,13 @@ it('estudiante puede solicitar habilitación de entrega', function () {
 
 it('solicitar registra en auditoría', function () {
     $entrega = Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
+        'semester_id' => $this->semestre->id,
         'phase' => 'anteproyecto',
         'title' => 'Entrega',
         'due_date' => now()->addMonths(2)->toDateString(),
         'status' => 'creacion',
     ]);
+    $entrega->proyectos()->attach($this->proyecto->id);
 
     $this->actingAs($this->estudiante)
         ->postJson("/api/entregas/{$entrega->id}/solicitar");
@@ -69,12 +71,13 @@ it('solicitar registra en auditoría', function () {
 
 it('solicitar falla si entrega no está en creación (422)', function () {
     $entrega = Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
+        'semester_id' => $this->semestre->id,
         'phase' => 'anteproyecto',
         'title' => 'Entrega',
         'due_date' => now()->addMonths(2)->toDateString(),
         'status' => 'pendiente',
     ]);
+    $entrega->proyectos()->attach($this->proyecto->id);
 
     $response = $this->actingAs($this->estudiante)
         ->postJson("/api/entregas/{$entrega->id}/solicitar");
@@ -86,12 +89,13 @@ it('solicitar falla si entrega no está en creación (422)', function () {
 
 it('director puede habilitar entrega solicitada', function () {
     $entrega = Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
+        'semester_id' => $this->semestre->id,
         'phase' => 'anteproyecto',
         'title' => 'Entrega',
         'due_date' => now()->addMonths(2)->toDateString(),
         'status' => 'solicitada',
     ]);
+    $entrega->proyectos()->attach($this->proyecto->id);
 
     $response = $this->actingAs($this->director)
         ->putJson("/api/admin/entregas/{$entrega->id}/habilitar");
@@ -104,12 +108,13 @@ it('director puede habilitar entrega solicitada', function () {
 it('no coordinador no puede habilitar entrega (403)', function () {
     $otroDirector = User::factory()->director()->create();
     $entrega = Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
+        'semester_id' => $this->semestre->id,
         'phase' => 'anteproyecto',
         'title' => 'Entrega',
         'due_date' => now()->addMonths(2)->toDateString(),
         'status' => 'solicitada',
     ]);
+    $entrega->proyectos()->attach($this->proyecto->id);
 
     $response = $this->actingAs($otroDirector)
         ->putJson("/api/admin/entregas/{$entrega->id}/habilitar");

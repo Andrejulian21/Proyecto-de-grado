@@ -20,11 +20,10 @@ beforeEach(function () {
  * Seed an entrega in the canonical persisted shape (archivos_requeridos
  * JSON uses `slug`, not `id` — see StoreEntregaAction).
  */
-function seedEntregaEditable(int $semestreId, ?int $proyectoId = null): Entrega
+function seedEntregaEditable(int $semestreId): Entrega
 {
     return Entrega::create([
         'semester_id' => $semestreId,
-        'proyecto_id' => $proyectoId,
         'phase' => 'anteproyecto',
         'title' => 'Título original',
         'description' => 'Descripción original',
@@ -41,7 +40,7 @@ function seedEntregaEditable(int $semestreId, ?int $proyectoId = null): Entrega
 }
 
 it('update persiste los campos canónicos en español', function () {
-    $entrega = seedEntregaEditable($this->semestre->id, $this->proyecto->id);
+    $entrega = seedEntregaEditable($this->semestre->id);
     $nuevaFechaLimite = now()->addMonths(2)->toDateString();
     $nuevaFechaInicio = now()->addMonth()->toDateString();
 
@@ -76,7 +75,7 @@ it('update persiste los campos canónicos en español', function () {
 });
 
 it('update acepta archivos con slug en lugar de id (alias)', function () {
-    $entrega = seedEntregaEditable($this->semestre->id, $this->proyecto->id);
+    $entrega = seedEntregaEditable($this->semestre->id);
 
     $response = $this->actingAs($this->coordinador)
         ->putJson("/api/admin/entregas/{$entrega->id}", [
@@ -131,7 +130,7 @@ it('store rechaza dos documentos analizable_ia incluso con slug', function () {
 });
 
 it('update ignora las claves legacy del contrato anterior', function () {
-    $entrega = seedEntregaEditable($this->semestre->id, $this->proyecto->id);
+    $entrega = seedEntregaEditable($this->semestre->id);
 
     $response = $this->actingAs($this->coordinador)
         ->putJson("/api/admin/entregas/{$entrega->id}", [

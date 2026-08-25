@@ -44,7 +44,6 @@ beforeEach(function () {
     $this->descripcionEsperada = 'En esta entrega el estudiante debe presentar el planteamiento del problema, incluyendo contexto, situación problemática, causas y consecuencias.';
 
     $this->entrega = Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
         'semester_id' => $this->semestre->id,
         'phase' => 'anteproyecto',
         'title' => 'Anteproyecto',

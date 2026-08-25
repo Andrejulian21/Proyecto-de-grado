@@ -58,7 +58,6 @@ beforeEach(function () {
     $this->descripcionEsperada = 'El estudiante debe entregar el marco teórico del proyecto de grado.';
 
     $this->entrega = Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
         'semester_id' => $this->semestre->id,
         'phase' => 'anteproyecto',
         'title' => 'Entrega marco teórico',

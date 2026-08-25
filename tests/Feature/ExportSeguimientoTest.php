@@ -79,13 +79,13 @@ function crearProyectoExport(Semestre $semestre, string $titulo): Proyecto
     $proyecto->estudiantes()->attach($estudiante->id);
 
     $entregada = Entrega::create([
-        'proyecto_id' => $proyecto->id,
         'semester_id' => $semestre->id,
         'phase' => 'desarrollo',
         'title' => 'Avance 1',
         'due_date' => now()->subWeek()->toDateString(),
         'status' => 'enviada',
     ]);
+    $entregada->proyectos()->attach($proyecto->id);
     VersionDocumento::create([
         'entrega_id' => $entregada->id,
         'version_number' => 1,
@@ -95,14 +95,14 @@ function crearProyectoExport(Semestre $semestre, string $titulo): Proyecto
         'uploaded_at' => now(),
     ]);
 
-    Entrega::create([
-        'proyecto_id' => $proyecto->id,
+    $pendiente = Entrega::create([
         'semester_id' => $semestre->id,
         'phase' => 'desarrollo',
         'title' => 'Avance 2',
         'due_date' => now()->addWeek()->toDateString(),
         'status' => 'pendiente',
     ]);
+    $pendiente->proyectos()->attach($proyecto->id);
 
     Bitacora::factory()->create([
         'proyecto_id' => $proyecto->id,

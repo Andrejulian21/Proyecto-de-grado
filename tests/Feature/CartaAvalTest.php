@@ -74,7 +74,6 @@ function crearTemplateCarta(string $archivo, array $placeholders): void
 
 test('lista proyectos del director habilitados tras el cierre de desarrollo', function () {
     Entrega::create([
-        'proyecto_id' => $this->proyecto->id,
         'semester_id' => $this->semestre->id,
         'phase' => 'desarrollo',
         'title' => 'Avance final',

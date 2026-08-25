@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\EstadoEntrega;
+use App\Enums\UserRole;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -208,6 +209,32 @@ class Entrega extends Model
                     $q2->where('proyectos.id', $proyectoId);
                 });
         });
+    }
+
+    /**
+     * Scope entregas by what the user may list (issue #38).
+     *
+     * Coordinador sees everything (intentional). Director and Estudiante
+     * are filtered to their projects. Unknown roles default to an empty
+     * result (default-deny). The EvaluadorExterno branch is pending the
+     * derived issue #47 (listing without evaluator filter); it stays
+     * unfiltered here to preserve the current behaviour.
+     */
+    public function scopeParaUsuario(Builder $query, User $user): Builder
+    {
+        return match ($user->role) {
+            UserRole::Coordinador => $query,
+            UserRole::Director => $query->where(function ($q) use ($user) {
+                $q->whereHas('proyecto', fn ($sq) => $sq->where('director_id', $user->id))
+                    ->orWhereHas('proyectos', fn ($sq) => $sq->where('director_id', $user->id));
+            }),
+            UserRole::Estudiante => $query->where(function ($q) use ($user) {
+                $q->whereHas('proyecto.estudiantes', fn ($sq) => $sq->where('user_id', $user->id))
+                    ->orWhereHas('proyectos.estudiantes', fn ($sq) => $sq->where('user_id', $user->id));
+            }),
+            UserRole::EvaluadorExterno => $query,
+            default => $query->whereRaw('0 = 1'),
+        };
     }
 
     /**

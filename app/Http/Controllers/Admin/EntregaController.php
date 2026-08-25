@@ -48,18 +48,10 @@ class EntregaController extends Controller
             'proyectos:id,code,title',
         ]);
 
-        // Role-based scoping — check via pivot table AND direct proyecto_id
-        if ($user->role->value === 'Director') {
-            $query->where(function ($q) use ($user) {
-                $q->whereHas('proyecto', fn ($sq) => $sq->where('director_id', $user->id))
-                    ->orWhereHas('proyectos', fn ($sq) => $sq->where('director_id', $user->id));
-            });
-        } elseif ($user->role->value === 'Estudiante') {
-            $query->where(function ($q) use ($user) {
-                $q->whereHas('proyecto.estudiantes', fn ($sq) => $sq->where('user_id', $user->id))
-                    ->orWhereHas('proyectos.estudiantes', fn ($sq) => $sq->where('user_id', $user->id));
-            });
-        }
+        // Role-based scoping — moved to the model scope (issue #38).
+        // Coordinator unfiltered (intentional); Director/Estudiante see
+        // their projects; EvaluadorExterno branch pending issue #47.
+        $query->paraUsuario($user);
 
         // Filter by grupo_id (semester): direct filter on semester_id
         if ($request->filled('grupo_id')) {
@@ -130,9 +122,7 @@ class EntregaController extends Controller
      */
     public function destroy(Request $request, int $id): JsonResponse
     {
-        if ($request->user()->role->value !== 'Coordinador') {
-            return response()->json(['error' => 'No autorizado.'], 403);
-        }
+        $this->authorize('delete', Entrega::class);
 
         $entrega = Entrega::findOrFail($id);
         $entrega->delete();
@@ -160,6 +150,11 @@ class EntregaController extends Controller
     public function solicitar(Request $request, int $id): JsonResponse
     {
         $entrega = Entrega::findOrFail($id);
+
+        // Issue #38: only students of a linked project may request
+        // habilitación (the action also enforces the membership rule).
+        $this->authorize('solicitar', $entrega);
+
         $user = $request->user();
 
         try {
@@ -189,23 +184,9 @@ class EntregaController extends Controller
             'versiones.analisisIa',
         ])->findOrFail($id);
 
-        // Authorize: director of linked project, student of linked project, or coordinator
-        $user = $request->user();
-        $role = $user->role->value;
-        $esDirector = $this->esDirectorDeEntrega($entrega, $user->id);
-        $esEstudiante = $this->esEstudianteDeEntrega($entrega, $user->id);
-
-        if (! in_array($role, ['Coordinador', 'Director', 'Estudiante'], true)) {
-            return response()->json(['error' => 'No autorizado.'], 403);
-        }
-
-        if ($role === 'Director' && ! $esDirector) {
-            return response()->json(['error' => 'No eres el director de este proyecto.'], 403);
-        }
-
-        if ($role === 'Estudiante' && ! $esEstudiante) {
-            return response()->json(['error' => 'No eres estudiante de este proyecto.'], 403);
-        }
+        // Issue #38: central rule — coordinator, director of a linked
+        // project, student of a linked project, or assigned evaluator.
+        $this->authorize('view', $entrega);
 
         $data = $entrega->toArray();
         $data['proyectos_count'] = $entrega->proyectos->count();
@@ -240,11 +221,11 @@ class EntregaController extends Controller
     public function habilitar(Request $request, int $id): JsonResponse
     {
         $entrega = Entrega::findOrFail($id);
-        $user = $request->user();
 
-        if (! $this->esDirectorDeEntrega($entrega, $user->id)) {
-            return response()->json(['error' => 'No eres el director de este proyecto.'], 403);
-        }
+        // Issue #38: only the director of a linked project enables.
+        $this->authorize('habilitar', $entrega);
+
+        $user = $request->user();
 
         try {
             $entrega = $this->habilitarEntregaAction->handle($entrega, $user->id, $request->ip(), $request->userAgent());
@@ -264,16 +245,9 @@ class EntregaController extends Controller
     {
         $entrega = Entrega::findOrFail($id);
 
-        // Scope by role
-        $user = $request->user();
-
-        if ($user->role->value === 'Estudiante') {
-            $esEstudiante = $this->esEstudianteDeEntrega($entrega, $user->id);
-
-            if (! $esEstudiante) {
-                return response()->json(['error' => 'No autorizado.'], 403);
-            }
-        }
+        // Issue #38: central rule. Fixes the derived finding where the
+        // version list was only checked for the Estudiante role.
+        $this->authorize('view', $entrega);
 
         $versiones = VersionDocumento::where('entrega_id', $id)
             ->orderByDesc('version_number')
@@ -290,14 +264,11 @@ class EntregaController extends Controller
     public function eliminarVersion(Request $request, int $entregaId, int $versionId): JsonResponse
     {
         $entrega = Entrega::findOrFail($entregaId);
-        $user = $request->user();
 
-        // Only the student of the linked project can delete
-        $esEstudiante = $this->esEstudianteDeEntrega($entrega, $user->id);
-
-        if (! $esEstudiante) {
-            return response()->json(['error' => 'No autorizado.'], 403);
-        }
+        // Issue #38: only the student of a linked project may delete a
+        // version. Pivot-level ownership (entrega_proyecto_id) is pending
+        // the derived issue #46.
+        $this->authorize('deleteVersion', $entrega);
 
         $version = VersionDocumento::where('entrega_id', $entregaId)
             ->where('id', $versionId)
@@ -329,12 +300,8 @@ class EntregaController extends Controller
     {
         $entrega = Entrega::findOrFail($id);
 
-        // Verify the user is the director of any linked project
-        $user = $request->user();
-
-        if (! $this->esDirectorDeEntrega($entrega, $user->id)) {
-            return response()->json(['error' => 'No eres el director de este proyecto.'], 403);
-        }
+        // Issue #38: only the director of a linked project reviews.
+        $this->authorize('review', $entrega);
 
         $validator = Validator::make($request->all(), [
             'status' => 'required|string|in:aprobada,rechazada,revisada',
@@ -365,7 +332,7 @@ class EntregaController extends Controller
         }
 
         try {
-            $entrega = $this->reviewEntregaAction->handle($entrega, $data, $user->id);
+            $entrega = $this->reviewEntregaAction->handle($entrega, $data, $request->user()->id);
         } catch (EntregaActionException $e) {
             return $this->errorEnvelope($e->status, $e->getMessage());
         }
@@ -380,9 +347,7 @@ class EntregaController extends Controller
      */
     public function finales(Request $request): JsonResponse
     {
-        if ($request->user()->role->value !== 'Coordinador') {
-            return response()->json(['error' => 'No autorizado.'], 403);
-        }
+        $this->authorize('manage', Entrega::class);
 
         $query = Entrega::where('status', 'aprobada')
             ->with([
@@ -432,21 +397,5 @@ class EntregaController extends Controller
     private function actionError(EntregaActionException $e): JsonResponse
     {
         return response()->json(['error' => $e->getMessage()], $e->status);
-    }
-
-    /**
-     * Check if a user is a student of any project linked to this entrega.
-     */
-    private function esEstudianteDeEntrega(Entrega $entrega, int $userId): bool
-    {
-        return $entrega->esEstudiante($userId);
-    }
-
-    /**
-     * Check if a user is the director of any project linked to this entrega.
-     */
-    private function esDirectorDeEntrega(Entrega $entrega, int $userId): bool
-    {
-        return $entrega->esDirector($userId);
     }
 }

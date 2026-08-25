@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
-use App\Enums\UserRole;
 use App\Http\Requests\Concerns\ValidatesDocumentosSolicitados;
 use App\Models\Entrega;
-use App\Models\User;
 use App\Services\EntregaPesoService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\App;
@@ -18,13 +16,11 @@ class UpdateEntregaRequest extends FormRequest
     use ValidatesDocumentosSolicitados;
 
     /**
-     * Only Coordinador can update entregas.
+     * Only Coordinador can update entregas (EntregaPolicy::update).
      */
     public function authorize(): bool
     {
-        $user = $this->user();
-
-        return $user instanceof User && $user->role === UserRole::Coordinador;
+        return $this->user()?->can('update', Entrega::class) ?? false;
     }
 
     /**

@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Enums\EstadoFirma;
+use App\Enums\UserRole;
+use App\Events\AuditEvent;
 use App\Http\Controllers\Controller;
 use App\Models\Bitacora;
 use App\Models\Notificacion;
 use App\Models\Proyecto;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -32,11 +35,10 @@ class BitacoraController extends Controller
         }
 
         $proyectoId = (int) $request->input('proyecto_id');
-        $user = $request->user();
 
-        if (! $this->tieneAccesoAProyecto($user, $proyectoId)) {
-            return response()->json(['error' => 'No autorizado.'], 403);
-        }
+        // Issue #38: central rule via BitacoraPolicy (coordinator, director
+        // or student of the project; external evaluators denied).
+        $this->authorize('view', [Bitacora::class, Proyecto::findOrFail($proyectoId)]);
 
         // Auto-expire codes before listing
         Bitacora::expireAutomaticamente();
@@ -85,19 +87,18 @@ class BitacoraController extends Controller
         }
 
         $data = $validator->validated();
-        $user = $request->user();
 
-        if (! $this->tieneAccesoAProyecto($user, (int) $data['proyecto_id'])) {
-            return response()->json(['error' => 'No autorizado.'], 403);
-        }
+        // Issue #38: central rule via BitacoraPolicy.
+        $this->authorize('create', [Bitacora::class, Proyecto::findOrFail((int) $data['proyecto_id'])]);
 
         // PR 4 — RF-WK-05: validar que no exista otra bitácora en la misma
         // semana calendario (lunes a domingo) para el mismo proyecto.
-        $weekStart = \Carbon\Carbon::parse($data['meeting_date'])->startOfWeek();
-        $weekEnd   = \Carbon\Carbon::parse($data['meeting_date'])->endOfWeek();
+        $weekStart = Carbon::parse($data['meeting_date'])->startOfWeek();
+        $weekEnd = Carbon::parse($data['meeting_date'])->endOfWeek();
         $existingWeek = Bitacora::where('proyecto_id', (int) $data['proyecto_id'])
             ->whereBetween('meeting_date', [$weekStart, $weekEnd])
             ->exists();
+
         if ($existingWeek) {
             return response()->json([
                 'error' => 'Ya existe una bitácora para esta semana. Solo puedes crear una por semana.',
@@ -106,9 +107,10 @@ class BitacoraController extends Controller
 
         // Validar que la semana sea mayor a la maxima existente
         $maxSemana = Bitacora::where('proyecto_id', (int) $data['proyecto_id'])->max('semana');
+
         if ($maxSemana !== null && (int) $data['semana'] <= (int) $maxSemana) {
             return response()->json([
-                'error' => 'No puedes crear una bitacora con una semana anterior o igual a la ultima creada (Semana ' . $maxSemana . ').',
+                'error' => 'No puedes crear una bitacora con una semana anterior o igual a la ultima creada (Semana '.$maxSemana.').',
             ], 422);
         }
 
@@ -135,9 +137,8 @@ class BitacoraController extends Controller
     {
         $bitacora = Bitacora::findOrFail($id);
 
-        if (! $this->tieneAccesoAProyecto($request->user(), $bitacora->proyecto_id)) {
-            return response()->json(['error' => 'No autorizado.'], 403);
-        }
+        // Issue #38: central rule via BitacoraPolicy.
+        $this->authorize('view', $bitacora);
 
         // Auto-expire if the signature code has expired
         $bitacora->checkExpiration();
@@ -152,9 +153,8 @@ class BitacoraController extends Controller
     {
         $bitacora = Bitacora::findOrFail($id);
 
-        if (! $this->tieneAccesoAProyecto($request->user(), $bitacora->proyecto_id)) {
-            return response()->json(['error' => 'No autorizado.'], 403);
-        }
+        // Issue #38: central rule via BitacoraPolicy.
+        $this->authorize('update', $bitacora);
 
         // PR 4 — RF-WK-04: edits are only allowed inside a 15-minute
         // window from creation. The check runs before the firma-status
@@ -199,9 +199,9 @@ class BitacoraController extends Controller
      * The endpoint enforces:
      *  - the bitacora must be in `Pendiente`
      *  - the code must not be expired (otherwise transition to NoFirmada)
-     *  - the per-bitacora rate limiter allows at most 5 failed attempts
-     *    inside a 2-minute window. Hitting that ceiling transitions the
-     *    bitacora to NoFirmada.
+     *  - the per-(bitacora, user) rate limiter allows at most 5 failed
+     *    attempts inside a 2-minute window. Hitting that ceiling
+     *    transitions the bitacora to NoFirmada.
      *  - a successful `Hash::check` transitions to `FirmadaDirector` and
      *    records `director_signed_at`.
      */
@@ -216,7 +216,15 @@ class BitacoraController extends Controller
         }
 
         $bitacora = Bitacora::findOrFail($id);
-        $throttleKey = 'firmar:'.$id;
+
+        // Issue #38 / derived #45: only the director of the project may
+        // sign. The audit event and flow hardening belong to issue #45.
+        $this->authorize('sign', $bitacora);
+
+        // Issue #45: key the attempt budget per (bitacora, user) so a
+        // third party cannot exhaust the director's attempts on a
+        // bitacora that does not belong to them.
+        $throttleKey = 'firmar:'.$id.':'.$request->user()->id;
 
         if ($bitacora->signature_status !== EstadoFirma::Pendiente) {
             return response()->json([
@@ -258,13 +266,29 @@ class BitacoraController extends Controller
             ]);
             RateLimiter::clear($throttleKey);
 
+            // Issue #45: a signature has academic consequences (it
+            // certifies that a follow-up meeting occurred and feeds the
+            // hours indicator). Leave an immutable trace of who signed
+            // and which bitacora, following the AuditEvent pipeline.
+            AuditEvent::dispatch(
+                $request->user(),
+                'bitacora.firmada',
+                "Bitácora #{$bitacora->id} firmada por el director del proyecto.",
+                [
+                    'bitacora_id' => $bitacora->id,
+                    'proyecto_id' => $bitacora->proyecto_id,
+                ],
+            );
+
             // Notify the project's students that their bitacora is now
             // signed by the director. Kept from the previous multi-step
             // flow so the existing NotificacionTest behavior is
             // preserved under the new TOTP design.
             $proyecto = Proyecto::find($bitacora->proyecto_id);
+
             if ($proyecto) {
                 $estudiantes = $proyecto->estudiantes()->pluck('user_id');
+
                 foreach ($estudiantes as $estudianteId) {
                     Notificacion::create([
                         'user_id' => $estudianteId,
@@ -308,9 +332,8 @@ class BitacoraController extends Controller
     {
         $bitacora = Bitacora::findOrFail($id);
 
-        if (! $this->tieneAccesoAProyecto($request->user(), $bitacora->proyecto_id)) {
-            return response()->json(['error' => 'No autorizado.'], 403);
-        }
+        // Issue #38: central rule via BitacoraPolicy.
+        $this->authorize('update', $bitacora);
 
         if (! $bitacora->canResendCode()) {
             return response()->json([
@@ -328,7 +351,10 @@ class BitacoraController extends Controller
         $bitacora->save();
 
         $plain = $bitacora->generateSignatureCode();
-        RateLimiter::clear('firmar:'.$id);
+        // Issue #45: clear only the current user's attempt budget for
+        // this bitacora. Each user keeps an independent counter, so a
+        // re-request never wipes another account's history.
+        RateLimiter::clear('firmar:'.$id.':'.$request->user()->id);
 
         return response()->json([
             'data' => $bitacora->fresh()->setAttribute('signature_code_plain', $plain),
@@ -350,18 +376,18 @@ class BitacoraController extends Controller
             ->get()
             ->map(function ($bitacora) use ($proyecto) {
                 return [
-                    'id'               => $bitacora->id,
-                    'topic'            => $bitacora->topic,
-                    'notes'            => $bitacora->notes,
-                    'meeting_date'     => $bitacora->meeting_date?->toDateString(),
-                    'semana'           => $bitacora->semana,
-                    'duration_hours'   => $bitacora->duration_hours,
+                    'id' => $bitacora->id,
+                    'topic' => $bitacora->topic,
+                    'notes' => $bitacora->notes,
+                    'meeting_date' => $bitacora->meeting_date?->toDateString(),
+                    'semana' => $bitacora->semana,
+                    'duration_hours' => $bitacora->duration_hours,
                     'signature_status' => $bitacora->signature_status?->value,
-                    'fecha'            => $bitacora->created_at->toISO8601String(),
-                    'contenido'        => $bitacora->notes ?? '',
-                    'firmada'          => $bitacora->signature_status->value === EstadoFirma::Completada->value,
-                    'director_name'    => $proyecto->director?->name ?? 'Sin asignar',
-                    'created_at'       => $bitacora->created_at->toISO8601String(),
+                    'fecha' => $bitacora->created_at->toISO8601String(),
+                    'contenido' => $bitacora->notes ?? '',
+                    'firmada' => $bitacora->signature_status->value === EstadoFirma::Completada->value,
+                    'director_name' => $proyecto->director?->name ?? 'Sin asignar',
+                    'created_at' => $bitacora->created_at->toISO8601String(),
                 ];
             });
 
@@ -380,7 +406,7 @@ class BitacoraController extends Controller
         $user = $request->user();
 
         // Only the project's director or a coordinator can view hours
-        $esCoordinador = $user->role->value === 'Coordinador';
+        $esCoordinador = $user->role === UserRole::Coordinador;
         $esDirector = $proyecto->director_id === $user->id;
 
         if (! $esCoordinador && ! $esDirector) {
@@ -397,30 +423,5 @@ class BitacoraController extends Controller
             'total_bitacoras' => $totalBitacoras,
             'proyecto_id' => $id,
         ]);
-    }
-
-    /**
-     * Check if a user has access to a project (student or director).
-     */
-    private function tieneAccesoAProyecto($user, int $proyectoId): bool
-    {
-        $proyecto = Proyecto::find($proyectoId);
-
-        if (! $proyecto) {
-            return false;
-        }
-
-        // Coordinadores tienen acceso global
-        if ($user->role->value === 'Coordinador') {
-            return true;
-        }
-
-        if ($proyecto->director_id === $user->id) {
-            return true;
-        }
-
-        return $proyecto->estudiantes()
-            ->where('user_id', $user->id)
-            ->exists();
     }
 }

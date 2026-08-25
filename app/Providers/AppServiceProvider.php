@@ -51,13 +51,17 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
-        // PR 1 — RF-SIG-02: limit each bitacora to 5 invalid signature
-        // attempts inside a 2-minute window. The 2-minute decay matches
-        // the signature-code TTL so a fresh code also resets the budget.
+        // PR 1 — RF-SIG-02 / issue #45: limit each bitacora to 5 invalid
+        // signature attempts inside a 2-minute window, keyed per
+        // (bitacora, user) so one account cannot exhaust another's
+        // budget on a bitacora it does not own. The 2-minute decay
+        // matches the signature-code TTL so a fresh code also resets
+        // the budget.
         RateLimiter::for('firmar', function (Request $request) {
             $id = (string) $request->route('id');
+            $userId = (string) ($request->user()?->id ?? 'guest');
 
-            return Limit::perMinutes(2, 5)->by('firmar:'.$id);
+            return Limit::perMinutes(2, 5)->by('firmar:'.$id.':'.$userId);
         });
     }
 }

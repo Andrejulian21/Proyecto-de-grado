@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
-use App\Enums\UserRole;
 use App\Http\Requests\Concerns\ValidatesDocumentosSolicitados;
-use App\Models\User;
+use App\Models\Entrega;
 use App\Services\EntregaPesoService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\App;
@@ -17,13 +16,11 @@ class StoreEntregaRequest extends FormRequest
     use ValidatesDocumentosSolicitados;
 
     /**
-     * Only Coordinador can create entregas.
+     * Only Coordinador can create entregas (EntregaPolicy::create).
      */
     public function authorize(): bool
     {
-        $user = $this->user();
-
-        return $user instanceof User && $user->role === UserRole::Coordinador;
+        return $this->user()?->can('create', Entrega::class) ?? false;
     }
 
     /**

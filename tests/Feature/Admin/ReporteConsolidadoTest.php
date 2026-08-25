@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Entrega\StoreEntregaAction;
 use App\Enums\UserRole;
 use App\Models\Entrega;
 use App\Models\Evaluacion;
@@ -65,6 +66,42 @@ describe('T-018: Reporte consolidado', function () {
         expect($data['proyecto']['title'])->toBe('Proyecto Test');
         expect($data['estudiantes'])->toHaveCount(1);
         expect($data['director']['id'])->toBe($this->director->id);
+    });
+
+    it('reporte consolidado devuelve entregas creadas por StoreEntregaAction', function () {
+        // Acceptance (issue #48): the report must surface entregas created
+        // through the production path. StoreEntregaAction links the entrega
+        // to active projects via the pivot, so the report must read them from
+        // entregasPivot (there is no entregas.proyecto_id anymore, #39).
+        $this->proyecto->update(['status' => 'en_curso']);
+
+        $entrega = app(StoreEntregaAction::class)->handle([
+            'grupo_id' => $this->semestre->id,
+            'fase' => 'anteproyecto',
+            'titulo' => 'Entrega produccion',
+            'descripcion' => 'Descripción',
+            'fecha_limite' => '2026-08-15',
+            'archivos_requeridos' => [
+                ['id' => 'documento-proyecto', 'nombre' => 'Documento', 'versionamiento' => true],
+            ],
+        ]);
+
+        Evaluacion::create([
+            'entrega_id' => $entrega->id,
+            'evaluador_id' => $this->evaluador->id,
+            'criterio' => 'Estructura',
+            'percentage' => 100.00,
+            'grade' => 86.00,
+            'evaluated_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->coordinador)
+            ->getJson('/api/admin/reportes/consolidado?proyecto_id=' . $this->proyecto->id);
+
+        $response->assertOk();
+        $entregas = collect($response->json('data.entregas'));
+        expect($entregas->contains('id', $entrega->id))->toBeTrue();
+        expect((float) $entregas->firstWhere('id', $entrega->id)['promedio_ponderado'])->toEqual(86.00);
     });
 
     it('reporte consolidado calcula promedio general correctamente', function () {

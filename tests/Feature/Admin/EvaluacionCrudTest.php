@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Entrega\StoreEntregaAction;
 use App\Enums\EstadoInvitacionEvaluador;
 use App\Models\Entrega;
 use App\Models\Evaluacion;
@@ -157,6 +158,15 @@ describe('T-016: CRUD evaluaciones', function () {
             'evaluated_at' => now(),
         ]);
 
+        // Issue #47: an external evaluator lists only projects they are
+        // assigned to (via evaluador_proyecto).
+        EvaluadorProyecto::create([
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Aceptada,
+            'assigned_at' => now(),
+        ]);
+
         $response = $this->actingAs($this->evaluador)
             ->getJson('/api/evaluaciones?entrega_id='.$this->entrega->id);
 
@@ -182,6 +192,15 @@ describe('T-016: CRUD evaluaciones', function () {
             'percentage' => 50.00,
             'grade' => 90.00,
             'evaluated_at' => now(),
+        ]);
+
+        // Issue #47: the evaluador is assigned to this project, so they may
+        // list it; they still only see their own evaluations.
+        EvaluadorProyecto::create([
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Aceptada,
+            'assigned_at' => now(),
         ]);
 
         $response = $this->actingAs($this->evaluador)
@@ -238,6 +257,48 @@ describe('T-016: CRUD evaluaciones', function () {
         $response->assertCreated();
         expect(Evaluacion::count())->toBe(1);
         expect($response->json('data')['criterio'])->toBe('Estructura');
+    });
+
+    it('evaluador asignado recibe 201 al calificar entrega creada por StoreEntregaAction', function () {
+        // Acceptance (issue #48): an assigned evaluator must be able to grade
+        // an entrega created through the production path. StoreEntregaAction
+        // links the entrega to projects via the pivot (no proyecto_id column,
+        // dropped in #39), so the assignment check must resolve the project
+        // from the pivot.
+        $this->proyecto->update(['status' => 'en_curso']);
+
+        $entrega = app(StoreEntregaAction::class)->handle([
+            'grupo_id' => $this->semestre->id,
+            'fase' => 'anteproyecto',
+            'titulo' => 'Entrega produccion',
+            'descripcion' => 'Descripción',
+            'fecha_limite' => '2026-08-15',
+            'archivos_requeridos' => [
+                ['id' => 'documento-proyecto', 'nombre' => 'Documento', 'versionamiento' => true],
+            ],
+        ]);
+
+        // The action attaches the entrega to every active project of the semester.
+        expect($entrega->proyectos()->where('proyectos.id', $this->proyecto->id)->exists())->toBeTrue();
+
+        EvaluadorProyecto::create([
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Aceptada,
+            'assigned_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->evaluador)
+            ->postJson('/api/evaluaciones', [
+                'entrega_id' => $entrega->id,
+                'criterio' => 'Estructura',
+                'percentage' => 100.00,
+                'grade' => 4.50,
+                'comment' => 'Excelente estructura',
+            ]);
+
+        $response->assertCreated();
+        expect(Evaluacion::where('entrega_id', $entrega->id)->count())->toBe(1);
     });
 
     it('calificar evaluacion valida campos requeridos', function () {
@@ -349,6 +410,15 @@ describe('T-017: Evaluacion por criterio', function () {
             'evaluated_at' => now(),
         ]);
 
+        // Issue #47: an external evaluator may see the consolidado only of
+        // an entrega linked to a project they are assigned to.
+        EvaluadorProyecto::create([
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Aceptada,
+            'assigned_at' => now(),
+        ]);
+
         $response = $this->actingAs($this->evaluador)
             ->getJson("/api/evaluaciones/{$this->entrega->id}/consolidado");
 
@@ -366,6 +436,13 @@ describe('T-017: Evaluacion por criterio', function () {
             'evaluador_id' => $this->evaluador->id,
             'criterio' => 'Estructura',
             'percentage' => 100.00,
+        ]);
+
+        EvaluadorProyecto::create([
+            'proyecto_id' => $this->proyecto->id,
+            'evaluador_id' => $this->evaluador->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Aceptada,
+            'assigned_at' => now(),
         ]);
 
         $response = $this->actingAs($this->evaluador)

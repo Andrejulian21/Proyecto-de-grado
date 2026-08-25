@@ -14,6 +14,7 @@ use App\Models\Semestre;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 class ProyectoController extends Controller
@@ -43,9 +44,15 @@ class ProyectoController extends Controller
             });
         }
 
-        $proyectos = $query->get();
+        // Issue #53: paginar en el servidor (antes devolvía todos los
+        // proyectos sin límite; el frontend filtraba en memoria). Los
+        // consumidores del frontend (useProyectos, ProjectAutocomplete)
+        // ya navegan las páginas con per_page/page.
+        $perPage = min(max((int) $request->query('per_page', 15), 1), 200);
 
-        return response()->json(['data' => $proyectos]);
+        $proyectos = $query->paginate($perPage);
+
+        return response()->json($proyectos);
     }
 
     public function show(Proyecto $proyecto): JsonResponse
@@ -104,16 +111,25 @@ class ProyectoController extends Controller
             $data['requires_group_justification'] = true;
         }
 
-        $proyecto = Proyecto::create([
-            'title' => $data['title'],
-            'semester_id' => $data['semester_id'],
-            'director_id' => $data['director_id'] ?? null,
-            'requires_group_justification' => $data['requires_group_justification'] ?? false,
-        ]);
+        // Issue #51 — Defect 3: create inside a transaction so the
+        // PostgreSQL advisory lock taken in Proyecto::creating() (keyed by
+        // semester) is held until the code + student links are committed.
+        // Without a wrapping transaction the lock would be released before
+        // the insert and the sequential-code generation would race.
+        $proyecto = DB::transaction(function () use ($data, $studentIds) {
+            $proyecto = Proyecto::create([
+                'title' => $data['title'],
+                'semester_id' => $data['semester_id'],
+                'director_id' => $data['director_id'] ?? null,
+                'requires_group_justification' => $data['requires_group_justification'] ?? false,
+            ]);
 
-        if (! empty($studentIds)) {
-            $proyecto->estudiantes()->attach($studentIds);
-        }
+            if (! empty($studentIds)) {
+                $proyecto->estudiantes()->attach($studentIds);
+            }
+
+            return $proyecto;
+        });
 
         $proyecto->load(['semestre', 'director', 'estudiantes']);
 

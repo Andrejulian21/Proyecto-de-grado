@@ -15,17 +15,32 @@ class SeguimientoService
 {
     /**
      * Returns 'entregada', 'no_entrego', or 'pendiente'.
+     *
+     * Uses the eager-loaded `versiones` (+ `entregaProyecto`) when present
+     * (issue #53 — the service loop preloads them), otherwise falls back
+     * to a query. Behaviour is identical to the query-based version:
+     * a version whose pivot matches (entrega, proyecto) counts first, and
+     * a legacy version without `entrega_proyecto_id` counts as fallback.
      */
     public function calcularEstadoEntrega(Entrega $entrega, int $proyectoId): string
     {
-        $tieneVersion = VersionDocumento::whereHas('entregaProyecto', function ($q) use ($entrega, $proyectoId) {
-            $q->where('entrega_id', $entrega->id)
-                ->where('proyecto_id', $proyectoId);
-        })->exists();
+        $versiones = $entrega->relationLoaded('versiones')
+            ? $entrega->versiones
+            : $entrega->versiones()->get();
 
-        // Fallback: versiones con FK directa
+        $tieneVersion = $versiones->contains(function (VersionDocumento $version) use ($entrega, $proyectoId): bool {
+            $pivot = $version->relationLoaded('entregaProyecto')
+                ? $version->entregaProyecto
+                : $version->entregaProyecto()->first();
+
+            return $pivot !== null
+                && (int) $pivot->entrega_id === $entrega->id
+                && (int) $pivot->proyecto_id === $proyectoId;
+        });
+
+        // Fallback: versiones con FK directa (legacy, sin entrega_proyecto_id).
         if (! $tieneVersion) {
-            $tieneVersion = $entrega->versiones()->exists();
+            $tieneVersion = $versiones->isNotEmpty();
         }
 
         if ($tieneVersion) {
@@ -56,14 +71,28 @@ class SeguimientoService
     }
 
     /**
+     * @return array{total: int, grupo_a: int, grupo_b: int}
+     */
+    private function contarBitacorasEnMemoria(\Illuminate\Support\Collection $bitacoras): array
+    {
+        return [
+            'total' => $bitacoras->count(),
+            'grupo_a' => $bitacoras->filter(fn (Bitacora $b) => $b->semana >= 1 && $b->semana <= 16)->count(),
+            'grupo_b' => $bitacoras->filter(fn (Bitacora $b) => $b->semana >= 17 && $b->semana <= 32)->count(),
+        ];
+    }
+
+    /**
      * @return array{semestre: array, proyectos: array}
      */
     public function obtenerSeguimiento(int $semestreId): array
     {
         $semestre = Semestre::findOrFail($semestreId);
 
+        // Issue #53: `versiones.entregaProyecto` se precarga para que
+        // `calcularEstadoEntrega` no ejecute una consulta por entrega.
         $proyectos = Proyecto::with([
-            'entregasPivot',
+            'entregasPivot.versiones.entregaProyecto',
             'bitacoras',
             'estudiantes',
             'director',
@@ -124,7 +153,9 @@ class SeguimientoService
                 }
             }
 
-            $bitacoras = $this->contarBitacorasPorGrupo($proyecto->id);
+            // Issue #53: la relación ya está precargada — contar en memoria
+            // en vez de ejecutar tres COUNT(*) por proyecto.
+            $bitacoras = $this->contarBitacorasEnMemoria($proyecto->bitacoras);
 
             $proyectosData[] = [
                 'id' => $proyecto->id,

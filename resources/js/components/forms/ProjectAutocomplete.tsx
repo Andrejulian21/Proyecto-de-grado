@@ -117,7 +117,7 @@ export function ProjectAutocomplete({ value, onChange, error, groupId }: Project
             abortRef.current = controller;
 
             try {
-                const params = new URLSearchParams({ search: query.trim() });
+                const params = new URLSearchParams({ search: query.trim(), per_page: '50' });
                 if (groupId != null) {
                     // Group is the authoritative filter: show every project of the group,
                     // regardless of whether the group is currently marked active.

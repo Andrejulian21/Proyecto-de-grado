@@ -23,6 +23,12 @@ use Symfony\Component\HttpFoundation\Response;
  * The 1h window matches the spec (`SESSION_LIFETIME=60` minutes in
  * the env file). The middleware is the source of truth — the
  * `SESSION_LIFETIME` env value is the coarse backup.
+ *
+ * Write throttling (issue #53): the UPDATE on `users` runs at most
+ * once per minute per user. With a 60-minute inactivity window,
+ * writing only when more than 60 seconds have elapsed does not change
+ * the timeout behaviour, and avoids ~40k redundant writes/day at the
+ * issue's scale (400 users × 30 navigations per session).
  */
 class ActivityMiddleware
 {
@@ -30,6 +36,11 @@ class ActivityMiddleware
      * Maximum inactivity window in minutes.
      */
     private const INACTIVITY_MINUTES = 1 * 60;
+
+    /**
+     * Minimum elapsed time (seconds) between `last_activity_at` writes.
+     */
+    private const ACTIVITY_UPDATE_SECONDS = 60;
 
     /**
      * Handle the request.
@@ -75,7 +86,14 @@ class ActivityMiddleware
         // Update last_activity_at only if the column is loaded and
         // writable. We use updateQuietly-style save to avoid firing
         // model events that could cause infinite middleware loops.
-        $user->forceFill(['last_activity_at' => now()])->saveQuietly();
+        // Throttled to at most one write per minute per user (issue #53):
+        // with a 60-minute inactivity window this does not alter behaviour.
+        $shouldWrite = $lastActivity === null
+            || $lastActivity->lt(now()->subSeconds(self::ACTIVITY_UPDATE_SECONDS));
+
+        if ($shouldWrite) {
+            $user->forceFill(['last_activity_at' => now()])->saveQuietly();
+        }
 
         return $next($request);
     }

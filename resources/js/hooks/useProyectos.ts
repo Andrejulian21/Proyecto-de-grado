@@ -94,6 +94,11 @@ export function useProyectos(grupoId?: number | null, filters?: { search?: strin
     const fetchData = useCallback(async () => {
         dispatch({ type: 'FETCH_START' });
         try {
+            // Issue #53: /api/admin/proyectos ahora pagina en el servidor.
+            // Este hook acumula todas las páginas (per_page máximo 200) para
+            // que los consumidores sigan trabajando con el listado completo
+            // sin truncar a partir del proyecto 201 (misma clase de defecto
+            // que el truncamiento de usuarios a 200).
             const params = new URLSearchParams();
             if (grupoId != null) {
                 params.set('grupo_id', String(grupoId));
@@ -104,15 +109,28 @@ export function useProyectos(grupoId?: number | null, filters?: { search?: strin
             if (filters?.semestre_activo) {
                 params.set('semestre_activo', 'true');
             }
-            const qs = params.toString();
-            const url = `/api/admin/proyectos${qs ? '?' + qs : ''}`;
-            const res = await apiFetch(url);
-            if (!res.ok) {
-                const body = await res.json().catch(() => null);
-                throw new Error(body?.message ?? `Error ${res.status}: ${res.statusText}`);
-            }
-            const json = await res.json();
-            dispatch({ type: 'FETCH_SUCCESS', payload: json.data ?? json });
+            params.set('per_page', '200');
+
+            const all: Proyecto[] = [];
+            let page = 1;
+            let lastPage = 1;
+
+            do {
+                const pageParams = new URLSearchParams(params);
+                pageParams.set('page', String(page));
+                const res = await apiFetch(`/api/admin/proyectos?${pageParams.toString()}`);
+                if (!res.ok) {
+                    const body = await res.json().catch(() => null);
+                    throw new Error(body?.message ?? `Error ${res.status}: ${res.statusText}`);
+                }
+                const json = await res.json();
+                const items: Proyecto[] = Array.isArray(json.data) ? json.data : [];
+                all.push(...items);
+                lastPage = json.last_page ?? 1;
+                page += 1;
+            } while (page <= lastPage);
+
+            dispatch({ type: 'FETCH_SUCCESS', payload: all });
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Error desconocido';
             dispatch({ type: 'FETCH_ERROR', payload: message });

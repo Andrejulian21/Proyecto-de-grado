@@ -129,6 +129,11 @@ export default function GestionUsuarios() {
     // (the backend never persists it — issue #42).
     const [createdEvaluatorPassword, setCreatedEvaluatorPassword] = useState<string | null>(null);
 
+    // Submit-in-flight guards for the three standalone forms (issue #54).
+    const [creatingEvaluador, setCreatingEvaluador] = useState(false);
+    const [addingEstudiante, setAddingEstudiante] = useState(false);
+    const [addingDirector, setAddingDirector] = useState(false);
+
     const [editingIsWhitelist, setEditingIsWhitelist] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<any>(null);
     const [deleteIsWhitelist, setDeleteIsWhitelist] = useState(false);
@@ -152,10 +157,25 @@ export default function GestionUsuarios() {
 
     const fetchUsers = useCallback(async () => {
         try {
-            const res = await apiFetch('/api/admin/usuarios?per_page=200');
-            if (!res.ok) throw new Error('Error al cargar usuarios');
-            const json = await res.json();
-            setUsers(json.data ?? json);
+            // Issue #53: el backend pagina (per_page máximo 200). Acumulamos
+            // todas las páginas para que el listado no trunque en silencio a
+            // partir del usuario 201 (defecto de correctitud además de
+            // rendimiento).
+            const all: User[] = [];
+            let page = 1;
+            let lastPage = 1;
+
+            do {
+                const res = await apiFetch(`/api/admin/usuarios?per_page=200&page=${page}`);
+                if (!res.ok) throw new Error('Error al cargar usuarios');
+                const json = await res.json();
+                const items: User[] = Array.isArray(json.data) ? json.data : [];
+                all.push(...items);
+                lastPage = json.last_page ?? 1;
+                page += 1;
+            } while (page <= lastPage);
+
+            setUsers(all);
         } catch {
             setMessage({ type: 'error', text: 'Error al cargar usuarios' });
         }
@@ -499,6 +519,8 @@ export default function GestionUsuarios() {
 
     async function handleCrearEvaluador(e: React.FormEvent) {
         e.preventDefault();
+        if (creatingEvaluador) return;
+        setCreatingEvaluador(true);
         try {
             const res = await apiFetch('/api/admin/evaluadores', {
                 method: 'POST',
@@ -527,11 +549,14 @@ export default function GestionUsuarios() {
             fetchUsers();
         } catch (err: any) {
             showMsg('error', err.message);
+        } finally {
+            setCreatingEvaluador(false);
         }
     }
 
     async function handleAgregarEstudiante(e: React.FormEvent) {
         e.preventDefault();
+        if (addingEstudiante) return;
         const email = estCorreo.trim();
         if (!isInstitutionalEmail(email)) {
             setEstCorreoError(INSTITUTIONAL_EMAIL_MESSAGE);
@@ -539,6 +564,7 @@ export default function GestionUsuarios() {
             return;
         }
         setEstCorreoError(null);
+        setAddingEstudiante(true);
         try {
             const res = await apiFetch('/api/admin/whitelist', {
                 method: 'POST',
@@ -562,11 +588,15 @@ export default function GestionUsuarios() {
             fetchUsers();
         } catch (err: any) {
             showMsg('error', err.message);
+        } finally {
+            setAddingEstudiante(false);
         }
     }
 
     async function handleAgregarDirector(e: React.FormEvent) {
         e.preventDefault();
+        if (addingDirector) return;
+        setAddingDirector(true);
         try {
             const res = await apiFetch('/api/admin/whitelist', {
                 method: 'POST',
@@ -597,6 +627,8 @@ export default function GestionUsuarios() {
             fetchUsers();
         } catch (err: any) {
             showMsg('error', err.message);
+        } finally {
+            setAddingDirector(false);
         }
     }
 
@@ -865,9 +897,14 @@ export default function GestionUsuarios() {
                     <div className="mt-5 flex items-center gap-3">
                         <button
                             type="submit"
-                            className="inline-flex items-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a]"
+                            disabled={creatingEvaluador}
+                            className="inline-flex items-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a] disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                            <UserPlus className="h-4 w-4" />
+                            {creatingEvaluador ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <UserPlus className="h-4 w-4" />
+                            )}
                             Crear usuario externo
                         </button>
                     </div>
@@ -1045,9 +1082,14 @@ export default function GestionUsuarios() {
                             </div>
                             <button
                                 type="submit"
-                                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a]"
+                                disabled={addingEstudiante}
+                                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a] disabled:cursor-not-allowed disabled:opacity-60"
                             >
-                                <UserPlus className="h-4 w-4" />
+                                {addingEstudiante ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <UserPlus className="h-4 w-4" />
+                                )}
                                 Agregar Estudiante
                             </button>
                         </div>
@@ -1102,9 +1144,14 @@ export default function GestionUsuarios() {
                             </div>
                             <button
                                 type="submit"
-                                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#4f46e5] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#4338ca]"
+                                disabled={addingDirector}
+                                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#4f46e5] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#4338ca] disabled:cursor-not-allowed disabled:opacity-60"
                             >
-                                <UserPlus className="h-4 w-4" />
+                                {addingDirector ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <UserPlus className="h-4 w-4" />
+                                )}
                                 Agregar Director
                             </button>
                         </div>

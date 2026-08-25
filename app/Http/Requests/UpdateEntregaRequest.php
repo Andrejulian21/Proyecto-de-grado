@@ -67,7 +67,6 @@ class UpdateEntregaRequest extends FormRequest
             'criterios' => ['sometimes', 'nullable', 'string'],
             'hora_maxima' => ['sometimes', 'nullable', 'string', 'max:10'],
             'grade_percentage' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100'],
-            'proyecto_id' => ['sometimes', 'required', 'exists:proyectos,id'],
             'archivos_requeridos' => ['sometimes', 'required', 'array', 'min:1', 'max:6'],
             'archivos_requeridos.*.id' => [
                 'required_with:archivos_requeridos',
@@ -160,7 +159,6 @@ class UpdateEntregaRequest extends FormRequest
             'criterios' => 'criterios de aceptación',
             'hora_maxima' => 'hora máxima',
             'grade_percentage' => 'porcentaje de nota',
-            'proyecto_id' => 'proyecto',
             'archivos_requeridos' => 'archivos requeridos',
             'archivos_requeridos.*.id' => 'identificador del archivo',
             'archivos_requeridos.*.nombre' => 'nombre del archivo',

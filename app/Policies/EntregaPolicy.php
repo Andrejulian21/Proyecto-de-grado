@@ -18,8 +18,8 @@ use App\Models\User;
  * Anything not enumerated is denied (`false` → 403).
  *
  * Membership is resolved through the Entrega model's existing helpers
- * (`esDirector`, `esEstudiante`), which check pivot projects first and the
- * direct `proyecto_id` FK as fallback.
+ * (`esDirector`, `esEstudiante`), which check the entrega_proyecto pivot
+ * (fase 3 dropped the direct `entregas.proyecto_id` FK).
  */
 class EntregaPolicy
 {
@@ -112,12 +112,6 @@ class EntregaPolicy
     private function esEvaluadorAsignado(User $actor, Entrega $entrega): bool
     {
         $proyectoIds = $entrega->proyectos()->pluck('proyectos.id')->all();
-
-        if ($entrega->proyecto_id !== null) {
-            $proyectoIds[] = $entrega->proyecto_id;
-        }
-
-        $proyectoIds = array_values(array_unique($proyectoIds));
 
         if ($proyectoIds === []) {
             return false;

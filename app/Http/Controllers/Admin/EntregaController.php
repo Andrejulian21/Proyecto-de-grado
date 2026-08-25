@@ -43,8 +43,6 @@ class EntregaController extends Controller
         $user = $request->user();
         $query = Entrega::query()->with([
             'semestre:id,name',
-            'proyecto:id,code,title,semester_id',
-            'proyecto.semestre:id,name',
             'proyectos:id,code,title',
         ]);
 
@@ -59,11 +57,7 @@ class EntregaController extends Controller
         }
 
         if ($request->filled('proyecto_id')) {
-            $query->where(function ($q) use ($request) {
-                $pid = $request->integer('proyecto_id');
-                $q->where('proyecto_id', $pid)
-                    ->orWhereHas('proyectos', fn ($sq) => $sq->where('proyecto_id', $pid));
-            });
+            $query->whereHas('proyectos', fn ($sq) => $sq->where('proyecto_id', $request->integer('proyecto_id')));
         }
 
         if ($request->filled('fase')) {
@@ -75,7 +69,7 @@ class EntregaController extends Controller
         // Attach semestre_nombre and project info to each entrega
         $data = $entregas->map(function (Entrega $e) {
             $arr = $e->toArray();
-            $arr['semestre_nombre'] = $e->semestre?->name ?? $e->proyecto?->semestre?->name ?? '—';
+            $arr['semestre_nombre'] = $e->semestre?->name ?? '—';
             $arr['proyectos_count'] = $e->proyectos->count();
             $arr['proyectos_list'] = $e->proyectos->map(fn ($p) => "{$p->code} - {$p->title}");
 
@@ -102,13 +96,12 @@ class EntregaController extends Controller
             return $this->actionError($e);
         }
 
-        $entrega->load('semestre:id,name', 'proyecto:id,code,title,semester_id', 'proyecto.semestre:id,name', 'proyectos:id,code,title');
+        $entrega->load('semestre:id,name', 'proyectos:id,code,title');
 
         $arr = $entrega->toArray();
         // Canonical: the entrega's own semester_id (entrega_proyecto pivot
-        // links projects, not proyecto_id). Fallback to project-derived
-        // values only for legacy rows where semester_id is null.
-        $arr['semestre_nombre'] = $entrega->semestre?->name ?? ($entrega->proyecto?->semestre?->name ?? '—');
+        // links projects, not proyecto_id).
+        $arr['semestre_nombre'] = $entrega->semestre?->name ?? '—';
         $arr['proyectos_count'] = $entrega->proyectos->count();
         $arr['proyectos_list'] = $entrega->proyectos->map(fn ($p) => "{$p->code} - {$p->title}");
 
@@ -174,8 +167,6 @@ class EntregaController extends Controller
     public function show(Request $request, int $id): JsonResponse
     {
         $entrega = Entrega::with([
-            'proyecto:id,code,title,director_id',
-            'proyecto.estudiantes:id,name',
             'proyectos:id,code,title',
             'proyectos.estudiantes:id,name',
             'semestre:id,name',
@@ -351,17 +342,12 @@ class EntregaController extends Controller
 
         $query = Entrega::where('status', 'aprobada')
             ->with([
-                'proyecto:id,code,title,director_id',
                 'proyectos:id,code,title,director_id',
                 'versiones' => fn ($q) => $q->latest(),
             ]);
 
         if ($request->filled('proyecto_id')) {
-            $query->where(function ($q) use ($request) {
-                $pid = $request->integer('proyecto_id');
-                $q->where('proyecto_id', $pid)
-                    ->orWhereHas('proyectos', fn ($sq) => $sq->where('proyecto_id', $pid));
-            });
+            $query->whereHas('proyectos', fn ($sq) => $sq->where('proyecto_id', $request->integer('proyecto_id')));
         }
 
         if ($request->filled('fecha_desde')) {
@@ -373,7 +359,7 @@ class EntregaController extends Controller
         }
 
         if ($request->filled('director_id')) {
-            $query->whereHas('proyecto', fn ($q) => $q->where('director_id', $request->integer('director_id')));
+            $query->whereHas('proyectos', fn ($q) => $q->where('director_id', $request->integer('director_id')));
         }
 
         $entregas = $query->orderByDesc('updated_at')

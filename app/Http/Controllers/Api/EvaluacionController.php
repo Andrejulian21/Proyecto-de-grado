@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Entrega;
 use App\Models\Evaluacion;
 use App\Models\EvaluadorProyecto;
-use App\Models\Entrega;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -19,7 +18,7 @@ class EvaluacionController extends Controller
     {
         $user = $request->user();
         $query = Evaluacion::query()
-            ->with(['evaluador:id,name,email', 'entrega:id,proyecto_id']);
+            ->with(['evaluador:id,name,email', 'entrega:id', 'entrega.proyectos:id,code,title']);
 
         if ($request->has('entrega_id')) {
             $validator = Validator::make($request->all(), [
@@ -45,24 +44,44 @@ class EvaluacionController extends Controller
         }
 
         // When no filter (e.g. page load), the frontend expects aggregated results
-        // per project for the ResultsTable component.
-        $grouped = $evaluaciones->groupBy(fn ($e) => $e->entrega?->proyecto_id ?? 0);
+        // per project for the ResultsTable component. An entrega is a semester
+        // template linked to every active project via the pivot, so each
+        // evaluation is bucketed under each of its linked projects.
+        $grouped = collect();
 
-        $results = $grouped->map(function (Collection $items, int $proyectoId) {
-            $grades = $items->whereNotNull('grade')->pluck('grade')->toArray();
+        foreach ($evaluaciones as $evaluacion) {
+            $proyectos = $evaluacion->entrega?->proyectos ?? collect();
+
+            if ($proyectos->isEmpty()) {
+                $grouped->push(['proyecto_id' => 0, 'evaluacion' => $evaluacion]);
+                continue;
+            }
+
+            foreach ($proyectos as $proyecto) {
+                $grouped->push(['proyecto_id' => $proyecto->id, 'evaluacion' => $evaluacion]);
+            }
+        }
+
+        $grouped = $grouped->groupBy('proyecto_id');
+
+        $results = $grouped->map(function ($items, int $proyectoId) {
+            $evaluaciones = $items->pluck('evaluacion');
+            $grades = $evaluaciones->whereNotNull('grade')->pluck('grade')->toArray();
             $promedio = count($grades) > 0
                 ? round(array_sum($grades) / count($grades), 2)
                 : null;
 
+            $proyecto = $evaluaciones->first()?->entrega?->proyectos->firstWhere('id', $proyectoId);
+
             return [
                 'id' => $proyectoId,
                 'proyecto_id' => $proyectoId,
-                'proyecto_nombre' => '',
-                'proyecto_codigo' => '',
+                'proyecto_nombre' => $proyecto?->title ?? '',
+                'proyecto_codigo' => $proyecto?->code ?? '',
                 'estudiantes' => [],
                 'director' => '',
                 'fase' => 'Anteproyecto',
-                'evaluadores' => $items->pluck('evaluador.name')->unique()->values()->toArray(),
+                'evaluadores' => $evaluaciones->pluck('evaluador.name')->unique()->values()->toArray(),
                 'nota_promedio' => $promedio,
                 'puntuaciones' => $grades,
             ];
@@ -91,7 +110,11 @@ class EvaluacionController extends Controller
 
         $entrega = Entrega::findOrFail($data['entrega_id']);
 
-        $esAsignado = EvaluadorProyecto::where('proyecto_id', $entrega->proyecto_id)
+        // An entrega is a semester template linked to its projects via the
+        // pivot; the evaluator is assigned to any of those projects.
+        $proyectoIds = $entrega->proyectos()->pluck('proyectos.id');
+
+        $esAsignado = EvaluadorProyecto::whereIn('proyecto_id', $proyectoIds)
             ->where('evaluador_id', $user->id)
             ->exists();
 

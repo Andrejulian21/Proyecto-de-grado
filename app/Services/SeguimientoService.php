@@ -8,8 +8,8 @@ use App\Models\Bitacora;
 use App\Models\Entrega;
 use App\Models\Proyecto;
 use App\Models\SeguimientoObservacion;
+use App\Models\Semestre;
 use App\Models\VersionDocumento;
-use Illuminate\Support\Facades\DB;
 
 class SeguimientoService
 {
@@ -20,7 +20,7 @@ class SeguimientoService
     {
         $tieneVersion = VersionDocumento::whereHas('entregaProyecto', function ($q) use ($entrega, $proyectoId) {
             $q->where('entrega_id', $entrega->id)
-              ->where('proyecto_id', $proyectoId);
+                ->where('proyecto_id', $proyectoId);
         })->exists();
 
         // Fallback: versiones con FK directa
@@ -60,12 +60,11 @@ class SeguimientoService
      */
     public function obtenerSeguimiento(int $semestreId): array
     {
-        $semestre = \App\Models\Semestre::findOrFail($semestreId);
+        $semestre = Semestre::findOrFail($semestreId);
 
         $proyectos = Proyecto::with([
-            'entregas',
-            'bitacoras',
             'entregasPivot',
+            'bitacoras',
             'estudiantes',
             'director',
         ])->where('semester_id', $semestreId)
@@ -74,16 +73,13 @@ class SeguimientoService
 
         $observaciones = SeguimientoObservacion::where('semestre_id', $semestreId)
             ->get()
-            ->keyBy(fn ($o) => $o->proyecto_id . '-' . $o->fase);
+            ->keyBy(fn ($o) => $o->proyecto_id.'-'.$o->fase);
 
         $proyectosData = [];
 
         foreach ($proyectos as $proyecto) {
-            // Merge direct + pivot entregas, deduplicate
-            $merged = $proyecto->entregas
-                ->concat($proyecto->entregasPivot)
-                ->unique('id')
-                ->values();
+            // The pivot is the single source of truth for entregas.
+            $merged = $proyecto->entregasPivot;
 
             // Group by phase
             $fases = [];
@@ -116,8 +112,10 @@ class SeguimientoService
 
             // Observations per phase
             $obsArray = [];
+
             foreach ($faseOrden as $faseKey) {
-                $key = $proyecto->id . '-' . $faseKey;
+                $key = $proyecto->id.'-'.$faseKey;
+
                 if (isset($observaciones[$key])) {
                     $obsArray[] = [
                         'fase' => $faseKey,

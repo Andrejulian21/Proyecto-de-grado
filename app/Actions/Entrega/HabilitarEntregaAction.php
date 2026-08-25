@@ -32,11 +32,11 @@ final class HabilitarEntregaAction
             'user_agent' => $userAgent,
             'metadata' => [
                 'entrega_id' => $entrega->id,
-                'proyecto_id' => $entrega->proyecto_id,
+                'proyecto_ids' => $entrega->proyectos()->pluck('proyectos.id')->all(),
             ],
         ]);
 
-        $entrega->load('proyecto:id,code,title');
+        $entrega->load('proyectos:id,code,title');
 
         return $entrega;
     }

@@ -53,10 +53,6 @@ final class UpdateEntregaAction
             $entrega->phase = $phase;
         }
 
-        if (isset($data['proyecto_id'])) {
-            $entrega->proyecto_id = $data['proyecto_id'];
-        }
-
         if (array_key_exists('grade_percentage', $data)) {
             $entrega->grade_percentage = $data['grade_percentage'];
         }

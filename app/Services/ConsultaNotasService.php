@@ -66,7 +66,6 @@ final class ConsultaNotasService
         $entregaIds = $pivotesPorProyecto
             ->flatten()
             ->pluck('entrega_id')
-            ->merge(Entrega::query()->whereIn('proyecto_id', $proyectoIds)->pluck('id'))
             ->unique()
             ->filter()
             ->values();
@@ -90,7 +89,6 @@ final class ConsultaNotasService
         foreach ($proyectos as $proyecto) {
             $idsDeEsteProyecto = collect($pivotesPorProyecto->get($proyecto->id, collect()))
                 ->pluck('entrega_id')
-                ->merge($entregas->where('proyecto_id', $proyecto->id)->pluck('id'))
                 ->unique()
                 ->values();
 

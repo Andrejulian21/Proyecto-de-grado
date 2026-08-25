@@ -74,10 +74,10 @@ test('Proyecto.estudiantes relation retorna BelongsToMany', function () {
     expect($proyecto->estudiantes())->toBeInstanceOf(BelongsToMany::class);
 });
 
-test('Proyecto.entregas relation retorna HasMany de Entrega', function () {
+test('Proyecto.entregasPivot relation retorna BelongsToMany de Entrega', function () {
     $proyecto = new Proyecto;
-    expect($proyecto->entregas())->toBeInstanceOf(HasMany::class);
-    expect($proyecto->entregas()->getRelated())->toBeInstanceOf(Entrega::class);
+    expect($proyecto->entregasPivot())->toBeInstanceOf(BelongsToMany::class);
+    expect($proyecto->entregasPivot()->getRelated())->toBeInstanceOf(Entrega::class);
 });
 
 test('Proyecto.bitacoras relation retorna HasMany de Bitacora', function () {

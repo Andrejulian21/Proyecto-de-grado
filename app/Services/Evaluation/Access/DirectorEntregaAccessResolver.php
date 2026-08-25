@@ -18,7 +18,7 @@ final class DirectorEntregaAccessResolver implements EvaluationAccessResolver
     public function resolve(User $user, int $entregaId): array
     {
         $entrega = Entrega::query()
-            ->with(['proyecto', 'proyectos'])
+            ->with(['proyectos'])
             ->whereKey($entregaId)
             ->first();
 
@@ -43,12 +43,6 @@ final class DirectorEntregaAccessResolver implements EvaluationAccessResolver
             if ((int) $proyecto->director_id === $userId) {
                 return $proyecto;
             }
-        }
-
-        $direct = $entrega->proyecto;
-
-        if ($direct && (int) $direct->director_id === $userId) {
-            return $direct;
         }
 
         return null;

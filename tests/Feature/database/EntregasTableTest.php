@@ -10,7 +10,7 @@ test('entregas table exists', function () {
 
 test('entregas has the columns defined in spec', function () {
     $expected = [
-        'id', 'proyecto_id', 'phase', 'title', 'description',
+        'id', 'phase', 'title', 'description',
         'due_date', 'status', 'consolidated_grade', 'evaluation_complete',
         'created_at', 'updated_at',
     ];
@@ -19,6 +19,10 @@ test('entregas has the columns defined in spec', function () {
         expect(Schema::hasColumn('entregas', $column))
             ->toBeTrue("entregas.{$column} should exist");
     }
+});
+
+test('entregas no longer has the legacy proyecto_id column (issue #39)', function () {
+    expect(Schema::hasColumn('entregas', 'proyecto_id'))->toBeFalse();
 });
 
 test('entregas.status defaults to pendiente', function () {
@@ -55,24 +59,14 @@ test('entregas.evaluation_complete defaults to false', function () {
     expect(in_array(trim((string) $default, "'"), ['0', 'false'], true))->toBeTrue();
 });
 
-test('entregas has foreign key on proyecto_id', function () {
-    $foreignKeys = Schema::getForeignKeys('entregas');
-    $fk = collect($foreignKeys)->firstWhere('columns', ['proyecto_id']);
-
-    expect($fk)->not->toBeNull();
-    expect($fk['foreign_table'] ?? $fk['foreignTable'] ?? null)->toBe('proyectos');
-});
-
-test('entregas has indexes on proyecto_id, (proyecto_id, phase), and status', function () {
+test('entregas has indexes on status', function () {
     $indexes = Schema::getIndexes('entregas');
     $indexNames = array_map(fn ($i) => $i['name'], $indexes);
 
-    expect($indexNames)->toContain('entregas_proyecto_id_index');
-    expect($indexNames)->toContain('entregas_proyecto_id_phase_index');
     expect($indexNames)->toContain('entregas_status_index');
 });
 
-test('entregas is reversible (down drops it)', function () {
-    $migration = include database_path('migrations/2026_07_09_100000_create_entregas_table.php');
+test('entregas drop migration is reversible (down recreates proyecto_id)', function () {
+    $migration = include database_path('migrations/2026_08_24_000002_drop_proyecto_id_from_entregas.php');
     expect(method_exists($migration, 'down'))->toBeTrue();
 });

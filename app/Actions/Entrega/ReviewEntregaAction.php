@@ -7,6 +7,7 @@ namespace App\Actions\Entrega;
 use App\Actions\Entrega\Exceptions\EntregaActionException;
 use App\Models\Entrega;
 use App\Models\Notificacion;
+use App\Models\Proyecto;
 use App\Models\VersionDocumento;
 
 /**
@@ -68,15 +69,25 @@ final class ReviewEntregaAction
             }
         }
 
+        // The reviewed project is the one owning the reviewed version's
+        // per-project delivery (EntregaProyecto). Legacy versions without a
+        // pivot fall back to the entrega's first linked project.
+        $proyectoRevisado = $entregaProyecto?->proyecto
+            ?? $entrega->proyectos->first();
+
         // Auto-advance phase if all entregas in the current phase are approved
         if ($data['status'] === 'aprobada') {
-            $this->autoAdvancePhase($entrega);
+            $this->autoAdvancePhase($entrega, $proyectoRevisado);
         }
 
-        $entrega->load('proyecto:id,code,title,current_phase', 'proyectos:id,code,title,current_phase');
+        $entrega->load('proyectos:id,code,title,current_phase');
 
-        // Notify students of all linked projects
-        $proyectos = $entrega->proyectos->isNotEmpty() ? $entrega->proyectos : collect([$entrega->proyecto])->filter();
+        // Notify ONLY the students of the reviewed project (resolved from the
+        // reviewed version's per-project delivery). Legacy versions without a
+        // pivot fall back to the entrega's first linked project.
+        $proyectos = $proyectoRevisado !== null
+            ? collect([$proyectoRevisado])
+            : collect();
         $notifiedUserIds = collect();
 
         foreach ($proyectos as $proyecto) {
@@ -117,36 +128,31 @@ final class ReviewEntregaAction
     }
 
     /**
-     * Auto-advance the project phase when all entregas in the current
-     * phase are approved.
+     * Auto-advance the phase of the REVIEWED project only when all its
+     * entregas in the current phase are approved.
      */
-    private function autoAdvancePhase(Entrega $entrega): void
+    private function autoAdvancePhase(Entrega $entrega, ?Proyecto $proyectoRevisado): void
     {
-        $proyectos = $entrega->proyectos()->get();
-
-        // Fall back to direct proyecto relation if no pivot projects
-        if ($proyectos->isEmpty() && $entrega->proyecto) {
-            $proyectos = collect([$entrega->proyecto]);
+        if ($proyectoRevisado === null) {
+            return;
         }
 
-        foreach ($proyectos as $proyecto) {
-            // Check if there are any non-approved entregas in this phase for this project
-            // (scope checks both direct FK and pivot table)
-            $pendingInPhase = Entrega::paraProyecto($proyecto->id)
-                ->where('phase', $entrega->phase)
-                ->where('status', '!=', 'aprobada')
-                ->exists();
+        // Check if there are any non-approved entregas in this phase for this
+        // project (scope only uses the pivot table).
+        $pendingInPhase = Entrega::paraProyecto($proyectoRevisado->id)
+            ->where('phase', $entrega->phase)
+            ->where('status', '!=', 'aprobada')
+            ->exists();
 
-            if (! $pendingInPhase) {
-                $currentPhase = $proyecto->current_phase;
+        if (! $pendingInPhase) {
+            $currentPhase = $proyectoRevisado->current_phase;
 
-                if ($currentPhase->value === $entrega->phase) {
-                    $nextPhase = $currentPhase->next();
+            if ($currentPhase->value === $entrega->phase) {
+                $nextPhase = $currentPhase->next();
 
-                    if ($nextPhase !== null) {
-                        $proyecto->current_phase = $nextPhase;
-                        $proyecto->save();
-                    }
+                if ($nextPhase !== null) {
+                    $proyectoRevisado->current_phase = $nextPhase;
+                    $proyectoRevisado->save();
                 }
             }
         }

@@ -20,7 +20,6 @@ class Entrega extends Model
     protected $table = 'entregas';
 
     protected $fillable = [
-        'proyecto_id',
         'semester_id',
         'phase',
         'title',
@@ -63,20 +62,11 @@ class Entrega extends Model
             return $this->semester_id;
         }
 
-        if ($this->proyecto) {
-            return $this->proyecto->semester_id;
-        }
-
         if ($this->relationLoaded('proyectos') && $this->proyectos->isNotEmpty()) {
             return $this->proyectos->first()->semester_id;
         }
 
         return null;
-    }
-
-    public function proyecto(): BelongsTo
-    {
-        return $this->belongsTo(Proyecto::class, 'proyecto_id');
     }
 
     public function proyectos(): BelongsToMany
@@ -86,7 +76,7 @@ class Entrega extends Model
     }
 
     /**
-     * Get the first linked project (from pivot) or fall back to direct proyecto relation.
+     * Get the first linked project (from pivot).
      */
     public function firstProyecto(): ?Proyecto
     {
@@ -94,7 +84,7 @@ class Entrega extends Model
             return $this->proyectos->first();
         }
 
-        return $this->proyecto;
+        return $this->proyectos()->first();
     }
 
     public function semestre(): BelongsTo
@@ -199,15 +189,13 @@ class Entrega extends Model
     }
 
     /**
-     * Filter entregas by project — checks both direct FK and pivot table.
+     * Filter entregas by project — the pivot table is the single source of
+     * truth for the entrega-project link.
      */
     public function scopeParaProyecto(Builder $query, int $proyectoId): Builder
     {
-        return $query->where(function ($q) use ($proyectoId) {
-            $q->where('proyecto_id', $proyectoId)
-                ->orWhereHas('proyectos', function ($q2) use ($proyectoId) {
-                    $q2->where('proyectos.id', $proyectoId);
-                });
+        return $query->whereHas('proyectos', function ($q2) use ($proyectoId) {
+            $q2->where('proyectos.id', $proyectoId);
         });
     }
 
@@ -224,14 +212,8 @@ class Entrega extends Model
     {
         return match ($user->role) {
             UserRole::Coordinador => $query,
-            UserRole::Director => $query->where(function ($q) use ($user) {
-                $q->whereHas('proyecto', fn ($sq) => $sq->where('director_id', $user->id))
-                    ->orWhereHas('proyectos', fn ($sq) => $sq->where('director_id', $user->id));
-            }),
-            UserRole::Estudiante => $query->where(function ($q) use ($user) {
-                $q->whereHas('proyecto.estudiantes', fn ($sq) => $sq->where('user_id', $user->id))
-                    ->orWhereHas('proyectos.estudiantes', fn ($sq) => $sq->where('user_id', $user->id));
-            }),
+            UserRole::Director => $query->whereHas('proyectos', fn ($sq) => $sq->where('director_id', $user->id)),
+            UserRole::Estudiante => $query->whereHas('proyectos.estudiantes', fn ($sq) => $sq->where('user_id', $user->id)),
             UserRole::EvaluadorExterno => $query,
             default => $query->whereRaw('0 = 1'),
         };
@@ -239,45 +221,23 @@ class Entrega extends Model
 
     /**
      * Whether the given user is a student of any project linked to this
-     * entrega (checks the pivot projects and falls back to the direct FK).
+     * entrega (via the pivot).
      */
     public function esEstudiante(int $userId): bool
     {
-        $proyectos = $this->proyectos()->get();
-
-        foreach ($proyectos as $proyecto) {
-            $esEstudiante = $proyecto->estudiantes()
-                ->where('user_id', $userId)
-                ->exists();
-
-            if ($esEstudiante) {
-                return true;
-            }
-        }
-
-        if ($this->proyecto) {
-            return $this->proyecto->estudiantes()
-                ->where('user_id', $userId)
-                ->exists();
-        }
-
-        return false;
+        return $this->proyectos()
+            ->whereHas('estudiantes', fn ($q) => $q->where('user_id', $userId))
+            ->exists();
     }
 
     /**
      * Whether the given user is the director of any project linked to this
-     * entrega (checks the pivot projects and falls back to the direct FK).
+     * entrega (via the pivot).
      */
     public function esDirector(int $userId): bool
     {
-        $proyectos = $this->proyectos()->get();
-
-        foreach ($proyectos as $proyecto) {
-            if ($proyecto->director_id === $userId) {
-                return true;
-            }
-        }
-
-        return $this->proyecto !== null && $this->proyecto->director_id === $userId;
+        return $this->proyectos()
+            ->where('director_id', $userId)
+            ->exists();
     }
 }

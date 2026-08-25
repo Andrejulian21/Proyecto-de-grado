@@ -116,19 +116,17 @@ class DirectorController extends Controller
         })
             ->where('status', 'enviada')
             ->with([
-            'proyecto:id,code,title,director_id',
-            'proyectos:id,code,title',
-        ])
+                'proyectos:id,code,title,director_id',
+            ])
             ->orderBy('due_date', 'asc')
             ->take(20)
             ->get();
 
-        // Load students for each project, handling both direct and pivot relations
-        $entregas->load('proyecto.estudiantes:id,name');
+        // Load students for each linked project
         $entregas->load('proyectos.estudiantes:id,name');
 
         $result = $entregas->map(function ($entrega) {
-            $primerProyecto = $entrega->proyecto ?? $entrega->proyectos->first();
+            $primerProyecto = $entrega->proyectos->first();
             $primerEstudiante = $primerProyecto?->estudiantes->first();
 
             return [
@@ -298,16 +296,13 @@ class DirectorController extends Controller
             return response()->json(['error' => 'No estás asignado como evaluador de este proyecto.'], 403);
         }
 
-        $entrega = Entrega::where(function ($q) use ($id) {
-            $q->where('proyecto_id', $id)
-                ->orWhereHas('proyectos', fn ($sq) => $sq->where('proyectos.id', $id));
-        })
+        $entrega = Entrega::whereHas('proyectos', fn ($sq) => $sq->where('proyectos.id', $id))
             ->where('phase', $phase)
             ->where('status', 'aprobada')
             ->with([
-            'versiones' => fn ($q) => $q->orderByDesc('version_number'),
-            'proyecto:id,code,title',
-        ])
+                'versiones' => fn ($q) => $q->orderByDesc('version_number'),
+                'proyectos:id,code,title',
+            ])
             ->first();
 
         if (! $entrega) {

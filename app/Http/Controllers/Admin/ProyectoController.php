@@ -12,7 +12,6 @@ use App\Models\Evaluacion;
 use App\Models\Proyecto;
 use App\Models\Semestre;
 use App\Models\User;
-use App\Models\VersionDocumento;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -55,16 +54,11 @@ class ProyectoController extends Controller
             'semestre',
             'director:id,name',
             'estudiantes:id,name',
-            'entregas',
             'entregasPivot',
         ]);
 
-        // Merge direct FK entregas + pivot-linked entregas, deduplicate by id
-        $directEntregas = $proyecto->entregas;
-        $pivotEntregas = $proyecto->entregasPivot;
-        $merged = $directEntregas->concat($pivotEntregas)->unique('id')->values();
-
-        $proyecto->setRelation('entregas', $merged);
+        // The pivot is the single source of truth for entregas.
+        $proyecto->setRelation('entregas', $proyecto->entregasPivot);
 
         return response()->json(['data' => $proyecto]);
     }
@@ -195,13 +189,6 @@ class ProyectoController extends Controller
                     ->whereColumn('versiones_documento.entrega_proyecto_id', 'entrega_proyecto.id');
             })
             ->exists();
-
-        // Fallback: verificar versiones directas (legacy, antes del nuevo esquema)
-        if (! $tieneVersiones) {
-            $tieneVersiones = VersionDocumento::whereHas('entrega', function ($q) use ($proyecto) {
-                $q->where('proyecto_id', $proyecto->id);
-            })->exists();
-        }
 
         if ($tieneVersiones) {
             return response()->json([

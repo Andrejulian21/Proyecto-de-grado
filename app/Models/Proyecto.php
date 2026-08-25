@@ -67,11 +67,6 @@ class Proyecto extends Model
             ->withTimestamps();
     }
 
-    public function entregas(): HasMany
-    {
-        return $this->hasMany(Entrega::class);
-    }
-
     public function entregasPivot(): BelongsToMany
     {
         return $this->belongsToMany(Entrega::class, 'entrega_proyecto', 'proyecto_id', 'entrega_id')

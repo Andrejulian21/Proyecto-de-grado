@@ -23,11 +23,11 @@ class ReporteController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $proyecto = Proyecto::with(['director', 'estudiantes', 'entregas'])->findOrFail(
+        $proyecto = Proyecto::with(['director', 'estudiantes', 'entregasPivot'])->findOrFail(
             $request->integer('proyecto_id')
         );
 
-        $entregas = $proyecto->entregas->map(function ($entrega) {
+        $entregas = $proyecto->entregasPivot->map(function ($entrega) {
             $evaluaciones = Evaluacion::where('entrega_id', $entrega->id)
                 ->whereNotNull('grade')
                 ->get();

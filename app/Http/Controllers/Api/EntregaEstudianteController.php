@@ -62,7 +62,7 @@ class EntregaEstudianteController extends Controller
         // Verificar que la entrega está vinculada al proyecto
         $tieneVinculo = $entrega->proyectos()->where('proyecto_id', $proyecto->id)->exists();
 
-        if (! $tieneVinculo && $entrega->proyecto_id !== $proyecto->id) {
+        if (! $tieneVinculo) {
             return response()->json(['error' => 'Esta entrega no está asignada a tu proyecto.'], 403);
         }
 

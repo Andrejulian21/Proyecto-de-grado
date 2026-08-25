@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Models\Entrega;
-use App\Models\Proyecto;
+use App\Models\Semestre;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -18,7 +18,7 @@ class EntregaFactory extends Factory
     public function definition(): array
     {
         return [
-            'proyecto_id' => Proyecto::factory(),
+            'semester_id' => fn () => Semestre::factory(),
             'title' => fake()->sentence(3),
             'phase' => 'anteproyecto',
             'due_date' => fake()->dateTimeBetween('+1 week', '+2 months'),

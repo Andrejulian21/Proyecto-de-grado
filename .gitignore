@@ -75,3 +75,8 @@ cookies.txt
 proyecto_grado
 response*.txt
 playwright-test.mjs
+
+# Database dumps / local SQLite (issue #43)
+database/dump-completo.sql
+database/*.sql
+*.sqlite

@@ -113,10 +113,6 @@ export default function RevisionBitacoraEstudiante() {
             mode="student"
             bitacora={bitacora}
             onBack={() => navigate('/bitacora')}
-            onSign={async () => {
-                // El estudiante no firma directamente; solo el director
-                throw new Error('Solo el director puede firmar la bitácora.');
-            }}
             onSaveContent={(content: string) => {
                 apiFetch(`/api/bitacoras/${id}`, {
                     method: 'PUT',

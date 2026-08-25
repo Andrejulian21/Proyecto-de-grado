@@ -38,6 +38,7 @@ use Throwable;
  *   - role.changed          — user role changed
  *   - user.created_external — coordinator created an external evaluator
  *   - password.changed      — external evaluator changed password
+ *   - bitacora.firmada      — director signed a bitacora (issue #45)
  */
 class AuditEvent
 {
@@ -86,7 +87,7 @@ class AuditEvent
             event($event);
         } catch (Throwable $e) {
             // Queue down — write synchronously to prevent data loss.
-            (new WriteAuditLog())->handle($event);
+            (new WriteAuditLog)->handle($event);
             report($e);
         }
 

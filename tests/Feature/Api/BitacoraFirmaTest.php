@@ -32,9 +32,6 @@ beforeEach(function () {
     ]);
     $this->proyecto->estudiantes()->attach($this->estudiante->id);
 
-    // Bypass the global API throttle for these tests so it does not
-    // interact with the per-firmar limiter.
-    RateLimiter::clear('firmar:0');
 });
 
 /**
@@ -118,6 +115,71 @@ it('firmar con codigo correcto transiciona a FirmadaDirector y registra director
     $b = $bitacora->fresh();
     expect($b->signature_status)->toBe(EstadoFirma::FirmadaDirector)
         ->and($b->director_signed_at)->not->toBeNull();
+});
+
+// -- FIRMAR: autorizacion (issue #45) ----------------------------------
+
+it('un estudiante no puede firmar la bitacora de su propio proyecto', function () {
+    [$bitacora, $plain] = makeBitacoraConCodigo($this->proyecto);
+
+    $this->actingAs($this->estudiante)
+        ->postJson("/api/bitacoras/{$bitacora->id}/firmar", ['code' => $plain])
+        ->assertForbidden();
+});
+
+it('un director ajeno al proyecto no puede firmar la bitacora', function () {
+    [$bitacora, $plain] = makeBitacoraConCodigo($this->proyecto);
+    $directorAjeno = User::factory()->director()->create();
+
+    $this->actingAs($directorAjeno)
+        ->postJson("/api/bitacoras/{$bitacora->id}/firmar", ['code' => $plain])
+        ->assertForbidden();
+});
+
+it('la firma exitosa queda registrada en audit_logs', function () {
+    [$bitacora, $plain] = makeBitacoraConCodigo($this->proyecto);
+
+    $this->actingAs($this->director)
+        ->postJson("/api/bitacoras/{$bitacora->id}/firmar", ['code' => $plain])
+        ->assertOk();
+
+    $this->assertDatabaseHas('audit_logs', [
+        'user_id' => $this->director->id,
+        'action' => 'bitacora.firmada',
+        'metadata->bitacora_id' => $bitacora->id,
+    ]);
+});
+
+it('el contador de intentos de firma es por bitacora y por usuario', function () {
+    [$bitacora] = makeBitacoraConCodigo($this->proyecto);
+    $otroDirector = User::factory()->director()->create();
+
+    // Dos fallos del director real por HTTP: su clave acumula los intentos
+    foreach ([1, 2] as $i) {
+        $this->actingAs($this->director)
+            ->postJson("/api/bitacoras/{$bitacora->id}/firmar", ['code' => '000000'])
+            ->assertStatus(422);
+    }
+
+    expect(RateLimiter::attempts('firmar:'.$bitacora->id.':'.$this->director->id))->toBe(2)
+        ->and(RateLimiter::attempts('firmar:'.$bitacora->id.':'.$otroDirector->id))->toBe(0);
+});
+
+it('agotar los intentos desde una cuenta no afecta los intentos de otra sobre la misma bitacora', function () {
+    [$bitacora, $plain] = makeBitacoraConCodigo($this->proyecto);
+
+    // Un tercero (estudiante ajeno al proyecto) intenta firmar 5 veces:
+    // siempre 403, sus intentos nunca consumen el presupuesto del director.
+    for ($i = 1; $i <= 5; $i++) {
+        $this->actingAs($this->otroEstudiante)
+            ->postJson("/api/bitacoras/{$bitacora->id}/firmar", ['code' => '000000'])
+            ->assertForbidden();
+    }
+
+    // El director conserva su presupuesto intacto y firma correctamente.
+    $this->actingAs($this->director)
+        ->postJson("/api/bitacoras/{$bitacora->id}/firmar", ['code' => $plain])
+        ->assertOk();
 });
 
 // -- FIRMAR: codigo expirado -------------------------------------------

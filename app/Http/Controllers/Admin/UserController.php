@@ -146,7 +146,9 @@ class UserController extends Controller
         $newPassword = Str::password(length: 16, symbols: true);
 
         $user->password = Hash::make($newPassword);
-        $user->last_temp_password = $newPassword;
+        // Hash, never plaintext (issue #42). The plain value is returned
+        // once in `new_password` for the coordinator to share.
+        $user->last_temp_password = Hash::make($newPassword);
         $user->password_changed_at = null;
         $user->save();
 
@@ -257,8 +259,13 @@ class UserController extends Controller
             'role' => UserRole::EvaluadorExterno->value,
             'es_externo' => true,
             'password_changed_at' => null,
-            'last_temp_password' => $plainPassword,
         ]);
+
+        // Store the bcrypt hash of the temporary password (issue #42).
+        // The plain value is returned exactly once in `temporary_password`
+        // below; it is never persisted and never serialized.
+        $user->last_temp_password = Hash::make($plainPassword);
+        $user->save();
 
         // Also add to whitelist so it appears in the unified user listing
         // and there's traceability of who created it.

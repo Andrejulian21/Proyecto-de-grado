@@ -27,6 +27,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property Carbon|null $last_activity_at
  * @property string|null $totp_secret
  * @property string|null $remember_token
+ * @property string|null $last_temp_password
  * @property Carbon|null $last_failed_at
  */
 class User extends Authenticatable
@@ -58,11 +59,15 @@ class User extends Authenticatable
         'max_capacity',
         'areas',
         'codigo_estudiante',
-        'last_temp_password',
     ];
 
     /**
      * Fields hidden from JSON / array serialization.
+     *
+     * `last_temp_password` is excluded on purpose (issue #42): it holds
+     * the bcrypt hash of the coordinator-issued temporary password and
+     * must never leak through model serialization. The plain value is
+     * returned exactly once by the create/reset endpoints.
      *
      * @var list<string>
      */
@@ -70,6 +75,7 @@ class User extends Authenticatable
         'password',
         'remember_token',
         'totp_secret',
+        'last_temp_password',
     ];
 
     /**

@@ -32,7 +32,6 @@ interface User {
     last_activity_at?: string | null;
     codigo_estudiante?: string;
     es_externo?: boolean;
-    last_temp_password?: string;
 }
 
 interface PaginationMeta {
@@ -124,9 +123,11 @@ export default function GestionUsuarios() {
     const [formRole, setFormRole] = useState('Estudiante');
     const [formCodigoEstudiante, setFormCodigoEstudiante] = useState('');
     const [submitting, setSubmitting] = useState(false);
-    const [formExternalPassword, setFormExternalPassword] = useState('');
     const [resettingPassword, setResettingPassword] = useState(false);
     const [resetPasswordSuccess, setResetPasswordSuccess] = useState<string | null>(null);
+    // Plain temporary password shown exactly once after creating an evaluator
+    // (the backend never persists it — issue #42).
+    const [createdEvaluatorPassword, setCreatedEvaluatorPassword] = useState<string | null>(null);
 
     const [editingIsWhitelist, setEditingIsWhitelist] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<any>(null);
@@ -229,7 +230,6 @@ export default function GestionUsuarios() {
         setFormEmail('');
         setFormRole('Estudiante');
         setFormCodigoEstudiante('');
-        setFormExternalPassword('');
         setResetPasswordSuccess(null);
         setEditAcademic(emptyDirectorAcademicForm());
         setLoadingProfile(false);
@@ -248,7 +248,6 @@ export default function GestionUsuarios() {
                 throw new Error(err?.error || 'Error al regenerar contraseña');
             }
             const json = await res.json();
-            setFormExternalPassword(json.new_password);
             setResetPasswordSuccess(json.new_password);
         } catch (err: any) {
             showMsg('error', err.message);
@@ -424,7 +423,6 @@ export default function GestionUsuarios() {
         setFormEmail(u.email);
         setFormRole(u.role);
         setFormCodigoEstudiante(u.codigo_estudiante || '');
-        setFormExternalPassword(u.last_temp_password || '---');
         setResetPasswordSuccess(null);
         setEditAcademic(emptyDirectorAcademicForm());
         setModalOpen(true);
@@ -516,6 +514,10 @@ export default function GestionUsuarios() {
                 const err = await res.json().catch(() => null);
                 throw new Error(err?.message || 'Error al crear evaluador');
             }
+            const json = await res.json();
+            // The plain temporary password is returned exactly once (issue #42);
+            // it is only stored hashed. Show it so the coordinator can copy it.
+            setCreatedEvaluatorPassword(json.temporary_password);
             showMsg('success', 'Evaluador creado exitosamente');
             setEvalNombre('');
             setEvalCorreo('');
@@ -871,6 +873,27 @@ export default function GestionUsuarios() {
                     </div>
                 </form>
 
+                {createdEvaluatorPassword && (
+                    <div className="mt-4 flex items-start gap-3 rounded-lg border border-[#fed7aa] bg-[#fff7ed] px-4 py-3">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#c2410c]" />
+                        <div className="flex-1">
+                            <p className="text-sm font-semibold text-[#9a3412]">
+                                Evaluador creado — copiá la contraseña temporal (se muestra una sola vez):
+                            </p>
+                            <p className="mt-1 break-all font-mono text-base text-[#7c2d12]">{createdEvaluatorPassword}</p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setCreatedEvaluatorPassword(null)}
+                            className="shrink-0 rounded-lg p-1 text-[#9a3412] transition hover:bg-[#fed7aa]"
+                            title="Cerrar"
+                            aria-label="Cerrar aviso de contraseña"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    </div>
+                )}
+
                 <hr className="my-6 border-t border-[#e5e5e5]" />
 
                 <div className="mb-4 flex items-center gap-2 flex-wrap">
@@ -1181,7 +1204,7 @@ export default function GestionUsuarios() {
                                             Contraseña
                                         </label>
                                         <p className="mb-2 text-xs text-[#57534e]">
-                                            {formExternalPassword === '---' ? 'El usuario ya tiene una contraseña asignada.' : `Contraseña actual: ${formExternalPassword}`}
+                                            La contraseña temporal se guarda con hash y no puede recuperarse. Si el evaluador no la tiene, generá una nueva.
                                         </p>
                                         <button
                                             type="button"

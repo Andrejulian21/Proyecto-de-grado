@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
 
 uses(RefreshDatabase::class);
@@ -114,4 +115,33 @@ it('registers audit:archive on the daily schedule', function () {
     expect($found)->not->toBeNull();
     // The expression for ->daily() in Laravel 11 is `0 0 * * *`.
     expect($found->expression)->toBe('0 0 * * *');
+});
+
+it('archives all eligible rows when they exceed the batch size', function () {
+    // Issue #50 regression: chunk() + delete inside the callback shifts
+    // the OFFSET and skips ~1/3 of rows (1500 rows / 500 batch = 3 pages,
+    // but the third page's offset lands beyond the shrunken result set).
+    // chunkById() pages with `WHERE id > ?` and must archive every row.
+    Carbon::setTestNow('2026-07-10 12:00:00');
+
+    DB::table('audit_logs')->insert(
+        collect(range(1, 1500))->map(fn () => [
+            'action' => 'login.success',
+            'description' => 'bulk old entry',
+            'created_at' => now()->subYears(6),
+        ])->all()
+    );
+
+    $exitCode = Artisan::call('audit:archive');
+
+    expect($exitCode)->toBe(0);
+
+    // Acceptance criteria #1: no eligible rows remain.
+    expect(DB::table('audit_logs')->count())->toBe(0);
+    // Acceptance criteria #3: total rows before and after is identical.
+    expect(DB::table('audit_logs_archive')->count())->toBe(1500);
+    // Acceptance criteria #2: reported count matches reality.
+    expect(Artisan::output())->toContain('Done. 1500 entries archived.');
+
+    Carbon::setTestNow();
 });

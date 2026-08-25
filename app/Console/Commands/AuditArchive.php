@@ -64,10 +64,16 @@ class AuditArchive extends Command
         $bar = $this->output->createProgressBar($count);
         $bar->start();
 
+        $archived = 0;
+
+        // chunkById() pages with `WHERE id > ?` instead of LIMIT/OFFSET,
+        // so deleting rows inside the callback cannot shift the page
+        // and skip rows (issue #50: chunk() + delete skipped ~1/3 of
+        // eligible rows while reporting full success).
         DB::table('audit_logs')
             ->where('created_at', '<', $cutoff)
             ->orderBy('id')
-            ->chunk(500, function ($rows) use ($bar, $isPgsql) {
+            ->chunkById(500, function ($rows) use ($bar, $isPgsql, &$archived) {
                 $rows = $rows instanceof EloquentCollection ? $rows : EloquentCollection::make($rows);
 
                 DB::transaction(function () use ($rows, $isPgsql) {
@@ -94,12 +100,13 @@ class AuditArchive extends Command
                     }
                 });
 
+                $archived += $rows->count();
                 $bar->advance($rows->count());
             });
 
         $bar->finish();
         $this->newLine();
-        $this->info("Done. {$count} entries archived.");
+        $this->info("Done. {$archived} entries archived.");
 
         return Command::SUCCESS;
     }

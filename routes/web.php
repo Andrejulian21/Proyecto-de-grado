@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\StorageController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -27,14 +28,18 @@ Route::get('/up', fn () => response('OK', 200))->name('health');
 Route::get('/auth/redirect', [AuthController::class, 'redirectToGoogle'])->name('auth.google.redirect');
 Route::get('/auth/callback', [AuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
 
-// Serve storage files (bypass SPA catch-all for /storage/* URLs)
-Route::get('/storage/{path}', function (string $path) {
-    $fullPath = storage_path('app/public/' . $path);
-    if (! file_exists($fullPath)) {
-        abort(404);
-    }
-    return response()->file($fullPath);
-})->where('path', '.*')->name('storage.serve');
+// Serve storage files for authenticated users only. The client-provided
+// path is validated against directory traversal (see StorageController):
+// `..` segments are rejected and the realpath() result must stay inside
+// the disk root. Unauthenticated browser requests redirect to /login.
+Route::get('/storage/{path}', StorageController::class)
+    ->middleware('auth:sanctum')
+    ->where('path', '.*')
+    ->name('storage.serve');
+
+// Named login route: auth:sanctum redirects unauthenticated browser requests
+// to protected routes (e.g. /storage/*) here, rendering the SPA login page.
+Route::get('/login', fn () => view('app'))->name('login');
 
 // SPA catch-all — anything that is not /api/* or an explicit route above
 // serves the Vite/React index.html so client-side routing works.

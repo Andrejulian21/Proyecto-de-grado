@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Entrega\ReviewEntregaAction;
 use App\Actions\Entrega\StoreEntregaAction;
 use App\Enums\UserRole;
 use App\Models\Entrega;
@@ -13,7 +14,9 @@ use App\Models\Proyecto;
 use App\Models\Semestre;
 use App\Models\User;
 use App\Models\VersionDocumento;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -189,5 +192,91 @@ describe('ReviewEntregaAction — notifica SOLO al proyecto revisado (issue #49)
 
         expect(Notificacion::where('user_id', $estudianteA->id)->count())->toBe(1);
         expect(Notificacion::where('user_id', $estudianteB->id)->count())->toBe(0);
+    });
+});
+
+describe('ReviewEntregaAction — atomicidad y rendimiento (issue #49)', function () {
+
+    it('la revision es atomica: un fallo a mitad revierte la entrega a su estado previo', function () {
+        $director = User::factory()->director()->create();
+        $estudiante = User::factory()->create(['role' => UserRole::Estudiante->value]);
+
+        $semestre = Semestre::factory()->create(['is_active' => true]);
+        $proyecto = Proyecto::factory()->create(['semester_id' => $semestre->id, 'director_id' => $director->id]);
+        $proyecto->estudiantes()->attach($estudiante);
+
+        $entrega = crearEntregaViaAction($semestre);
+
+        // A version belonging to ANOTHER entrega: the version lookup inside
+        // the action fails AFTER the entrega was already marked approved.
+        $otraEntrega = crearEntregaViaAction($semestre, ['titulo' => 'Otra entrega']);
+        $versionAjeno = VersionDocumento::create([
+            'entrega_id' => $otraEntrega->id,
+            'version_number' => 1,
+            'file_path' => 'entregas/ajeno.pdf',
+            'file_size' => 1024,
+            'original_name' => 'ajeno.pdf',
+            'uploaded_at' => now(),
+        ]);
+
+        expect(fn () => app(ReviewEntregaAction::class)->handle($entrega, [
+            'status' => 'aprobada',
+            'consolidated_grade' => 4.5,
+            'director_notes' => 'Buen trabajo',
+            'version_id' => $versionAjeno->id,
+        ], $director->id))->toThrow(ModelNotFoundException::class);
+
+        // Rolled back: no intermediate state and no notifications.
+        expect($entrega->fresh()->status->value)->toBe('pendiente');
+        expect($entrega->fresh()->evaluation_complete)->toBeFalse();
+        expect(Notificacion::where('type', 'entrega.revisada')->count())->toBe(0);
+    });
+
+    it('la revision ejecuta un numero constante de consultas sin importar los proyectos del semestre', function () {
+        $director = User::factory()->director()->create();
+        $estudianteA = User::factory()->create(['role' => UserRole::Estudiante->value]);
+
+        $semestre = Semestre::factory()->create(['is_active' => true]);
+
+        // Ten projects in the semester: the entrega is linked to ALL of them
+        // (StoreEntregaAction attaches every active project of the semester).
+        $proyectos = Proyecto::factory()->count(10)->create([
+            'semester_id' => $semestre->id,
+            'director_id' => $director->id,
+        ]);
+        $proyectoA = $proyectos->first();
+        $proyectoA->estudiantes()->attach($estudianteA);
+
+        $entrega = crearEntregaViaAction($semestre);
+
+        $pivotA = EntregaProyecto::where('entrega_id', $entrega->id)
+            ->where('proyecto_id', $proyectoA->id)
+            ->firstOrFail();
+
+        $version = VersionDocumento::create([
+            'entrega_id' => $entrega->id,
+            'entrega_proyecto_id' => $pivotA->id,
+            'version_number' => 1,
+            'file_path' => 'entregas/test.pdf',
+            'file_size' => 1024,
+            'original_name' => 'test.pdf',
+            'uploaded_at' => now(),
+        ]);
+
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+
+        app(ReviewEntregaAction::class)->handle($entrega, [
+            'status' => 'aprobada',
+            'consolidated_grade' => 4.5,
+            'version_id' => $version->id,
+        ], $director->id);
+
+        $queries = count(DB::getQueryLog());
+
+        // ~800 queries before #49; now bounded (~10) and independent of the
+        // number of projects in the semester.
+        expect($queries)->toBeLessThan(15);
+        expect(Notificacion::where('user_id', $estudianteA->id)->count())->toBe(1);
     });
 });

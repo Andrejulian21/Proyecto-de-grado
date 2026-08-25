@@ -41,26 +41,43 @@ describe('T-015: Migraciones y modelos EvaluadorProyecto', function () {
         expect($asignacion->assigned_at)->not->toBeNull();
     });
 
-    it('unique compuesto proyecto_id + evaluador_id en evaluador_proyecto', function () {
+    it('unique compuesto proyecto_id + evaluador_id + fase en evaluador_proyecto', function () {
         $coordinador = User::factory()->coordinador()->create();
         $director = User::factory()->director()->create();
         $semestre = Semestre::create(['name' => '2026-1', 'start_date' => '2026-02-01', 'end_date' => '2026-06-30']);
         $proyecto = Proyecto::create(['title' => 'Test', 'semester_id' => $semestre->id, 'director_id' => $director->id]);
         $evaluador = User::factory()->external()->create();
 
+        // Issue #51 — Defect 2: the UNIQUE is now (proyecto, evaluador, fase).
+        // The same evaluator MAY be assigned to the same project once per phase,
+        // so a duplicate is only rejected when the fase matches too.
         EvaluadorProyecto::create([
             'proyecto_id' => $proyecto->id,
             'evaluador_id' => $evaluador->id,
             'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
             'assigned_at' => now(),
+            'fase' => 'presentacion_anteproyecto',
         ]);
 
+        // Same evaluator + same project + SAME fase → unique violation.
         expect(fn () => EvaluadorProyecto::create([
             'proyecto_id' => $proyecto->id,
             'evaluador_id' => $evaluador->id,
             'invitation_status' => EstadoInvitacionEvaluador::Aceptada,
             'assigned_at' => now(),
+            'fase' => 'presentacion_anteproyecto',
         ]))->toThrow(QueryException::class);
+
+        // Same evaluator + same project + DIFFERENT fase → legitimate, allowed.
+        EvaluadorProyecto::create([
+            'proyecto_id' => $proyecto->id,
+            'evaluador_id' => $evaluador->id,
+            'invitation_status' => EstadoInvitacionEvaluador::Aceptada,
+            'assigned_at' => now(),
+            'fase' => 'presentacion_final',
+        ]);
+
+        expect(EvaluadorProyecto::query()->count())->toBe(2);
     });
 
     it('evaluador_proyecto belongsTo relations', function () {

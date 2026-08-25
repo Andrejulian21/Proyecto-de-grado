@@ -42,7 +42,10 @@ class DirectorCupoController extends Controller
                     EstadoProyecto::EnRiesgo,
                 ]);
             }])
-            ->get(['id', 'name', 'areas', 'max_capacity'])
+            // 'email' MUST be selected: keyBy('email') below would otherwise
+            // resolve to null for every row and collapse the collection into
+            // a single entry (issue #51 — Defect 5).
+            ->get(['id', 'name', 'areas', 'max_capacity', 'email'])
             ->keyBy('email');
 
         // 2. Whitelist entries with role Director whose email is NOT in users

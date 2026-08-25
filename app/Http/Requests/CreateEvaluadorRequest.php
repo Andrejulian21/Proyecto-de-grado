@@ -23,6 +23,20 @@ class CreateEvaluadorRequest extends FormRequest
     }
 
     /**
+     * Issue #51 — Defect 4: normalize the email before the `unique:users,email`
+     * rule runs, so a case-variant of an existing account is rejected with a
+     * 422 instead of failing the unique lower(email) index with a 500.
+     */
+    protected function prepareForValidation(): void
+    {
+        if (is_string($this->input('email'))) {
+            $this->merge([
+                'email' => strtolower(trim($this->input('email'))),
+            ]);
+        }
+    }
+
+    /**
      * @return array<string, list<string>>
      */
     public function rules(): array

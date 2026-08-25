@@ -43,6 +43,8 @@ class UserController extends Controller
      */
     public function usuarios(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', User::class);
+
         $perPage = min((int) $request->query('per_page', 50), 200);
         $search = $request->query('search');
         $role = $request->query('role');
@@ -82,6 +84,8 @@ class UserController extends Controller
      */
     public function updateUsuario(UpdateUserRequest $request, User $user, DirectorAssignmentGuard $guard): JsonResponse
     {
+        $this->authorize('update', $user);
+
         $payload = $request->validated();
         $newRole = UserRole::from($payload['role']);
 
@@ -135,6 +139,8 @@ class UserController extends Controller
      */
     public function resetPassword(Request $request, User $user): JsonResponse
     {
+        $this->authorize('update', $user);
+
         if ($request->user()->role->value !== 'Coordinador') {
             return response()->json(['error' => 'No autorizado.'], 403);
         }
@@ -177,6 +183,8 @@ class UserController extends Controller
      */
     public function destroyUsuario(Request $request, User $user, DirectorAssignmentGuard $guard): JsonResponse
     {
+        $this->authorize('delete', $user);
+
         try {
             $guard->assertCanDelete($user);
         } catch (DirectorAssignmentException $e) {
@@ -211,6 +219,8 @@ class UserController extends Controller
         User $user,
         DeleteDirectorWithReassignmentAction $action,
     ): JsonResponse {
+        $this->authorize('delete', $user);
+
         try {
             $result = $action->handle($user, $request->user());
         } catch (DirectorAssignmentException $e) {
@@ -248,6 +258,8 @@ class UserController extends Controller
      */
     public function storeExternal(CreateEvaluadorRequest $request): JsonResponse
     {
+        $this->authorize('create', User::class);
+
         $payload = $request->validated();
 
         $plainPassword = $payload['password'];

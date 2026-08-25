@@ -11,6 +11,7 @@ use App\Models\EvaluacionEvaluador;
 use App\Models\EvaluadorProyecto;
 use App\Models\Proyecto;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -114,20 +115,28 @@ class EvaluadorProyectoController extends Controller
 
         $created = [];
 
-        foreach ($data['evaluador_ids'] as $evaluadorId) {
-            $asignacion = EvaluadorProyecto::create([
-                'proyecto_id' => $data['proyecto_id'],
-                'evaluador_id' => $evaluadorId,
-                'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
-                'assigned_at' => now(),
-                'fecha' => $data['fecha'],
-                'hora_inicio' => $data['hora_inicio'],
-                'hora_fin' => $data['hora_fin'],
-                'fase' => $data['fase'],
-            ]);
+        try {
+            foreach ($data['evaluador_ids'] as $evaluadorId) {
+                $asignacion = EvaluadorProyecto::create([
+                    'proyecto_id' => $data['proyecto_id'],
+                    'evaluador_id' => $evaluadorId,
+                    'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
+                    'assigned_at' => now(),
+                    'fecha' => $data['fecha'],
+                    'hora_inicio' => $data['hora_inicio'],
+                    'hora_fin' => $data['hora_fin'],
+                    'fase' => $data['fase'],
+                ]);
 
-            $asignacion->load('evaluador:id,name,email,role');
-            $created[] = $asignacion;
+                $asignacion->load('evaluador:id,name,email,role');
+                $created[] = $asignacion;
+            }
+        } catch (QueryException $e) {
+            // Issue #51 — Defect 2: a UNIQUE violation on the (proyecto_id,
+            // evaluador_id, fase) tuple must surface as a 422, not a 500.
+            return response()->json([
+                'error' => 'El evaluador ya está asignado a este proyecto en la misma fase.',
+            ], 422);
         }
 
         // Return the created records in the same grouped shape as index().
@@ -275,14 +284,22 @@ class EvaluadorProyectoController extends Controller
                         'fase' => $data['fase'] ?? $asignacion->fase,
                     ];
 
-                    foreach ($toAdd as $evaluadorId) {
-                        EvaluadorProyecto::create([
-                            'proyecto_id' => $proyectoId,
-                            'evaluador_id' => $evaluadorId,
-                            'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
-                            'assigned_at' => now(),
-                            ...$base,
-                        ]);
+                    try {
+                        foreach ($toAdd as $evaluadorId) {
+                            EvaluadorProyecto::create([
+                                'proyecto_id' => $proyectoId,
+                                'evaluador_id' => $evaluadorId,
+                                'invitation_status' => EstadoInvitacionEvaluador::Pendiente,
+                                'assigned_at' => now(),
+                                ...$base,
+                            ]);
+                        }
+                    } catch (QueryException $e) {
+                        // Issue #51 — Defect 2: surface UNIQUE violations on
+                        // the (proyecto_id, evaluador_id, fase) tuple as 422.
+                        return response()->json([
+                            'error' => 'El evaluador ya está asignado a este proyecto en la misma fase.',
+                        ], 422);
                     }
                 }
             }

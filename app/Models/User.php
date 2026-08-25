@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Auth\LoginAttemptPolicy;
 use App\Enums\UserRole;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -150,6 +151,22 @@ class User extends Authenticatable
     }
 
     // -- external-evaluator helpers (T-016, T-017) -----------------------
+
+    /**
+     * Issue #51 — Defect 4: normalize the email to lowercase on WRITE.
+     *
+     * The `users.email` column is UNIQUE case-sensitively; storing emails
+     * with a canonical (lowercase) form keeps lookups and the unique
+     * lower(email) index consistent no matter what casing a caller sends.
+     * Read-side normalization lives in loginExterno() (AuthController) and
+     * CreateEvaluadorRequest.
+     */
+    protected function email(): Attribute
+    {
+        return Attribute::make(
+            set: fn (string $value) => strtolower(trim($value)),
+        );
+    }
 
     /**
      * True when the lockout window is still in the future OR the

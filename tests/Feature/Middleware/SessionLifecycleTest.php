@@ -123,3 +123,25 @@ it('resets the inactivity clock on a successful request', function () {
     $user = $user->fresh();
     expect($user->last_activity_at->diffInSeconds(now()))->toBeLessThan(5);
 });
+
+it('invalidates a previous session when a newer token exists (single-session via HTTP)', function () {
+    $user = User::factory()->external()->create();
+
+    // Simulate a login path that did not purge: two tokens coexist.
+    $older = $user->createToken('device-a')->plainTextToken;
+    $newer = $user->createToken('device-b')->plainTextToken;
+
+    // The previous session (older token) is rejected and revoked…
+    $this->withToken($older)
+        ->getJson('/api/_protected')
+        ->assertStatus(401)
+        ->assertJson(['error' => 'session.replaced']);
+
+    // …while the active (most recent) session keeps working.
+    $this->withToken($newer)
+        ->getJson('/api/_protected')
+        ->assertOk();
+
+    // Only the active token remains.
+    expect($user->fresh()->tokens)->toHaveCount(1);
+});

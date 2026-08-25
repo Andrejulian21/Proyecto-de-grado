@@ -109,14 +109,14 @@ function App() {
                                 <Route path="/" element={<DashboardRouter />} />
                                 <Route path="/dashboard/estudiante" element={<ProtectedRoute allowedRoles={['Estudiante']}><EstudianteDashboard /></ProtectedRoute>} />
                                 <Route path="/bitacora" element={<ProtectedRoute allowedRoles={['Estudiante']}><BitacorasEstudiante /></ProtectedRoute>} />
-                                <Route path="/dashboard/director" element={<DirectorDashboard />} />
-                                <Route path="/dashboard/coordinador" element={<CoordinadorDashboard />} />
+                                <Route path="/dashboard/director" element={<ProtectedRoute allowedRoles={['Director']}><DirectorDashboard /></ProtectedRoute>} />
+                                <Route path="/dashboard/coordinador" element={<ProtectedRoute allowedRoles={['Coordinador']}><CoordinadorDashboard /></ProtectedRoute>} />
                                 <Route path="/dashboard/coordinador/proyecto/:id" element={
                                     <ProtectedRoute allowedRoles={['Coordinador']}>
                                         <SuspenseWrapper><SupervisionReadOnlyWrapper /></SuspenseWrapper>
                                     </ProtectedRoute>
                                 } />
-                                <Route path="/dashboard/evaluador-externo" element={<EvaluadorDashboard />} />
+                                <Route path="/dashboard/evaluador-externo" element={<ProtectedRoute allowedRoles={['EvaluadorExterno']}><EvaluadorDashboard /></ProtectedRoute>} />
                                 <Route path="/coordinador/usuarios" element={<ProtectedRoute allowedRoles={['Coordinador']}><GestionUsuarios /></ProtectedRoute>} />
                                 <Route path="/coordinador/audit-log" element={<ProtectedRoute allowedRoles={['Coordinador']}><AuditLog /></ProtectedRoute>} />
                                 <Route path="/anuncios" element={<SuspenseWrapper><AnunciosPublica /></SuspenseWrapper>} />

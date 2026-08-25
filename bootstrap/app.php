@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Http\Middleware\ActivityMiddleware;
-use App\Http\Middleware\EnsurePasswordChanged;
 use App\Http\Middleware\RoleMiddleware;
 use App\Http\Middleware\SingleSessionMiddleware;
 use Illuminate\Foundation\Application;
@@ -39,7 +38,6 @@ return Application::configure(basePath: dirname(__DIR__))
         // Route middleware aliases (T-017, T-018, T-021, T-022).
         $middleware->alias([
             'role' => RoleMiddleware::class,
-            'ensure_password_changed' => EnsurePasswordChanged::class,
             'single_session' => SingleSessionMiddleware::class,
             'activity' => ActivityMiddleware::class,
         ]);

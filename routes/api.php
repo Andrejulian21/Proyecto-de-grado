@@ -62,8 +62,10 @@ Route::post('/auth/externo/login', [AuthController::class, 'loginExterno'])
 //   - auth:sanctum           (Sanctum cookie/bearer token)
 //   - single_session         (T-021, belt-and-suspenders)
 //   - activity               (T-022, 8h inactivity timeout)
-//   - ensure_password_changed (T-017, forces external evaluators to
-//     change their temporary password)
+// NOTE: `ensure_password_changed` (T-017) was intentionally REMOVED
+// (issue #58, user decision): the password the coordinator creates for
+// an external evaluator is the definitive one — there is no temporary
+// password to force a change of.
 Route::middleware([
     'auth:sanctum',
     'single_session',

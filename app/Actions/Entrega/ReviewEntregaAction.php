@@ -135,18 +135,17 @@ final class ReviewEntregaAction
     }
 
     /**
-     * RF-NOT-03 / design TBD-6: an entrega is editable while it is not in a
-     * terminal status (aprobada/rechazada) and its due date has not passed.
-     * There is no literal 'activa' state in the enum; openness is derived
-     * from the negation of the terminal states.
+     * RF-NOT-03 / design TBD-6: the director can review an entrega as long
+     * as it is not in a terminal status (aprobada/rechazada). The due_date
+     * only restricts the STUDENT from uploading — it never blocks the
+     * director, coordinator, or evaluator from reviewing, observing, or
+     * grading.
      */
     private function esEditable(Entrega $entrega): bool
     {
         $terminal = ['aprobada', 'rechazada'];
 
-        return ! in_array($entrega->status?->value, $terminal, true)
-            && $entrega->due_date !== null
-            && $entrega->due_date->startOfDay()->gte(now()->startOfDay());
+        return ! in_array($entrega->status?->value, $terminal, true);
     }
 
     /**

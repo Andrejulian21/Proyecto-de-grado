@@ -219,7 +219,7 @@ it('rechaza revisar cuando la entrega ya está cerrada por status terminal (RF-N
         ->toBe('La entrega está cerrada; la nota y las observaciones no pueden modificarse');
 })->with(['aprobada', 'rechazada']);
 
-it('rechaza revisar cuando la due_date ya venció (RF-NOT-03)', function () {
+it('el director puede revisar aunque la due_date haya vencido (solo status terminal bloquea)', function () {
     ['entrega' => $entrega, 'version' => $version] = crearEntregaRevisable($this->proyecto, [
         'due_date' => now()->subDay()->toDateString(),
     ]);
@@ -227,7 +227,7 @@ it('rechaza revisar cuando la due_date ya venció (RF-NOT-03)', function () {
     $response = $this->actingAs($this->director)
         ->putJson("/api/admin/entregas/{$entrega->id}/revisar", payloadRevisar(['version_id' => $version->id]));
 
-    $response->assertStatus(422);
-    expect($response->json('error.message'))
-        ->toBe('La entrega está cerrada; la nota y las observaciones no pueden modificarse');
+    // Director CAN review after due_date — only terminal status (aprobada/rechazada) blocks
+    $response->assertOk();
+    expect($entrega->fresh()->status->value)->toBe('aprobada');
 });

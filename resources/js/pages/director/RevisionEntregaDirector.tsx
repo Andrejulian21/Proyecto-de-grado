@@ -301,15 +301,11 @@ export default function RevisionEntregaDirector() {
 
     const statusCfg = statusConfig(entrega.status);
 
-    /* ── RF-NOT-03: the delivery is closed when its status is terminal
-       or its due_date is in the past; note and observations are read-only. */
-    const esTerminal = entrega.status === 'aprobada' || entrega.status === 'rechazada';
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-    const dueInicio = entrega.due_date ? new Date(entrega.due_date) : null;
-    if (dueInicio) dueInicio.setHours(0, 0, 0, 0);
-    const vencida = dueInicio !== null && dueInicio < hoy;
-    const cerrada = esTerminal || vencida;
+    /* ── RF-NOT-03: the director can review at any time while the delivery
+       is not in a terminal state. Due date only blocks the student from
+       uploading — the director, coordinator, and evaluator are never
+       locked out by the calendar. */
+    const cerrada = entrega.status === 'aprobada' || entrega.status === 'rechazada';
 
     /* ══════════════════════════════════════════════════
        Submitted (success screen)
@@ -620,7 +616,7 @@ export default function RevisionEntregaDirector() {
                             role="alert"
                         >
                             <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
-                            La entrega está cerrada; la nota y las observaciones no pueden modificarse.
+                            La entrega está cerrada (aprobada o rechazada); no se pueden realizar más revisiones.
                         </div>
                     )}
 

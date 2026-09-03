@@ -4,20 +4,23 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Enums\UserRole;
+use App\Models\AuthorizedEmail;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        $this->call(SemestreSeeder::class);
+        // Coordinadores autorizados (Google OAuth whitelist)
+        AuthorizedEmail::updateOrCreate(
+            ['email' => 'jarteaga145@unab.edu.co'],
+            ['name' => 'Julian Arteaga', 'role' => UserRole::Coordinador],
+        );
 
-        // TestUsersSeeder usa datos de prueba personales: solo se ejecuta
-        // en entornos local/testing (nunca en producción o staging).
-        if (app()->environment(['local', 'testing'])) {
-            $this->call(TestUsersSeeder::class);
-        }
-
-        $this->call(DemoDataSeeder::class);
+        AuthorizedEmail::updateOrCreate(
+            ['email' => 'lpardo688@unab.edu.co'],
+            ['name' => 'Luisa Parra', 'role' => UserRole::Coordinador],
+        );
     }
 }

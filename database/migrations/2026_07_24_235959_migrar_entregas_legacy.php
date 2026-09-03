@@ -27,10 +27,10 @@ return new class extends Migration
 
         // Step 1-2: Group by (semester_id, phase, title), keep minimum ID.
         $groups = DB::table('entregas')
-            ->select('semester_id', 'phase', 'title', DB::raw('MIN(id) as keep_id'), DB::raw('COUNT(*) as count'))
+            ->select('semester_id', 'phase', 'title', DB::raw('MIN(id) as keep_id'), DB::raw('COUNT(*) as cnt'))
             ->whereNotNull('semester_id')
             ->groupBy('semester_id', 'phase', 'title')
-            ->having('count', '>', 1)
+            ->having('cnt', '>', 1)
             ->get();
 
         foreach ($groups as $group) {

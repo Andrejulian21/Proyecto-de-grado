@@ -1,71 +1,146 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Sistema Centralizado de Proyectos de Grado
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Plataforma web para gestionar proyectos de grado de Ingeniería de Sistemas en la **UNAB** (Universidad Nacional Abierta y a Distancia). Permite a coordinadores, directores, estudiantes y evaluadores externos gestionar el ciclo de vida completo: inscripción, entregas con versionado, bitácoras firmadas, evaluación y generación de reportes.
 
-## About Laravel
+## Stack
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+| Capa | Tecnología |
+|------|-----------|
+| Backend | Laravel 11 + PHP 8.4 |
+| Frontend | React 19 + Vite 8 + TypeScript |
+| UI | Tailwind CSS v4 + shadcn/ui |
+| Base de datos | PostgreSQL 16 (producción) / SQLite (desarrollo) |
+| Auth | Sanctum cookie SPA + Google OAuth |
+| Testing | Pest (PHP) + Playwright (E2E) |
+| Deploy | Docker + Coolify |
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Requisitos
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- PHP 8.4+
+- Node.js 18+ con npm/pnpm
+- Composer
+- SQLite (desarrollo) o PostgreSQL (producción)
 
-## Learning Laravel
+## Instalación local
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+```bash
+# Clonar
+git clone https://github.com/Andrejulian21/Proyecto-de-grado.git
+cd Proyecto-de-grado
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+# Dependencias
+composer install
+npm install
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+# Entorno
+cp .env.example .env
+php artisan key:generate
 
-## Laravel Sponsors
+# Base de datos
+touch database/database.sqlite
+php artisan migrate --force
+php artisan db:seed
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+# Storage link
+php artisan storage:link
 
-### Premium Partners
+# Servidores (en terminales separadas)
+php artisan serve --port=8000
+npm run dev
+```
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+- App: http://localhost:8000
+- Vite: http://localhost:5173
 
-## Contributing
+## Usuarios de prueba
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+| Correo | Contraseña | Rol |
+|--------|-----------|-----|
+| `julian21arteaga@gmail.com` | `Pruebas123!` | Director |
+| `juliarteaga938@gmail.com` | `Pruebas123!` | Estudiante |
+| `evaluador.externo@test.com` | `password` | Evaluador Externo |
+| `jarteaga145@unab.edu.co` | — (Google OAuth) | Coordinador |
 
-## Code of Conduct
+## Funcionalidades
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### Coordinador
+- Gestión de proyectos, usuarios y whitelist
+- Asignación de evaluadores externos
+- Configuración de entregas y porcentajes de nota
+- Consulta de notas ponderadas por fase (PG1/PG2)
+- Exportación de notas a Excel
+- Seguimiento por semestre
+- Anuncios y recursos informativos
 
-## Security Vulnerabilities
+### Director
+- Supervisión de proyectos asignados
+- Revisión y calificación de entregas
+- Firma de bitácoras con código
+- Consulta de notas de sus proyectos
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### Estudiante
+- Subida de documentos por versión (máx. 4)
+- Bitácoras semanales con firma
+- Consulta de notas de su proyecto
+- Asistente de orientación (IA)
 
-## License
+### Evaluador Externo
+- Evaluación de presentaciones (anteproyecto / final)
+- Calificación con rúbrica
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## Estructura del proyecto
 
-## Dependencias de características (backend)
+```
+app/
+├── Actions/          # Use cases (ReviewEntrega, SolicitarEntrega, etc.)
+├── Console/          # Artisan commands
+├── Enums/            # PHP enums (UserRole, FaseProyecto, EstadoEntrega, etc.)
+├── Http/
+│   ├── Controllers/  # API controllers
+│   ├── Middleware/    # SingleSession, Activity, Role
+│   └── Requests/     # Form request validation
+├── Models/           # Eloquent models
+├── Policies/         # Authorization policies
+├── Services/         # Business logic (AI, Evaluation, Seguimiento, etc.)
+└── Events/           # Audit events
 
-- **Cartas de aval (DOCX)** — `phpoffice/phpword` (^1.4). Instalar con `composer require phpoffice/phpword` y regenerar el lock. Los templates se copian a `storage/app/templates/` (fuera de versionamiento git).
-- **Export de seguimiento (XLSX)** — `phpoffice/phpspreadsheet` (se instala en el PR 3 del change `cartas-avales-y-export-alertas`).
+resources/js/
+├── components/       # Shared React components
+├── hooks/            # Custom hooks (useAuth, useEntregas, etc.)
+├── pages/            # Page components by role
+│   ├── coordinador/
+│   ├── director/
+│   ├── estudiante/
+│   ├── evaluador/
+│   └── shared/
+└── types/            # TypeScript type definitions
+
+tests/
+├── Feature/          # Feature tests (Pest)
+└── Unit/             # Unit tests
+```
+
+## Testing
+
+```bash
+# Ejecutar todos los tests
+vendor/bin/pest
+
+# Tests específicos
+vendor/bin/pest --filter="EntregaPeso"
+vendor/bin/pest --filter="ConsultaNotas"
+```
+
+## Despliegue (Coolify)
+
+El proyecto incluye `Dockerfile` multi-stage para producción. Coolify detecta automáticamente el Dockerfile y despliega con Nginx + PHP-FPM.
+
+Variables de entorno necesarias en Coolify:
+- `APP_KEY`, `APP_URL`, `APP_ENV=production`
+- `DB_CONNECTION=pgsql`, `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`
+- `SESSION_DRIVER=database`
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (opcional, para OAuth)
+
+## Licencia
+
+Proyecto académico — UNAB Ingeniería de Sistemas.

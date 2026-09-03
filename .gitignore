@@ -80,3 +80,12 @@ playwright-test.mjs
 database/dump-completo.sql
 database/*.sql
 *.sqlite
+
+# AI / Development workflow files
+openspec/
+contexto/
+CLAUDE.md
+AGENTS.md
+constitution.md
+LOCAL.md
+sdd/

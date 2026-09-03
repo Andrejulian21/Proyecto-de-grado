@@ -182,7 +182,7 @@ describe('T-016: CRUD evaluaciones', function () {
             'evaluador_id' => $this->evaluador->id,
             'criterio' => 'Estructura',
             'percentage' => 50.00,
-            'grade' => 85.00,
+            'grade' => 4.25,
             'evaluated_at' => now(),
         ]);
         Evaluacion::create([
@@ -190,7 +190,7 @@ describe('T-016: CRUD evaluaciones', function () {
             'evaluador_id' => $otroEvaluador->id,
             'criterio' => 'Contenido',
             'percentage' => 50.00,
-            'grade' => 90.00,
+            'grade' => 4.50,
             'evaluated_at' => now(),
         ]);
 
@@ -218,7 +218,7 @@ describe('T-016: CRUD evaluaciones', function () {
             'evaluador_id' => $this->evaluador->id,
             'criterio' => 'Estructura',
             'percentage' => 50.00,
-            'grade' => 85.00,
+            'grade' => 4.25,
             'evaluated_at' => now(),
         ]);
         Evaluacion::create([
@@ -226,7 +226,7 @@ describe('T-016: CRUD evaluaciones', function () {
             'evaluador_id' => $otroEvaluador->id,
             'criterio' => 'Contenido',
             'percentage' => 50.00,
-            'grade' => 90.00,
+            'grade' => 4.50,
             'evaluated_at' => now(),
         ]);
 
@@ -398,7 +398,7 @@ describe('T-017: Evaluacion por criterio', function () {
             'evaluador_id' => $this->evaluador->id,
             'criterio' => 'Estructura',
             'percentage' => 40.00,
-            'grade' => 80.00,
+            'grade' => 4.00,
             'evaluated_at' => now(),
         ]);
         Evaluacion::create([
@@ -406,7 +406,7 @@ describe('T-017: Evaluacion por criterio', function () {
             'evaluador_id' => $this->evaluador->id,
             'criterio' => 'Contenido',
             'percentage' => 60.00,
-            'grade' => 90.00,
+            'grade' => 4.50,
             'evaluated_at' => now(),
         ]);
 
@@ -425,8 +425,8 @@ describe('T-017: Evaluacion por criterio', function () {
         $response->assertOk();
         $data = $response->json('data');
         expect($data)->toHaveKey('promedio_ponderado');
-        // (40*80 + 60*90) / 100 = (3200 + 5400) / 100 = 86
-        expect((float) $data['promedio_ponderado'])->toEqual(86.00);
+        // (40*4.00 + 60*4.50) / 100 = 4.30
+        expect((float) $data['promedio_ponderado'])->toEqual(4.30);
         expect($data['criterios'])->toHaveCount(2);
     });
 

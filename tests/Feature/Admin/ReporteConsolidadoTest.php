@@ -35,7 +35,7 @@ describe('T-018: Reporte consolidado', function () {
             'evaluador_id' => $this->evaluador->id,
             'criterio' => 'Estructura',
             'percentage' => 40.00,
-            'grade' => 80.00,
+            'grade' => 4.00,
             'evaluated_at' => now(),
         ]);
         Evaluacion::create([
@@ -43,7 +43,7 @@ describe('T-018: Reporte consolidado', function () {
             'evaluador_id' => $this->evaluador->id,
             'criterio' => 'Contenido',
             'percentage' => 60.00,
-            'grade' => 90.00,
+            'grade' => 4.50,
             'evaluated_at' => now(),
         ]);
     });
@@ -91,7 +91,7 @@ describe('T-018: Reporte consolidado', function () {
             'evaluador_id' => $this->evaluador->id,
             'criterio' => 'Estructura',
             'percentage' => 100.00,
-            'grade' => 86.00,
+            'grade' => 4.30,
             'evaluated_at' => now(),
         ]);
 
@@ -101,7 +101,7 @@ describe('T-018: Reporte consolidado', function () {
         $response->assertOk();
         $entregas = collect($response->json('data.entregas'));
         expect($entregas->contains('id', $entrega->id))->toBeTrue();
-        expect((float) $entregas->firstWhere('id', $entrega->id)['promedio_ponderado'])->toEqual(86.00);
+        expect((float) $entregas->firstWhere('id', $entrega->id)['promedio_ponderado'])->toEqual(4.30);
     });
 
     it('reporte consolidado calcula promedio general correctamente', function () {
@@ -111,9 +111,9 @@ describe('T-018: Reporte consolidado', function () {
         $response->assertOk();
         $data = $response->json('data');
 
-        // (40*80 + 60*90) / 100 = 86
-        expect((float) $data['promedio_general'])->toEqual(86.00);
-        expect($data['entregas'][0]['promedio_ponderado'])->toEqual(86.00);
+        // (40*4.00 + 60*4.50) / 100 = 4.30
+        expect((float) $data['promedio_general'])->toEqual(4.30);
+        expect($data['entregas'][0]['promedio_ponderado'])->toEqual(4.30);
     });
 
     it('no-coordinador NO puede ver reporte consolidado (403)', function () {

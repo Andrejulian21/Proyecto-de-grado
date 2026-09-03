@@ -128,7 +128,7 @@ describe('ReporteController sobre entregas creadas con StoreEntregaAction', func
             'evaluador_id' => $ctx['evaluador']->id,
             'criterio' => 'Estructura',
             'percentage' => 40,
-            'grade' => 80,
+            'grade' => 4.0,
             'evaluated_at' => now(),
         ]);
         Evaluacion::create([
@@ -136,7 +136,7 @@ describe('ReporteController sobre entregas creadas con StoreEntregaAction', func
             'evaluador_id' => $ctx['evaluador']->id,
             'criterio' => 'Contenido',
             'percentage' => 60,
-            'grade' => 90,
+            'grade' => 4.5,
             'evaluated_at' => now(),
         ]);
 
@@ -147,8 +147,8 @@ describe('ReporteController sobre entregas creadas con StoreEntregaAction', func
         $data = $response->json('data');
 
         expect($data['entregas'])->toHaveCount(1);
-        expect((float) $data['promedio_general'])->toEqual(86.00);
-        expect($data['entregas'][0]['promedio_ponderado'])->toEqual(86.00);
+        expect((float) $data['promedio_general'])->toEqual(4.30);
+        expect($data['entregas'][0]['promedio_ponderado'])->toEqual(4.30);
     });
 });
 

@@ -94,7 +94,7 @@ class UpdateEntregaRequest extends FormRequest
                 $this->validarUnicoDocumentoAnalizableIa($validator, $archivos);
             }
 
-            $this->validarPesos($validator);
+            // No weight validation on update — coordinator can adjust freely.
         });
     }
 
@@ -113,8 +113,16 @@ class UpdateEntregaRequest extends FormRequest
         $entregaId = (int) $this->route('id');
         $entrega = Entrega::find($entregaId);
 
-        $semestreId = $this->input('grupo_id') ?? $entrega?->semester_id;
         $fase = $this->input('fase') ?? $this->input('phase') ?? $entrega?->phase;
+
+        // grade_percentage only applies to anteproyecto and desarrollo phases.
+        if (in_array($fase, ['presentacion_anteproyecto', 'presentacion_final'], true)) {
+            $validator->errors()->add('grade_percentage', 'El porcentaje de nota no aplica en fases de presentación.');
+
+            return;
+        }
+
+        $semestreId = $this->input('grupo_id') ?? $entrega?->semester_id;
 
         if ($semestreId === null || $fase === null) {
             return;

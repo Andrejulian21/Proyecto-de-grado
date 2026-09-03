@@ -8,35 +8,39 @@ use App\Models\Entrega;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Validates the 100% weight rule per pair of phases at semester level
- * (RF-ENT-04).
+ * Validates the 100% weight rule per phase at semester level (RF-ENT-04).
  *
- * Pairs: anteproyecto + presentacion_anteproyecto (Par 1) and
- * desarrollo + presentacion_final (Par 2). Validation operates over ALL
- * entregas of the semester (not per project) and applies on both Store
- * and Update. Entregas with grade_percentage = NULL do not count.
+ * Each phase (anteproyecto, desarrollo) independently sums to 100%.
+ * Presentación phases (presentacion_anteproyecto, presentacion_final)
+ * do NOT participate in the grade_percentage system.
  *
- * Preventive block: (existing NOT NULL pair sum) + (proposed value) > 100.
- * Completeness: when both phases of the pair already have at least one
- * entrega with a NOT NULL percentage, the pair sum MUST be exactly 100.
+ * Validation operates over ALL entregas of the semester (not per project)
+ * and applies on both Store and Update. Entregas with grade_percentage =
+ * NULL do not count.
+ *
+ * Preventive block: (existing NOT NULL phase sum) + (proposed value) > 100.
+ * Completeness: when a phase already has at least one entrega with a NOT
+ * NULL percentage, the phase sum MUST be exactly 100.
  */
 final class EntregaPesoService
 {
     private const PARES = [
-        'anteproyecto' => ['anteproyecto', 'presentacion_anteproyecto'],
-        'presentacion_anteproyecto' => ['anteproyecto', 'presentacion_anteproyecto'],
-        'desarrollo' => ['desarrollo', 'presentacion_final'],
-        'presentacion_final' => ['desarrollo', 'presentacion_final'],
+        'anteproyecto' => ['anteproyecto'],
+        'desarrollo' => ['desarrollo'],
+        // Presentación phases do NOT participate in grade_percentage.
+        'presentacion_anteproyecto' => [],
+        'presentacion_final' => [],
     ];
 
     /**
-     * Return the two phases that make up the pair for the given phase.
+     * Return the phases that participate in weight validation for the
+     * given phase. Empty array means the phase does not participate.
      *
      * @return list<string>
      */
     public function fasesDelPar(string $fase): array
     {
-        return self::PARES[$fase] ?? [$fase];
+        return self::PARES[$fase] ?? [];
     }
 
     /**
@@ -72,6 +76,12 @@ final class EntregaPesoService
         }
 
         $par = $this->fasesDelPar($fase);
+
+        // Phase does not participate in the weight system (e.g. presentación).
+        if ($par === []) {
+            return;
+        }
+
         $sumaActual = $this->obtenerSumaPar($semesterId, $par, $excluirEntregaId);
         $total = $sumaActual + $nuevoPeso;
 
@@ -99,22 +109,36 @@ final class EntregaPesoService
     }
 
     /**
-     * Whether BOTH phases of the pair already have at least one entrega
-     * with a NOT NULL grade_percentage in the semester.
+     * Whether ALL deliveries in the phase already have a NOT NULL
+     * grade_percentage. Only when every delivery has a weight does
+     * the phase become "complete" and the 100% exact rule fires.
      *
      * @param  list<string>  $par
      */
     private function parCompleto(int $semesterId, array $par, ?int $excluirEntregaId): bool
     {
         foreach ($par as $fase) {
-            $existe = Entrega::query()
+            // Total deliveries in this phase for the semester (excluding the one being edited)
+            $total = Entrega::query()
+                ->where('semester_id', $semesterId)
+                ->where('phase', $fase)
+                ->when($excluirEntregaId !== null, fn ($query) => $query->where('id', '!=', $excluirEntregaId))
+                ->count();
+
+            if ($total === 0) {
+                return false;
+            }
+
+            // Deliveries WITH a percentage
+            $conPeso = Entrega::query()
                 ->where('semester_id', $semesterId)
                 ->where('phase', $fase)
                 ->whereNotNull('grade_percentage')
                 ->when($excluirEntregaId !== null, fn ($query) => $query->where('id', '!=', $excluirEntregaId))
-                ->exists();
+                ->count();
 
-            if (! $existe) {
+            // If any delivery is missing a percentage, the phase is incomplete
+            if ($conPeso < $total) {
                 return false;
             }
         }

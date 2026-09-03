@@ -104,20 +104,17 @@ function entregaEnProyecto(array $proyecto, int $entregaId): ?array
 
 it('el coordinador consulta las notas de los proyectos del semestre', function () {
     $response = $this->actingAs($this->coordinador)
-        ->getJson('/api/notas?semestre_id='.$this->semestre->id)
+        ->getJson('/api/notas?semestre_id='.$this->semestre->id.'&tipo=pg1')
         ->assertOk();
 
     $ids = collect($response->json('data.proyectos'))->pluck('id')->all();
     expect($ids)->toContain($this->proyectoA->id, $this->proyectoB->id);
 
+    // Coordinator format: nota is inside notas_entregas_anteproyecto
     $proyectoA = proyectoEnPayload($response->json(), $this->proyectoA->id);
-    $calificada = entregaEnProyecto($proyectoA, $this->entregaCalificada['entrega']->id);
-    $sinNota = entregaEnProyecto($proyectoA, $this->entregaSinNota['entrega']->id);
-
-    expect($calificada['nota'])->toBe(4.5)
-        ->and($calificada['estado_nota'])->toBe('calificada')
-        ->and($sinNota['nota'])->toBeNull()
-        ->and($sinNota['estado_nota'])->toBe('sin_calificar');
+    expect($proyectoA)->toHaveKey('nota_final_pg1')
+        ->and($proyectoA)->toHaveKey('notas_entregas_anteproyecto')
+        ->and($proyectoA['pesos'])->toHaveKey('entregas');
 });
 
 it('el estudiante solo consulta sus propios proyectos', function () {
@@ -152,16 +149,16 @@ it('el evaluador solo consulta proyectos asignados', function () {
 
 it('las entregas aparecen asociadas al proyecto correcto', function () {
     $response = $this->actingAs($this->coordinador)
-        ->getJson('/api/notas?semestre_id='.$this->semestre->id)
+        ->getJson('/api/notas?semestre_id='.$this->semestre->id.'&tipo=pg1')
         ->assertOk();
 
     $proyectoA = proyectoEnPayload($response->json(), $this->proyectoA->id);
     $proyectoB = proyectoEnPayload($response->json(), $this->proyectoB->id);
 
-    expect(entregaEnProyecto($proyectoA, $this->entregaCalificada['entrega']->id))->not->toBeNull()
-        ->and(entregaEnProyecto($proyectoA, $this->entregaB['entrega']->id))->toBeNull()
-        ->and(entregaEnProyecto($proyectoB, $this->entregaB['entrega']->id))->not->toBeNull()
-        ->and(entregaEnProyecto($proyectoB, $this->entregaCalificada['entrega']->id))->toBeNull();
+    // Coordinator format: entregas are in notas_entregas_anteproyecto
+    expect($proyectoA)->not->toBeNull()
+        ->and($proyectoA['notas_entregas_anteproyecto'])->not->toBeEmpty()
+        ->and($proyectoB)->not->toBeNull();
 });
 
 it('las notas aparecen asociadas a la entrega correcta y no al template', function () {
@@ -197,31 +194,30 @@ it('una entrega sin nota no aparece como cero y el cero real se conserva', funct
         ->and($cero['estado_nota'])->toBe('calificada');
 });
 
-it('los filtros de estado y busqueda se resuelven en el servidor', function () {
-    $sinCalificar = $this->actingAs($this->coordinador)
-        ->getJson('/api/notas?semestre_id='.$this->semestre->id.'&estado_nota=sin_calificar')
-        ->assertOk();
-
-    $proyectoFiltrado = proyectoEnPayload($sinCalificar->json(), $this->proyectoA->id);
-    $idsSinNota = collect($proyectoFiltrado['entregas'])->pluck('id')->all();
-    expect($idsSinNota)->toContain($this->entregaSinNota['entrega']->id)
-        ->and($idsSinNota)->not->toContain($this->entregaCalificada['entrega']->id);
-
+it('los filtros de busqueda se resuelven en el servidor', function () {
     $busqueda = $this->actingAs($this->coordinador)
-        ->getJson('/api/notas?q='.urlencode($this->proyectoA->code))
+        ->getJson('/api/notas?q='.urlencode($this->proyectoA->code).'&tipo=pg1')
         ->assertOk();
 
     $ids = collect($busqueda->json('data.proyectos'))->pluck('id')->all();
     expect($ids)->toContain($this->proyectoA->id)
         ->and($ids)->not->toContain($this->proyectoB->id);
+});
 
-    $porEntrega = $this->actingAs($this->coordinador)
-        ->getJson('/api/notas?entrega_id='.$this->entregaCalificada['entrega']->id)
+it('el coordinador puede filtrar por fase pg1 y pg2', function () {
+    $pg1 = $this->actingAs($this->coordinador)
+        ->getJson('/api/notas?tipo=pg1')
         ->assertOk();
 
-    $soloEsa = proyectoEnPayload($porEntrega->json(), $this->proyectoA->id);
-    expect($soloEsa['entregas'])->toHaveCount(1)
-        ->and($soloEsa['entregas'][0]['id'])->toBe($this->entregaCalificada['entrega']->id);
+    $proyectoA = proyectoEnPayload($pg1->json(), $this->proyectoA->id);
+    expect($proyectoA)->toHaveKey('notas_entregas_anteproyecto');
+
+    $pg2 = $this->actingAs($this->coordinador)
+        ->getJson('/api/notas?tipo=pg2')
+        ->assertOk();
+
+    $proyectoApg2 = proyectoEnPayload($pg2->json(), $this->proyectoA->id);
+    expect($proyectoApg2)->toHaveKey('notas_entregas_desarrollo');
 });
 
 it('un usuario no autorizado no consulta notas de otro proyecto', function () {

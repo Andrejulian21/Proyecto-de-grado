@@ -349,6 +349,14 @@ Route::middleware(['auth:sanctum', 'single_session', 'activity', 'role:Coordinad
             ->name('seguimiento.export');
         Route::put('/seguimiento/observaciones', [SeguimientoController::class, 'guardarObservacion'])
             ->name('seguimiento.guardar-observacion');
+
+        // Grade weights for coordinator view (PG1/PG2).
+        Route::put('/notas/pesos', [ConsultaNotasController::class, 'updatePesos'])
+            ->name('notas.pesos.update');
+
+        // Export grades to Excel (PG1/PG2).
+        Route::get('/notas/export', [ConsultaNotasController::class, 'exportar'])
+            ->name('notas.export');
     });
 
 // Entregas — accessible by all authenticated roles (controller handles RBAC)

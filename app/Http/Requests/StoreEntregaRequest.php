@@ -105,8 +105,17 @@ class StoreEntregaRequest extends FormRequest
             return;
         }
 
-        $semestreId = $this->input('grupo_id');
         $fase = $this->input('fase');
+
+        // grade_percentage only applies to anteproyecto and desarrollo phases.
+        // Presentación phases do not participate in the weight system.
+        if (in_array($fase, ['presentacion_anteproyecto', 'presentacion_final'], true)) {
+            $validator->errors()->add('grade_percentage', 'El porcentaje de nota no aplica en fases de presentación.');
+
+            return;
+        }
+
+        $semestreId = $this->input('grupo_id');
 
         if ($semestreId === null || $fase === null) {
             return;

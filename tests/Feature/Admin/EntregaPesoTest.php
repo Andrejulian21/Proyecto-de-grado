@@ -36,7 +36,7 @@ function baseEntregaPayload(int $semestreId, array $overrides = []): array
 
 /**
  * Seed an entrega with a grade_percentage directly (used to set up the
- * existing pair state that the endpoint validation must respect).
+ * existing phase state that the endpoint validation must respect).
  */
 function seedEntregaConPeso(int $semestreId, string $phase, ?float $peso): Entrega
 {
@@ -113,28 +113,30 @@ it('store rechaza grade_percentage fuera de rango (422)', function () {
         ->toContain('El porcentaje de nota debe estar entre 0 y 100');
 });
 
-// -- RF-ENT-04: pair weight rule on store ------------------------------------
+// -- RF-ENT-04: phase weight rule on store -----------------------------------
+// Each phase (anteproyecto, desarrollo) independently sums to 100%.
+// Presentación phases do NOT participate in the grade_percentage system.
 
-it('store bloquea suma del par que superaria 100 (422)', function () {
+it('store bloquea suma de anteproyecto que no suma exacto 100 (422)', function () {
     seedEntregaConPeso($this->semestre->id, 'anteproyecto', 70.0);
 
     $response = $this->actingAs($this->coordinador)
         ->postJson('/api/admin/entregas', baseEntregaPayload($this->semestre->id, [
-            'fase' => 'presentacion_anteproyecto',
+            'fase' => 'anteproyecto',
             'grade_percentage' => 40,
         ]));
 
     $response->assertStatus(422);
-    expect($response->json('errors.grade_percentage.0'))->toContain('superaría el 100%');
+    expect($response->json('errors.grade_percentage.0'))->toContain('exactamente 100%');
 });
 
-it('store bloquea par completo que no suma exacto 100 (422)', function () {
+it('store bloquea anteproyecto completo que no suma exacto 100 (422)', function () {
     seedEntregaConPeso($this->semestre->id, 'anteproyecto', 50.0);
-    seedEntregaConPeso($this->semestre->id, 'presentacion_anteproyecto', 40.0);
+    seedEntregaConPeso($this->semestre->id, 'anteproyecto', 40.0);
 
     $response = $this->actingAs($this->coordinador)
         ->postJson('/api/admin/entregas', baseEntregaPayload($this->semestre->id, [
-            'fase' => 'presentacion_anteproyecto',
+            'fase' => 'anteproyecto',
             'grade_percentage' => 20,
         ]));
 
@@ -150,12 +152,12 @@ it('store permite grade_percentage NULL sin bloquear', function () {
     expect($response->json('data.grade_percentage'))->toBeNull();
 });
 
-it('store permite completar el par en exacto 100', function () {
+it('store permite completar anteproyecto en exacto 100', function () {
     seedEntregaConPeso($this->semestre->id, 'anteproyecto', 40.0);
 
     $response = $this->actingAs($this->coordinador)
         ->postJson('/api/admin/entregas', baseEntregaPayload($this->semestre->id, [
-            'fase' => 'presentacion_anteproyecto',
+            'fase' => 'anteproyecto',
             'grade_percentage' => 60,
         ]));
 
@@ -163,11 +165,46 @@ it('store permite completar el par en exacto 100', function () {
     expect($response->json('data.grade_percentage'))->toBe('60.00');
 });
 
-// -- RF-ENT-04 / D4: pair weight rule on update -------------------------------
+it('store bloquea suma de desarrollo que no suma exacto 100 (422)', function () {
+    seedEntregaConPeso($this->semestre->id, 'desarrollo', 70.0);
 
-it('update cambia grade_percentage a NULL sin bloquear (D4)', function () {
+    $response = $this->actingAs($this->coordinador)
+        ->postJson('/api/admin/entregas', baseEntregaPayload($this->semestre->id, [
+            'fase' => 'desarrollo',
+            'grade_percentage' => 40,
+        ]));
+
+    $response->assertStatus(422);
+    expect($response->json('errors.grade_percentage.0'))->toContain('exactamente 100%');
+});
+
+it('store rechaza grade_percentage en presentacion_anteproyecto (422)', function () {
+    $response = $this->actingAs($this->coordinador)
+        ->postJson('/api/admin/entregas', baseEntregaPayload($this->semestre->id, [
+            'fase' => 'presentacion_anteproyecto',
+            'grade_percentage' => 40,
+        ]));
+
+    $response->assertStatus(422);
+    expect($response->json('errors.grade_percentage.0'))->toContain('no aplica en fases de presentación');
+});
+
+it('store rechaza grade_percentage en presentacion_final (422)', function () {
+    $response = $this->actingAs($this->coordinador)
+        ->postJson('/api/admin/entregas', baseEntregaPayload($this->semestre->id, [
+            'fase' => 'presentacion_final',
+            'grade_percentage' => 90,
+        ]));
+
+    $response->assertStatus(422);
+    expect($response->json('errors.grade_percentage.0'))->toContain('no aplica en fases de presentación');
+});
+
+// -- RF-ENT-04: phase weight rule on update ----------------------------------
+
+it('update cambia grade_percentage a NULL sin bloquear', function () {
     $a = seedEntregaConPeso($this->semestre->id, 'anteproyecto', 50.0);
-    seedEntregaConPeso($this->semestre->id, 'presentacion_anteproyecto', 50.0);
+    seedEntregaConPeso($this->semestre->id, 'anteproyecto', 50.0);
 
     $response = $this->actingAs($this->coordinador)
         ->putJson("/api/admin/entregas/{$a->id}", ['grade_percentage' => null]);
@@ -177,28 +214,51 @@ it('update cambia grade_percentage a NULL sin bloquear (D4)', function () {
     expect($a->grade_percentage)->toBeNull();
 });
 
-it('update bloquea suma del par que superaria 100 (422)', function () {
+it('update permite cambiar grade_percentage libremente sin validacion de suma', function () {
     $a = seedEntregaConPeso($this->semestre->id, 'anteproyecto', 70.0);
-    seedEntregaConPeso($this->semestre->id, 'presentacion_anteproyecto', 20.0);
+    seedEntregaConPeso($this->semestre->id, 'anteproyecto', 20.0);
 
+    // Coordinator can adjust freely — no backend restriction on update
     $response = $this->actingAs($this->coordinador)
         ->putJson("/api/admin/entregas/{$a->id}", ['grade_percentage' => 90]);
 
-    $response->assertStatus(422);
-    expect($response->json('errors.grade_percentage.0'))->toContain('superaría el 100%');
+    $response->assertOk();
 });
 
-it('update bloquea par completo que no sumaria exacto 100 (422)', function () {
-    // Pair closed even when excluding the updated row: 40 (anteproyecto) +
-    // 10 (presentacion_anteproyecto). Updating A 50 -> 30 would leave the
-    // closed pair at 80 -> completeness rule (RF-ENT-04) must reject.
-    $a = seedEntregaConPeso($this->semestre->id, 'anteproyecto', 50.0);
-    seedEntregaConPeso($this->semestre->id, 'anteproyecto', 40.0);
-    seedEntregaConPeso($this->semestre->id, 'presentacion_anteproyecto', 10.0);
+it('update permite cambiar anteproyecto sin considerar presentacion', function () {
+    $a = seedEntregaConPeso($this->semestre->id, 'anteproyecto', 70.0);
+    seedEntregaConPeso($this->semestre->id, 'presentacion_anteproyecto', 20.0);
 
+    // presentacion_anteproyecto does NOT participate — updating $a from 70→90
+    // excludes $a itself, so sum = 90 (only $a's new value). Valid.
     $response = $this->actingAs($this->coordinador)
-        ->putJson("/api/admin/entregas/{$a->id}", ['grade_percentage' => 30]);
+        ->putJson("/api/admin/entregas/{$a->id}", ['grade_percentage' => 90]);
 
-    $response->assertStatus(422);
-    expect($response->json('errors.grade_percentage.0'))->toContain('exactamente 100%');
+    $response->assertOk();
+});
+
+it('update permite cambiar desarrollo sin considerar presentacion_final', function () {
+    $a = seedEntregaConPeso($this->semestre->id, 'desarrollo', 70.0);
+    seedEntregaConPeso($this->semestre->id, 'presentacion_final', 20.0);
+
+    // presentacion_final does NOT participate — updating $a from 70→50
+    // excludes $a itself, so sum = 50. Valid.
+    $response = $this->actingAs($this->coordinador)
+        ->putJson("/api/admin/entregas/{$a->id}", ['grade_percentage' => 50]);
+
+    $response->assertOk();
+});
+
+it('store permite desarrollo independiente de anteproyecto', function () {
+    seedEntregaConPeso($this->semestre->id, 'anteproyecto', 100.0);
+
+    // desarrollo is independent — summing to 100 in its own phase
+    $response = $this->actingAs($this->coordinador)
+        ->postJson('/api/admin/entregas', baseEntregaPayload($this->semestre->id, [
+            'fase' => 'desarrollo',
+            'grade_percentage' => 100,
+        ]));
+
+    $response->assertCreated();
+    expect($response->json('data.grade_percentage'))->toBe('100.00');
 });

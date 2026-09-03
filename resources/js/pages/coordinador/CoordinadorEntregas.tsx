@@ -408,12 +408,13 @@ export default function CoordinadorEntregas() {
                             />
                         </div>
 
-                        {/* Porcentaje derivado de la fase seleccionada (RF-ENT-03/05) */}
+                        {/* Porcentaje derivado de la fase seleccionada (RF-ENT-03/05) — solo aplica en anteproyecto y desarrollo */}
+                        {formFase !== 'presentacion_anteproyecto' && formFase !== 'presentacion_final' && (
                         <div className="flex flex-col gap-1.5 sm:col-span-2">
                             <label htmlFor="form-grade-percentage" className="text-sm font-semibold text-[#1c1917]">
                                 Porcentaje de nota de {FASE_LABELS[formFase]} (%)
                                 <span className="ml-1 text-xs font-normal text-[#a8a29e]">
-                                    Peso de esta fase en su par (0-100)
+                                    Peso de la fase correspondiente (0-100)
                                 </span>
                             </label>
                             <input
@@ -435,6 +436,7 @@ export default function CoordinadorEntregas() {
                                 />
                             )}
                         </div>
+                        )}
 
                         <p className="sm:col-span-2 mb-0 text-sm font-semibold text-[#1c1917]">
                             Fecha y hora de apertura
@@ -809,12 +811,13 @@ export default function CoordinadorEntregas() {
                                 error={editArchivosError ?? undefined}
                             />
 
-                            {/* Porcentaje de nota del par de fases (RF-ENT-03/05) */}
+                            {/* Porcentaje de nota de la fase (solo anteproyecto y desarrollo) */}
+                            {editFase !== 'presentacion_anteproyecto' && editFase !== 'presentacion_final' && (
                             <div className="flex flex-col gap-1.5">
                                 <label htmlFor="edit-grade-percentage" className="text-sm font-semibold text-[#1c1917]">
                                     Porcentaje de nota (%)
                                     <span className="ml-1 text-xs font-normal text-[#a8a29e]">
-                                        Peso del par de fases (0-100)
+                                        Peso de la fase correspondiente (0-100)
                                     </span>
                                 </label>
                                 <input
@@ -837,6 +840,7 @@ export default function CoordinadorEntregas() {
                                     />
                                 )}
                             </div>
+                            )}
 
                             {/* Fecha límite */}
                             <div className="flex flex-col gap-1.5">

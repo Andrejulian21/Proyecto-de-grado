@@ -37,13 +37,14 @@ final class ConsultaNotasService
             $tipo = null;
         }
 
-        // Coordinator view — always use coordinator-specific logic, default to pg1
-        if ($user->role === UserRole::Coordinador) {
+        // All roles now use the coordinator format with PG1/PG2 weighted grades.
+        // Scope is applied per role inside listarCoordinador via aplicarScopeRol.
+        if ($user->role !== UserRole::EvaluadorExterno) {
             return $this->listarCoordinador($user, $filters, $tipo ?? 'pg1');
         }
 
-        // Existing view for student/director/evaluator (unchanged)
-        return $this->listarEstudianteDirectorEvaluador($user, $filters);
+        // Evaluador externo — simple view with their own evaluation grade + phase
+        return $this->listarEvaluador($user, $filters);
     }
 
     // -------------------------------------------------------------------------
@@ -63,6 +64,9 @@ final class ConsultaNotasService
         $proyectosQuery = Proyecto::query()
             ->with(['director:id,name', 'estudiantes:id,name', 'semestre:id,name,is_active'])
             ->orderBy('code');
+
+        // Scope by role: coordinator sees all, others see only their projects
+        $this->aplicarScopeRol($proyectosQuery, $user);
 
         if (isset($filters['semestre_id']) && $filters['semestre_id'] !== '') {
             $proyectosQuery->where('semester_id', (int) $filters['semestre_id']);
@@ -436,6 +440,96 @@ final class ConsultaNotasService
     // -------------------------------------------------------------------------
     // Student / Director / Evaluator view (original logic, unchanged)
     // -------------------------------------------------------------------------
+
+    // -------------------------------------------------------------------------
+    // Evaluador externo — simple view
+    // -------------------------------------------------------------------------
+
+    private function listarEvaluador(User $user, array $filters): array
+    {
+        $proyectoId = isset($filters['proyecto_id']) && $filters['proyecto_id'] !== ''
+            ? (int) $filters['proyecto_id']
+            : null;
+
+        // If specific project requested, verify evaluator has access
+        if ($proyectoId !== null) {
+            $hasAccess = EvaluadorProyecto::where('evaluador_id', $user->id)
+                ->where('proyecto_id', $proyectoId)
+                ->exists();
+
+            if (! $hasAccess) {
+                throw new AuthorizationException('No tienes permiso para consultar las notas de este proyecto.');
+            }
+        }
+
+        $proyectosQuery = Proyecto::query()
+            ->with(['director:id,name', 'estudiantes:id,name', 'semestre:id,name,is_active'])
+            ->whereHas('evaluadores', fn (Builder $q) => $q->where('users.id', $user->id))
+            ->orderBy('code');
+
+        if (isset($filters['semestre_id']) && $filters['semestre_id'] !== '') {
+            $proyectosQuery->where('semester_id', (int) $filters['semestre_id']);
+        }
+
+        $q = isset($filters['q']) ? trim((string) $filters['q']) : '';
+
+        if ($q !== '') {
+            $proyectosQuery->where(function (Builder $query) use ($q) {
+                $query->where('code', 'like', '%'.$q.'%')
+                    ->orWhere('title', 'like', '%'.$q.'%');
+            });
+        }
+
+        if ($proyectoId !== null) {
+            $proyectosQuery->whereKey($proyectoId);
+        }
+
+        $proyectos = $proyectosQuery->get();
+        $proyectoIds = $proyectos->pluck('id');
+
+        // Get evaluator's assignments with their grades
+        $asignaciones = EvaluadorProyecto::query()
+            ->with('evaluacion')
+            ->where('evaluador_id', $user->id)
+            ->whereIn('proyecto_id', $proyectoIds)
+            ->get()
+            ->groupBy('proyecto_id');
+
+        $payload = [];
+
+        foreach ($proyectos as $proyecto) {
+            $proyectoAsignaciones = $asignaciones->get($proyecto->id, collect());
+
+            $evaluaciones = [];
+            foreach ($proyectoAsignaciones as $asignacion) {
+                $evaluaciones[] = [
+                    'fase' => $asignacion->fase,
+                    'fase_label' => match ($asignacion->fase) {
+                        'presentacion_anteproyecto' => 'Presentación Anteproyecto',
+                        'presentacion_final' => 'Presentación Final',
+                        default => $asignacion->fase,
+                    },
+                    'nota' => $asignacion->evaluacion?->nota,
+                    'evaluado' => $asignacion->evaluado,
+                ];
+            }
+
+            $payload[] = [
+                'id' => $proyecto->id,
+                'codigo' => $proyecto->code,
+                'titulo' => $proyecto->title,
+                'director' => $proyecto->director?->name,
+                'estudiantes' => $proyecto->estudiantes->pluck('name')->filter()->implode(', '),
+                'semestre_id' => $proyecto->semester_id,
+                'evaluaciones' => $evaluaciones,
+            ];
+        }
+
+        return [
+            'semestres' => $this->semestresVisibles($user),
+            'proyectos' => $payload,
+        ];
+    }
 
     /**
      * @param  array{semestre_id?: mixed, proyecto_id?: mixed, entrega_id?: mixed, estado_nota?: mixed, q?: mixed}  $filters

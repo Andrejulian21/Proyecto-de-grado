@@ -4,7 +4,6 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { apiFetch, cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import type {
-    EntregaNota,
     PesoConfig,
     ProyectoNotas,
     ProyectoNotasCoordinador,
@@ -39,122 +38,73 @@ const TIPO_LABEL: Record<string, string> = {
 
 /* ── Helpers ───────────────────────────────────────────────────────── */
 
-function formatNota(nota: number | null, estado: EntregaNota['estado_nota']): string {
-    if (estado === 'sin_calificar' || nota === null) {
-        return 'Sin calificar';
-    }
-    return nota.toFixed(2);
-}
-
 function formatPonderada(nota: number | null): string {
     if (nota === null) return '—';
     return nota.toFixed(2);
 }
 
-/* ── Shared: Non-coordinator table ────────────────────────────────── */
+/* ── Evaluador Externo: Simple Table ──────────────────────────────── */
 
-function StandardTable({
+function EvaluadorSimpleTable({
     proyectos,
-    role,
-    expanded,
-    setExpanded,
 }: {
     proyectos: ProyectoNotas[];
-    role: string;
-    expanded: number | null;
-    setExpanded: (id: number | null) => void;
 }) {
     return (
         <div className="overflow-x-auto rounded-xl border border-[#e5e5e5] bg-white shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
             <table className="min-w-full text-left text-sm">
                 <thead className="bg-[#fff7ed] text-[10px] font-bold uppercase tracking-wider text-[#57534e]">
                     <tr>
-                        <th className="w-10 px-3 py-3" />
                         <th className="px-3 py-3">Proyecto</th>
                         <th className="px-3 py-3">Código</th>
                         <th className="px-3 py-3">Estudiantes</th>
                         <th className="px-3 py-3">Director</th>
-                        {role === 'EvaluadorExterno' && (
-                            <th className="px-3 py-3">Tu evaluación</th>
-                        )}
+                        <th className="px-3 py-3">Fase</th>
+                        <th className="px-3 py-3">Tu Nota</th>
                     </tr>
                 </thead>
                 <tbody>
                     {proyectos.map((proyecto) => {
-                        const open = expanded === proyecto.id;
+                        const fases = [
+                            ...new Set(
+                                proyecto.entregas.map(
+                                    (e) => FASE_LABEL[e.fase] ?? e.fase,
+                                ),
+                            ),
+                        ];
                         return (
-                            <tr key={proyecto.id} className="border-t border-[#e5e5e5] align-top">
-                                <td className="px-3 py-3" colSpan={role === 'EvaluadorExterno' ? 6 : 5}>
-                                    <button
-                                        type="button"
-                                        onClick={() => setExpanded(open ? null : proyecto.id)}
-                                        className="flex w-full items-start gap-3 text-left"
+                            <tr
+                                key={proyecto.id}
+                                className="border-t border-[#e5e5e5]"
+                            >
+                                <td className="px-3 py-3 font-semibold text-[#1c1917]">
+                                    {proyecto.titulo}
+                                </td>
+                                <td className="px-3 py-3 font-mono text-xs text-[#57534e]">
+                                    {proyecto.codigo}
+                                </td>
+                                <td className="px-3 py-3 text-xs text-[#57534e]">
+                                    {proyecto.estudiantes || '—'}
+                                </td>
+                                <td className="px-3 py-3 text-xs text-[#57534e]">
+                                    {proyecto.director || '—'}
+                                </td>
+                                <td className="px-3 py-3 text-xs text-[#57534e]">
+                                    {fases.length > 0 ? fases.join(', ') : '—'}
+                                </td>
+                                <td className="px-3 py-3">
+                                    <span
+                                        className={cn(
+                                            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold',
+                                            proyecto.nota_evaluador === null
+                                                ? 'border-[#fde68a] bg-[#fffbeb] text-[#b45309]'
+                                                : 'border-[#bbf7d0] bg-[#f0fdf4] text-[#15803d]',
+                                        )}
                                     >
-                                        {open ? (
-                                            <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-[#c2410c]" />
-                                        ) : (
-                                            <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-[#a8a29e]" />
-                                        )}
-                                        <div className="grid flex-1 grid-cols-1 gap-2 sm:grid-cols-4">
-                                            <span className="font-semibold text-[#1c1917]">{proyecto.titulo}</span>
-                                            <span className="font-mono text-xs text-[#57534e]">{proyecto.codigo}</span>
-                                            <span className="text-xs text-[#57534e]">{proyecto.estudiantes || '—'}</span>
-                                            <span className="text-xs text-[#57534e]">{proyecto.director || '—'}</span>
-                                        </div>
-                                        {role === 'EvaluadorExterno' && (
-                                            <span className="shrink-0 text-xs font-semibold tabular-nums text-[#1c1917]">
-                                                {proyecto.nota_evaluador === null
-                                                    ? 'Sin calificar'
-                                                    : proyecto.nota_evaluador.toFixed(2)}
-                                            </span>
-                                        )}
-                                    </button>
-                                    {open && (
-                                        <div className="mt-3 ml-7 overflow-hidden rounded-lg border border-[#e5e5e5]">
-                                            <table className="min-w-full text-sm">
-                                                <thead className="bg-[#fafaf9] text-[10px] font-bold uppercase tracking-wider text-[#78716c]">
-                                                    <tr>
-                                                        <th className="px-3 py-2">Entrega</th>
-                                                        <th className="px-3 py-2">Fase</th>
-                                                        <th className="px-3 py-2">Nota</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {proyecto.entregas.length === 0 ? (
-                                                        <tr>
-                                                            <td colSpan={3} className="px-3 py-3 text-xs text-[#a8a29e]">
-                                                                Este proyecto no tiene entregas registradas.
-                                                            </td>
-                                                        </tr>
-                                                    ) : (
-                                                        proyecto.entregas.map((entrega) => (
-                                                            <tr key={entrega.id} className="border-t border-[#e5e5e5]">
-                                                                <td className="px-3 py-2 text-[#1c1917]">{entrega.titulo}</td>
-                                                                <td className="px-3 py-2 text-xs text-[#57534e]">
-                                                                    {FASE_LABEL[entrega.fase] ?? entrega.fase}
-                                                                </td>
-                                                                <td className="px-3 py-2">
-                                                                    <span
-                                                                        className={cn(
-                                                                            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold',
-                                                                            entrega.estado_nota === 'sin_calificar'
-                                                                                ? 'border-[#fde68a] bg-[#fffbeb] text-[#b45309]'
-                                                                                : 'border-[#bbf7d0] bg-[#f0fdf4] text-[#15803d]',
-                                                                        )}
-                                                                    >
-                                                                        {entrega.estado_nota === 'calificada' && (
-                                                                            <Star className="h-3 w-3" />
-                                                                        )}
-                                                                        {formatNota(entrega.nota, entrega.estado_nota)}
-                                                                    </span>
-                                                                </td>
-                                                            </tr>
-                                                        ))
-                                                    )}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    )}
+                                        {proyecto.nota_evaluador === null
+                                            ? 'Sin calificar'
+                                            : proyecto.nota_evaluador.toFixed(2)}
+                                    </span>
                                 </td>
                             </tr>
                         );
@@ -554,7 +504,14 @@ function DeliveryDetails({
 export default function ConsultaNotas() {
     const { role } = useAuth();
 
-    /* Shared state */
+    /* ── Role flags ────────────────────────────────────────────────── */
+    const isStudent = role === 'Estudiante';
+    const isDirector = role === 'Director';
+    const isEvaluator = role === 'EvaluadorExterno';
+    const isCoordinator = role === 'Coordinador';
+    const usesCoordinatorTable = !isEvaluator;
+
+    /* ── Shared state ──────────────────────────────────────────────── */
     const [semestres, setSemestres] = useState<SemestreOpcionNotas[]>([]);
     const [semestreId, setSemestreId] = useState<number | null>(null);
     const [q, setQ] = useState('');
@@ -563,20 +520,17 @@ export default function ConsultaNotas() {
     const [error, setError] = useState<string | null>(null);
     const [expanded, setExpanded] = useState<number | null>(null);
 
-    /* Non-coordinator state */
-    const [estadoNota, setEstadoNota] = useState('');
+    /* ── Evaluador externo state (simple format) ─────────────────── */
     const [proyectos, setProyectos] = useState<ProyectoNotas[]>([]);
 
-    /* Coordinator state */
-    const [tipoProyecto, setTipoProyecto] = useState('');
+    /* ── Student / Director / Coordinator state (coordinator format) ─ */
+    const [tipoProyecto, setTipoProyecto] = useState<string>('pg1');
     const [proyectosCoord, setProyectosCoord] = useState<ProyectoNotasCoordinador[]>([]);
     const [pesos, setPesos] = useState<PesoConfig[]>([]);
     const [showEditModal, setShowEditModal] = useState(false);
     const [expandedDeliveries, setExpandedDeliveries] = useState<number | null>(null);
 
-    const isCoordinator = role === 'Coordinador';
-
-    /* Export hook */
+    /* Export hook (coordinator only) */
     const { exporting, error: exportError, exportar } = useExportNotas();
 
     /* Debounced search */
@@ -585,7 +539,7 @@ export default function ConsultaNotas() {
         return () => window.clearTimeout(handle);
     }, [q]);
 
-    /* Fetch data */
+    /* ── Fetch data ────────────────────────────────────────────────── */
     const fetchNotas = useCallback(async () => {
         setLoading(true);
         setError(null);
@@ -595,7 +549,16 @@ export default function ConsultaNotas() {
         if (qDebounced) params.set('q', qDebounced);
 
         try {
-            if (isCoordinator) {
+            if (isEvaluator) {
+                /* Evaluador externo — simple format, no tipo parameter */
+                const res = await apiFetch(`/api/notas?${params.toString()}`);
+                const json = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(json.error ?? `Error ${res.status}`);
+                const data = json.data ?? json;
+                setSemestres(data.semestres ?? []);
+                setProyectos(data.proyectos ?? []);
+            } else {
+                /* Student, Director, Coordinator — coordinator format with tipo */
                 if (tipoProyecto) params.set('tipo', tipoProyecto);
                 const res = await apiFetch(`/api/notas?${params.toString()}`);
                 const json = await res.json().catch(() => ({}));
@@ -604,18 +567,6 @@ export default function ConsultaNotas() {
                 setSemestres(data.semestres ?? []);
                 setProyectosCoord(data.proyectos ?? []);
                 setPesos(data.pesos ?? []);
-            } else {
-                if (estadoNota) params.set('estado_nota', estadoNota);
-                const res = await apiFetch(`/api/notas?${params.toString()}`);
-                const json = await res.json().catch(() => ({}));
-                if (!res.ok) throw new Error(json.error ?? `Error ${res.status}`);
-                const data = json.data ?? json;
-                setSemestres(data.semestres ?? []);
-                setProyectos(data.proyectos ?? []);
-            }
-
-            if (semestreId === null && (semestres.length === 1 || !isCoordinator)) {
-                /* auto-select semester handled below */
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'No se pudieron cargar las notas.');
@@ -624,7 +575,7 @@ export default function ConsultaNotas() {
         } finally {
             setLoading(false);
         }
-    }, [semestreId, qDebounced, isCoordinator, tipoProyecto, estadoNota, semestres.length]);
+    }, [semestreId, qDebounced, isEvaluator, tipoProyecto]);
 
     useEffect(() => {
         void fetchNotas();
@@ -637,16 +588,16 @@ export default function ConsultaNotas() {
         }
     }, [semestreId, semestres]);
 
-    /* Subtitle */
+    /* ── Subtitle ──────────────────────────────────────────────────── */
     const subtitle = useMemo(() => {
         if (isCoordinator) return 'Gestión centralizada de notas por proyecto';
-        if (role === 'Estudiante') return 'Notas de las entregas de tu proyecto';
-        if (role === 'Director') return 'Notas de las entregas de los proyectos que diriges';
-        if (role === 'EvaluadorExterno') return 'Notas de los proyectos que tienes asignados';
+        if (isStudent) return 'Notas de las entregas de tu proyecto';
+        if (isDirector) return 'Notas de los proyectos que diriges';
+        if (isEvaluator) return 'Tus evaluaciones';
         return 'Consulta de notas por proyecto y entrega';
-    }, [role, isCoordinator]);
+    }, [role, isCoordinator, isStudent, isDirector, isEvaluator]);
 
-    /* Coordinator: on peso save, update local state and refetch to recalculate nota final */
+    /* ── Coordinator: on peso save, update local state and refetch ── */
     const handlePesosSave = useCallback(
         (updated: { peso_entregas: number; peso_evaluadores: number; peso_presentacion: number }) => {
             const currentTipo = tipoProyecto === 'pg1' || tipoProyecto === 'pg2' ? tipoProyecto : 'pg1';
@@ -663,6 +614,13 @@ export default function ConsultaNotas() {
         [tipoProyecto, fetchNotas],
     );
 
+    /* ── Filter visibility ─────────────────────────────────────────── */
+    const showSemesterFilter = !isStudent && semestres.length > 0;
+    const showSearchInput = !isStudent;
+    const showTipoSelector = !isEvaluator;
+    const showEditWeights = isCoordinator;
+    const showExportButton = isCoordinator;
+
     /* ── Render ─────────────────────────────────────────────────────── */
 
     return (
@@ -673,7 +631,7 @@ export default function ConsultaNotas() {
                 subtitle={subtitle}
                 actions={
                     <>
-                        {isCoordinator && (
+                        {showExportButton && (
                             <button
                                 type="button"
                                 onClick={() => {
@@ -707,7 +665,8 @@ export default function ConsultaNotas() {
 
             {/* ── Filters ─────────────────────────────────────────── */}
             <div className="flex flex-wrap items-end gap-3">
-                {semestres.length > 0 && (
+                {/* Semester filter — director, coordinator, evaluador (NOT student) */}
+                {showSemesterFilter && (
                     <label className="flex max-w-xs flex-col gap-1.5">
                         <span className="text-xs font-semibold text-[#57534e]">Semestre</span>
                         <select
@@ -725,22 +684,25 @@ export default function ConsultaNotas() {
                     </label>
                 )}
 
-                <label className="flex min-w-[220px] flex-1 flex-col gap-1.5">
-                    <span className="text-xs font-semibold text-[#57534e]">Proyecto</span>
-                    <div className="relative">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#a8a29e]" />
-                        <input
-                            type="search"
-                            value={q}
-                            onChange={(e) => setQ(e.target.value)}
-                            placeholder="Código o título"
-                            className="w-full rounded-lg border border-[#e5e5e5] bg-white py-2.5 pl-9 pr-3 text-sm text-[#1c1917] outline-none focus:border-[#c2410c]"
-                        />
-                    </div>
-                </label>
+                {/* Search input — director, coordinator, evaluador (NOT student) */}
+                {showSearchInput && (
+                    <label className="flex min-w-[220px] flex-1 flex-col gap-1.5">
+                        <span className="text-xs font-semibold text-[#57534e]">Proyecto</span>
+                        <div className="relative">
+                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#a8a29e]" />
+                            <input
+                                type="search"
+                                value={q}
+                                onChange={(e) => setQ(e.target.value)}
+                                placeholder="Código o título"
+                                className="w-full rounded-lg border border-[#e5e5e5] bg-white py-2.5 pl-9 pr-3 text-sm text-[#1c1917] outline-none focus:border-[#c2410c]"
+                            />
+                        </div>
+                    </label>
+                )}
 
-                {isCoordinator ? (
-                    /* Fase del proyecto filter for coordinator */
+                {/* PG1/PG2 selector — student, director, coordinator (NOT evaluador) */}
+                {showTipoSelector && (
                     <label className="flex max-w-xs flex-col gap-1.5">
                         <span className="text-xs font-semibold text-[#57534e]">Elegir fase del proyecto</span>
                         <select
@@ -751,28 +713,14 @@ export default function ConsultaNotas() {
                             }}
                             className="rounded-lg border border-[#e5e5e5] bg-white px-3 py-2.5 text-sm font-semibold text-[#1c1917] outline-none focus:border-[#c2410c]"
                         >
-                            <option value="">Seleccionar fase</option>
                             <option value="pg1">Proyecto de Grado 1</option>
                             <option value="pg2">Proyecto de Grado 2</option>
                         </select>
                     </label>
-                ) : (
-                    /* Estado nota filter for other roles */
-                    <label className="flex max-w-xs flex-col gap-1.5">
-                        <span className="text-xs font-semibold text-[#57534e]">Estado de nota</span>
-                        <select
-                            value={estadoNota}
-                            onChange={(e) => setEstadoNota(e.target.value)}
-                            className="rounded-lg border border-[#e5e5e5] bg-white px-3 py-2.5 text-sm font-semibold text-[#1c1917] outline-none focus:border-[#c2410c]"
-                        >
-                            <option value="">Todas</option>
-                            <option value="calificada">Calificadas</option>
-                            <option value="sin_calificar">Sin calificar</option>
-                        </select>
-                    </label>
                 )}
 
-                {isCoordinator && (
+                {/* Edit weights button — coordinator ONLY */}
+                {showEditWeights && (
                     <button
                         type="button"
                         onClick={() => setShowEditModal(true)}
@@ -809,7 +757,7 @@ export default function ConsultaNotas() {
 
             {/* ── Empty ───────────────────────────────────────────── */}
             {!loading && !error && (
-                isCoordinator ? proyectosCoord.length === 0 : proyectos.length === 0
+                usesCoordinatorTable ? proyectosCoord.length === 0 : proyectos.length === 0
             ) && (
                 <EmptyState
                     icon={Star}
@@ -818,18 +766,13 @@ export default function ConsultaNotas() {
                 />
             )}
 
-            {/* ── Non-coordinator table ───────────────────────────── */}
-            {!loading && !isCoordinator && proyectos.length > 0 && (
-                <StandardTable
-                    proyectos={proyectos}
-                    role={role ?? ''}
-                    expanded={expanded}
-                    setExpanded={setExpanded}
-                />
+            {/* ── Evaluador externo: simple table ─────────────────── */}
+            {!loading && isEvaluator && proyectos.length > 0 && (
+                <EvaluadorSimpleTable proyectos={proyectos} />
             )}
 
-            {/* ── Coordinator table + expanded details ────────────── */}
-            {!loading && isCoordinator && proyectosCoord.length > 0 && (
+            {/* ── Student / Director / Coordinator: coordinator table + expanded details */}
+            {!loading && usesCoordinatorTable && proyectosCoord.length > 0 && (
                 <div className="flex flex-col gap-3">
                     <CoordinatorTable
                         proyectos={proyectosCoord}

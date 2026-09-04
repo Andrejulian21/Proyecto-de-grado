@@ -1,24 +1,21 @@
 # syntax=docker/dockerfile:1
 
 # ------------------------------------------------------------------------------
-# Production image for the Proyectos de Grado platform (issue #55).
+# Production image for the Proyectos de Grado platform.
 #
 # Multi-stage build:
-#   1. frontend — Node 20 + pnpm (matches CI), builds the React SPA into public/build
-#   2. vendor   — PHP 8.4 (matches composer.json platform + CI), installs prod deps
-#   3. runtime  — slim php-fpm image with only what the app needs at runtime
-#
-# Deploy target: Docker Compose on a single Azure VM (see openspec/config.yaml).
+#   1. frontend — Node 22 + pnpm, builds the React SPA into public/build
+#   2. vendor   — PHP 8.4-fpm, installs prod deps
+#   3. runtime  — PHP-FPM + Nginx (serves static + proxies to FPM)
 # ------------------------------------------------------------------------------
 
 # ---------------------------------------------------------------- frontend ----
-FROM node:20-alpine AS frontend
+FROM node:22-alpine AS frontend
 
 WORKDIR /app
 
 RUN npm install -g pnpm@11
 
-# Dependency layer first, so it only rebuilds when the lockfile changes.
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
@@ -28,8 +25,6 @@ RUN pnpm run build
 # ----------------------------------------------------------------- vendor ----
 FROM php:8.4-fpm-alpine AS vendor
 
-# Build deps + libs required by the PHP extensions the app needs at runtime
-# (pdo_pgsql, gd, zip, intl, mbstring, xml group, redis).
 RUN apk add --no-cache $PHPIZE_DEPS \
         postgresql-dev libzip-dev oniguruma-dev icu-dev libxml2-dev \
         libpng-dev freetype-dev libjpeg-turbo-dev \
@@ -42,8 +37,6 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
 
-# Production dependencies only. --no-scripts: the app is not copied yet, so
-# package discovery would fail here; it runs explicitly after the full copy.
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-interaction --prefer-dist \
         --optimize-autoloader --no-scripts --no-progress
@@ -57,10 +50,10 @@ RUN composer dump-autoload --no-dev --optimize --classmap-authoritative --no-scr
 # --------------------------------------------------------------- runtime -----
 FROM php:8.4-fpm-alpine AS runtime
 
-# Same extension set as the vendor stage; build-only tools are removed after.
+# PHP extensions + Nginx
 RUN apk add --no-cache $PHPIZE_DEPS \
         postgresql-dev libzip-dev oniguruma-dev icu-dev libxml2-dev \
-        libpng-dev freetype-dev libjpeg-turbo-dev \
+        libpng-dev freetype-dev libjpeg-turbo-dev nginx \
     && docker-php-ext-install -j"$(nproc)" \
         pdo_pgsql bcmath opcache pcntl zip gd intl mbstring xml \
     && pecl install redis \
@@ -68,32 +61,45 @@ RUN apk add --no-cache $PHPIZE_DEPS \
     && apk del $PHPIZE_DEPS \
     && rm -rf /tmp/pear
 
-# Production hardening: opcache with timestamp validation off, hide PHP version.
+# PHP production config
 RUN { \
         echo 'opcache.enable=1'; \
         echo 'opcache.memory_consumption=128'; \
         echo 'opcache.max_accelerated_files=10000'; \
         echo 'opcache.validate_timestamps=0'; \
         echo 'expose_php=0'; \
+        echo 'upload_max_filesize=64M'; \
+        echo 'post_max_size=64M'; \
+        echo 'memory_limit=256M'; \
     } > /usr/local/etc/php/conf.d/99-production.ini
+
+# Nginx config
+COPY nginx.conf /etc/nginx/http.d/default.conf
+RUN rm -f /etc/nginx/http.d/default.conf.bak
 
 WORKDIR /var/www/html
 
 COPY --from=vendor --chown=www-data:www-data /app /var/www/html
 
-# Laravel needs write access to storage and the bootstrap cache at runtime.
+# Laravel needs write access to storage and bootstrap cache
 RUN mkdir -p storage/framework/cache/data storage/framework/sessions \
         storage/framework/views storage/logs bootstrap/cache \
-    && chown -R www-data:www-data storage bootstrap/cache
+    && chown -R www-data:www-data storage bootstrap/cache \
+    && chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Overridable via Compose env; the real .env is provided at deploy time.
 ENV APP_ENV=production
 
-EXPOSE 9000
+EXPOSE 80
 
-# php-fpm runs its workers as www-data. The health check validates the FPM
-# config/process; app-level liveness is checked by the nginx proxy.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD php-fpm -t || exit 1
+# Startup script: start PHP-FPM in background, then Nginx in foreground
+COPY <<EOF /start.sh
+#!/bin/sh
+php-fpm -D
+nginx -g "daemon off;"
+EOF
+RUN chmod +x /start.sh
 
-CMD ["php-fpm"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget -qO- http://localhost/api/health || exit 1
+
+CMD ["/start.sh"]

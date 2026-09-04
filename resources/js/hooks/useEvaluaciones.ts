@@ -32,19 +32,20 @@ function calcularPromedio(puntuaciones?: number[]): number | null {
 }
 
 function normalizarResultados(raw: unknown[]): EvaluacionResult[] {
-    return raw.map((item: Record<string, unknown>) => {
-        const puntuaciones = (item.puntuaciones as number[]) ?? (item.puntajes as number[]) ?? [];
+    return raw.map((item) => {
+        const obj = item as Record<string, unknown>;
+        const puntuaciones = (obj.puntuaciones as number[]) ?? (obj.puntajes as number[]) ?? [];
         return {
-            id: item.id as number,
-            proyecto_id: item.proyecto_id as number,
-            proyecto_nombre: (item.proyecto_nombre ?? item.proyecto ?? '') as string,
-            proyecto_codigo: (item.proyecto_codigo ?? item.codigo ?? '') as string,
-            estudiantes: (item.estudiantes ?? []) as string[],
-            director: (item.director ?? '') as string,
-            fase: (item.fase ?? '') as string,
-            evaluadores: (item.evaluadores ?? []) as string[],
+            id: obj.id as number,
+            proyecto_id: obj.proyecto_id as number,
+            proyecto_nombre: (obj.proyecto_nombre ?? obj.proyecto ?? '') as string,
+            proyecto_codigo: (obj.proyecto_codigo ?? obj.codigo ?? '') as string,
+            estudiantes: (obj.estudiantes ?? []) as string[],
+            director: (obj.director ?? '') as string,
+            fase: (obj.fase ?? '') as string,
+            evaluadores: (obj.evaluadores ?? []) as string[],
             nota_promedio:
-                (item.nota_promedio as number | null) ?? calcularPromedio(puntuaciones),
+                (obj.nota_promedio as number | null) ?? calcularPromedio(puntuaciones),
             puntuaciones,
         };
     });

@@ -7,7 +7,7 @@ import { PhaseStepper, type PhaseStep } from '@/components/project/PhaseStepper'
 import { useDirectorProyectos, type DirectorProyecto } from '@/hooks/useDirectorProyectos';
 import { apiFetch } from '@/lib/utils';
 import {
-    ArrowLeft, Search, BookOpen, GraduationCap, FileText,
+    ArrowLeft, Search, BookOpen, FileText,
     Calendar, Clock, User, Award, ChevronDown, ChevronRight,
     Eye, RefreshCw, Loader2, AlertCircle, Users,
 } from 'lucide-react';
@@ -71,7 +71,6 @@ function ProjectCardSkeleton() {
    ══════════════════════════════════════ */
 
 function ProjectListView() {
-    const navigate = useNavigate();
     const [todas, setTodas] = useState(false);
     const { data: proyectos, loading, error, refetch } = useDirectorProyectos(todas);
     const [search, setSearch] = useState('');

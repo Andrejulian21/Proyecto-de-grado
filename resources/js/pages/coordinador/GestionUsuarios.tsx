@@ -34,12 +34,6 @@ interface User {
     es_externo?: boolean;
 }
 
-interface PaginationMeta {
-    current_page: number;
-    last_page: number;
-    total: number;
-}
-
 const ROLES = ['Estudiante', 'Director', 'Coordinador', 'EvaluadorExterno'] as const;
 const ROLE_LABELS: Record<string, string> = {
     Estudiante: 'Estudiante',
@@ -91,9 +85,6 @@ export default function GestionUsuarios() {
 
     // ── Whitelist (tabla separada de users) ──
     const [whitelistEntries, setWhitelistEntries] = useState<User[]>([]);
-    const [whitelistMeta, setWhitelistMeta] = useState<PaginationMeta | null>(null);
-    const [whitelistPage, setWhitelistPage] = useState(1);
-    const [whitelistLoading, setWhitelistLoading] = useState(false);
 
     // ── Sección 2: Crear evaluador ──
     const [evalNombre, setEvalNombre] = useState('');
@@ -111,9 +102,6 @@ export default function GestionUsuarios() {
     const [dirAcademic, setDirAcademic] = useState<DirectorAcademicFormValues>(emptyDirectorAcademicForm());
     const [editAcademic, setEditAcademic] = useState<DirectorAcademicFormValues>(emptyDirectorAcademicForm());
     const [loadingProfile, setLoadingProfile] = useState(false);
-
-    // ── Sección 4: Roles ──
-    const [roleChanges, setRoleChanges] = useState<Record<string, string>>({});
 
     // ── Modal / message ──
     const [modalOpen, setModalOpen] = useState(false);
@@ -136,7 +124,7 @@ export default function GestionUsuarios() {
 
     const [editingIsWhitelist, setEditingIsWhitelist] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<any>(null);
-    const [deleteIsWhitelist, setDeleteIsWhitelist] = useState(false);
+    const [_deleteIsWhitelist, setDeleteIsWhitelist] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [reassignTarget, setReassignTarget] = useState<{
         userId: number;
@@ -147,7 +135,6 @@ export default function GestionUsuarios() {
     const [reassigning, setReassigning] = useState(false);
 
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-    const [savingRoles, setSavingRoles] = useState(false);
 
     // ── Paginación y filtros ──
     const [page, setPage] = useState(1);
@@ -182,20 +169,16 @@ export default function GestionUsuarios() {
     }, []);
 
     const fetchWhitelist = useCallback(async () => {
-        setWhitelistLoading(true);
         try {
-            const params = new URLSearchParams({ page: String(whitelistPage), per_page: '20' });
+            const params = new URLSearchParams({ page: '1', per_page: '20' });
             const res = await apiFetch(`/api/admin/whitelist?${params}`);
             if (!res.ok) throw new Error('Error al cargar whitelist');
             const json = await res.json();
             setWhitelistEntries(json.data);
-            setWhitelistMeta(json.meta);
         } catch {
             setMessage({ type: 'error', text: 'Error al cargar whitelist' });
-        } finally {
-            setWhitelistLoading(false);
         }
-    }, [whitelistPage]);
+    }, []);
 
     useEffect(() => {
         fetchUsers();
@@ -471,49 +454,6 @@ export default function GestionUsuarios() {
             } finally {
                 setLoadingProfile(false);
             }
-        }
-    }
-
-    async     function toggleBlock(_u: User) {
-        // Función reservada para futura activación/desactivación de usuarios.
-    }
-
-    function handleRoleChange(userId: number, newRole: string) {
-        setRoleChanges((prev) => {
-            const next = { ...prev };
-            if (next[userId] === newRole) {
-                delete next[userId];
-            } else {
-                next[userId] = newRole;
-            }
-            return next;
-        });
-    }
-
-    async function saveAllRoles() {
-        setSavingRoles(true);
-        try {
-            for (const [userId, newRole] of Object.entries(roleChanges)) {
-                const res = await apiFetch(`/api/admin/usuarios/${userId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ role: newRole }),
-                });
-                if (!res.ok) {
-                    const err = await res.json().catch(() => null);
-                    throw new Error(err?.message || `Error al actualizar usuario ${userId}`);
-                }
-            }
-            showMsg('success', 'Roles actualizados correctamente');
-            setRoleChanges({});
-            fetchUsers();
-        } catch (err: unknown) {
-            showMsg(
-                'error',
-                err instanceof Error ? err.message : 'Error al guardar cambios de roles',
-            );
-        } finally {
-            setSavingRoles(false);
         }
     }
 

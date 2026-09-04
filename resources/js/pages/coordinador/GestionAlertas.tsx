@@ -11,7 +11,6 @@ import {
     ChevronDown,
     ChevronRight,
     AlertCircle,
-    Loader2,
     RefreshCw,
 } from 'lucide-react';
 

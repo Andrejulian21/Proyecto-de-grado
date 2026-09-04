@@ -7,7 +7,6 @@ import {
     FileText,
     Download,
     Trash2,
-    Plus,
     Loader2,
     Link2,
     FileSpreadsheet,

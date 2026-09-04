@@ -1,5 +1,4 @@
-import { useState, useReducer, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useCallback, useEffect } from 'react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { apiFetch } from '@/lib/utils';
@@ -84,20 +83,9 @@ function faseLabel(fase: string | null): string {
     return labels[fase ?? ''] ?? fase ?? '—';
 }
 
-function statusBadgeVariant(status: string | null): 'success' | 'warning' | 'error' | 'info' | 'inactivo' | 'riesgo' {
-    const map: Record<string, 'success' | 'warning' | 'error' | 'info' | 'inactivo' | 'riesgo'> = {
-        'en_curso': 'en-curso',
-        'en_riesgo': 'riesgo',
-        'completado': 'success',
-        'aprobado': 'success',
-    };
-    return map[status ?? ''] ?? 'inactivo';
-}
-
 /* ── Component ── */
 
 export default function EvaluacionesDirector() {
-    const navigate = useNavigate();
     const [proyectos, setProyectos] = useState<EvaluacionAsignada[]>([]);
     const [loadingLista, setLoadingLista] = useState(true);
     const [errorLista, setErrorLista] = useState<string | null>(null);

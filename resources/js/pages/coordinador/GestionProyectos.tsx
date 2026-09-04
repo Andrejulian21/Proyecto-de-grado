@@ -6,9 +6,9 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { GroupSelector } from '@/components/forms/GroupSelector';
 import { StudentAutocomplete } from '@/components/forms/StudentAutocomplete';
-import { useProyectos, type Proyecto, type CreateProyectoPayload } from '@/hooks/useProyectos';
+import { useProyectos, type Proyecto } from '@/hooks/useProyectos';
 import { useGrupos, type Grupo } from '@/hooks/useGrupos';
-import { useCupos, type DirectorCupo } from '@/hooks/useCupos';
+import { useCupos } from '@/hooks/useCupos';
 import {
     Plus,
     Trash2,
@@ -857,7 +857,7 @@ export default function GestionProyectos() {
                         : `¿Está seguro de eliminar el proyecto ${deleteTarget?.code}? Esta acción no se puede deshacer.`
                 }
                 confirmLabel={deleteError ? 'Cerrar' : 'Eliminar'}
-                variant={deleteError ? 'warning' : 'danger'}
+                variant={deleteError ? 'default' : 'danger'}
                 onConfirm={() => {
                     if (deleteError) {
                         setDeleteError(null);

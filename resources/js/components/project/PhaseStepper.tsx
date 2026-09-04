@@ -10,7 +10,7 @@ interface PhaseStepperProps {
     phases: PhaseStep[];
     selectedPhaseId: string;
     onSelectPhase: (phaseId: string) => void;
-    deliveryCountByPhase: (phaseId: PhaseId) => number;
+    deliveryCountByPhase: (phaseId: string) => number;
     title?: string;
     countLabel?: { singular: string; plural: string };
 }

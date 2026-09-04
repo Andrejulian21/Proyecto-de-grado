@@ -31,9 +31,6 @@ export function SignatureCodeDisplay({
     const [now, setNow] = useState(() => Date.now());
     const tickRef = useRef<number | null>(null);
 
-    const expiry = new Date(expiresAt).getTime();
-    const remainingMs = Math.max(0, expiry - now);
-
     useEffect(() => {
         tickRef.current = window.setInterval(() => setNow(Date.now()), 1000);
         return () => {

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { DataTable, type Column } from '@/components/ui/DataTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { Search, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
+import { Search, Eye } from 'lucide-react';
 
 interface BinnacleEntry {
     id: number;

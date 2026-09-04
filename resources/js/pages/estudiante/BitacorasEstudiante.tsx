@@ -17,7 +17,7 @@ interface Binnacle {
     topic: string;
     description: string;
     duration: string;
-    signatureStatus: 'signed' | 'pending' | 'unsigned';
+    signatureStatus: 'signed' | 'pending' | 'unsigned' | 'no_firmada';
 }
 
 interface BitacoraRaw {
@@ -38,11 +38,11 @@ interface BitacoraRaw {
 
 /* ── Signature status config ── */
 
-const signatureConfig: Record<string, { label: string; variant: 'success' | 'warning' | 'inactivo' | 'danger' }> = {
+const signatureConfig: Record<string, { label: string; variant: 'success' | 'warning' | 'inactivo' | 'error' }> = {
     signed: { label: 'Firmada', variant: 'success' },
     pending: { label: 'Pendiente', variant: 'warning' },
     unsigned: { label: 'No firmado', variant: 'inactivo' },
-    no_firmada: { label: 'No firmada', variant: 'danger' },
+    no_firmada: { label: 'No firmada', variant: 'error' },
 };
 
 /* ── Helpers ── */

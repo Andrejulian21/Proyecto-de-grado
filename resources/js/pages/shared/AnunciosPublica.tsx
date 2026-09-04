@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { Loader2, ArrowRight, Megaphone, Calendar, AlertCircle } from 'lucide-react';
+import { ArrowRight, Megaphone, Calendar, AlertCircle } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
 
 interface Announcement {

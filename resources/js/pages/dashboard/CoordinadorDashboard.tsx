@@ -135,6 +135,15 @@ function KpiError({ message, onRetry }: { message: string; onRetry: () => void }
     );
 }
 
+/* ── Alert item type ── */
+
+interface AlertItem {
+    icon: React.ComponentType<{ className?: string }>;
+    title: string;
+    description: string;
+    variant: 'error' | 'warning' | 'info';
+}
+
 function AlertCard({ icon: Icon, title, description, variant }: AlertItem) {
     const variantStyles = {
         error: 'bg-error-container/40 border-error/20',

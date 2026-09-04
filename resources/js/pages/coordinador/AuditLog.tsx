@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
-import { Search, Calendar, ChevronLeft, ChevronRight, Loader2, RotateCcw } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Loader2, RotateCcw } from 'lucide-react';
 
 interface AuditEntry {
     id: number;
@@ -57,8 +57,6 @@ export default function AuditLog() {
     const [dateTo, setDateTo] = useState('');
     const [userId, setUserId] = useState('');
 
-    const [filtersApplied, setFiltersApplied] = useState(false);
-
     const fetchLogs = useCallback(async () => {
         setLoading(true);
         try {
@@ -90,7 +88,6 @@ export default function AuditLog() {
 
     function applyFilters() {
         setPage(1);
-        setFiltersApplied(true);
     }
 
     function clearFilters() {
@@ -99,7 +96,6 @@ export default function AuditLog() {
         setDateTo('');
         setUserId('');
         setPage(1);
-        setFiltersApplied(false);
     }
 
     if (role !== 'Coordinador') {

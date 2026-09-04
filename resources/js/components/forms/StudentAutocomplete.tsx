@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useStudentSearch, type StudentUser } from '@/hooks/useStudentSearch';
-import { X, Search, Loader2, ChevronDown } from 'lucide-react';
+import { X, Search, Loader2 } from 'lucide-react';
 
 export interface StudentAutocompleteProps {
     value: StudentUser[];

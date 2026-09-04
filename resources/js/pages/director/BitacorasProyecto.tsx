@@ -5,8 +5,8 @@ import { DataTable, type Column } from '@/components/ui/DataTable';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { apiFetch } from '@/lib/utils';
 import {
-    ArrowLeft, Eye, FileText, Loader2,
-    RefreshCw,
+    ArrowLeft, Eye, Loader2,
+    RefreshCw, AlertCircle,
 } from 'lucide-react';
 
 /* ── Types ── */

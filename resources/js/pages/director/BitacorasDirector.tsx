@@ -5,7 +5,6 @@ import { DataTable, type Column } from '@/components/ui/DataTable';
 import { StatCard } from '@/components/ui/StatCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useDirectorBitacoras, type BitacoraEntry } from '@/hooks/useDirectorBitacoras';
-import { apiFetch } from '@/lib/utils';
 import { SignatureCodeInput } from '@/components/bitacoras/SignatureCode';
 import {
     FileText, Users, Clock, Eye, Loader2,

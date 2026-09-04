@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { Loader2, ArrowLeft, Calendar, User, Paperclip, FileDown, FileText, AlertCircle } from 'lucide-react';
+import { Loader2, ArrowLeft, Calendar, User, Paperclip, FileDown, AlertCircle } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
 
 interface Attachment {

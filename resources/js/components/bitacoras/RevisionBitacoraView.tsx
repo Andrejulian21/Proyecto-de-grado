@@ -10,7 +10,6 @@ import {
     User,
     FileText,
     ShieldCheck,
-    Loader2,
     Pencil,
     Save,
 } from 'lucide-react';
@@ -80,8 +79,8 @@ export function RevisionBitacoraView({
     bitacora: initialBitacora,
     onBack,
     onSign,
-    onRemoveSignature,
-    onSaveContent,
+    onRemoveSignature: _onRemoveSignature,
+    onSaveContent: _onSaveContent,
     currentStudentName = 'Ana Martínez',
     disableSigning = false,
 }: RevisionBitacoraViewProps) {
@@ -177,23 +176,6 @@ export function RevisionBitacoraView({
         .filter((s) => s.role === 'director')
         .map((s, i) => ({ ...s, id: `${s.role}-${i}` }));
 
-
-    function handleRemoveSignature() {
-        onRemoveSignature?.();
-        setBitacora((prev) => ({
-            ...prev,
-            status: 'pending_director',
-            signatures: prev.signatures.map((s) =>
-                s.role === 'director' ? { ...s, signed: false, signedAt: null } : s,
-            ),
-        }));
-    }
-
-    function handleSaveContent() {
-        onSaveContent?.(content);
-        setBitacora((prev) => ({ ...prev, content }));
-        setEditing(false);
-    }
 
     async function handleSaveFull() {
         const res = await apiFetch(`/api/bitacoras/${bitacora.id}`, {

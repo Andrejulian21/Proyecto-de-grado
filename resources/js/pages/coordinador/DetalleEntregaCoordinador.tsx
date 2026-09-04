@@ -4,8 +4,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import {
     ArrowLeft, Download, FileText, Calendar, Loader2,
-    AlertTriangle, User, MessageSquareText, Star,
-    CheckCircle2, XCircle, Clock, Eye, ChevronLeft, ChevronRight,
+    AlertTriangle, Star,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
 
@@ -79,19 +78,6 @@ function formatDate(dateStr: string | null | undefined): string {
     }
 }
 
-function formatFileSize(bytes: number | null): string {
-    if (bytes === null || bytes === undefined) return '—';
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function getDownloadUrl(filePath: string): string {
-    return `/storage/${filePath}`;
-}
-
-/* ── Internos ── */
-
 function formatDateShort(dateStr: string | null | undefined): string {
     if (!dateStr) return '—';
     try {
@@ -106,6 +92,10 @@ function formatDateShort(dateStr: string | null | undefined): string {
     }
 }
 
+function getDownloadUrl(filePath: string): string {
+    return `/storage/${filePath}`;
+}
+
 function getReviewStatus(
     version: Version,
     entregaStatus: string,
@@ -118,10 +108,6 @@ function getReviewStatus(
         return { label: 'Aprobada', variant: 'success' };
     }
     return { label: 'Necesita ajustes', variant: 'warning' };
-}
-
-function isPdfUrl(filePath: string): boolean {
-    return filePath.toLowerCase().endsWith('.pdf');
 }
 
 /* ── Component ── */
@@ -186,7 +172,7 @@ export default function DetalleEntregaCoordinador() {
                 <AlertTriangle className="h-10 w-10 text-[#dc2626]" />
                 <p className="text-sm text-[#dc2626]">{error ?? 'No se encontró la entrega.'}</p>
                 <button
-                    onClick={() => navigate(directorId ? `/directores?directorId=${directorId}&proyectoId=${proyectoId}` : -1)}
+                    onClick={() => navigate(directorId ? `/directores?directorId=${directorId}&proyectoId=${proyectoId}` : '/directores') as unknown as number}
                     className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-white px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:bg-[#f5f5f4]"
                 >
                     <ArrowLeft className="h-4 w-4" />
@@ -229,7 +215,7 @@ export default function DetalleEntregaCoordinador() {
                 subtitle={projectCode ? `${projectCode} · ${phaseLabels[entrega.phase] ?? entrega.phase}` : phaseLabels[entrega.phase] ?? entrega.phase}
                 actions={
                     <button
-                        onClick={() => navigate(directorId ? `/directores?directorId=${directorId}&proyectoId=${proyectoId}` : -1)}
+                        onClick={() => navigate(directorId ? `/directores?directorId=${directorId}&proyectoId=${proyectoId}` : '/directores') as unknown as number}
                         className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-transparent px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:border-[#c2410c] hover:bg-[#fed7aa] hover:text-[#c2410c] active:scale-[0.98]"
                     >
                         <ArrowLeft className="h-4 w-4" />

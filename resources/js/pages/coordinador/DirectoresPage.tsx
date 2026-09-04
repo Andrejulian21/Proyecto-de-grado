@@ -6,7 +6,6 @@ import { useDirectores, type Director, type DirectorProyecto, type Bitacora } fr
 import SupervisionReadOnly from '@/components/supervision/SupervisionReadOnly';
 import {
     UserCheck,
-    BookText,
     FolderKanban,
     ArrowLeft,
     AlertTriangle,

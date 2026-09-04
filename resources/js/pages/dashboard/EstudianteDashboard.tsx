@@ -13,7 +13,7 @@ const PHASES = [
     { id: 'presentacion_anteproyecto', label: 'Presentación Anteproyecto' },
     { id: 'desarrollo', label: 'Desarrollo del proyecto' },
     { id: 'presentacion_final', label: 'Presentación Final' },
-];
+] as const;
 
 const LABELS: Record<string, string> = {
     anteproyecto: 'Documento de Anteproyecto',
@@ -22,9 +22,9 @@ const LABELS: Record<string, string> = {
     presentacion_final: 'Informe Final',
 };
 
-function buildPhases(current: string) {
+function buildPhases(current: string): PhaseStep[] {
     const idx = PHASES.findIndex((p) => p.id === current);
-    return PHASES.map((p, i) => ({ ...p, status: i < idx ? 'done' : i === idx ? 'current' : 'future' }));
+    return PHASES.map((p, i) => ({ ...p, status: (i < idx ? 'done' : i === idx ? 'current' : 'future') as 'done' | 'current' | 'future' }));
 }
 
 function toDate(d: string | undefined) {

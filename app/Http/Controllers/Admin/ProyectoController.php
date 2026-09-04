@@ -216,9 +216,19 @@ class ProyectoController extends Controller
         //    Las entregas NO se eliminan porque son compartidas entre proyectos del semestre.
         $proyecto->bitacoras()->forceDelete();
         $proyecto->estudiantes()->detach();
+
+        // Eliminar evaluaciones a través del pivote entrega_proyecto (evaluaciones no tiene proyecto_id)
+        $pivoteIds = \DB::table('entrega_proyecto')
+            ->where('proyecto_id', $proyecto->id)
+            ->pluck('id');
+        \DB::table('evaluaciones')
+            ->whereIn('entrega_id', function ($q) use ($pivoteIds) {
+                $q->select('entrega_id')->from('entrega_proyecto')->whereIn('id', $pivoteIds);
+            })
+            ->delete();
+
         \DB::table('entrega_proyecto')->where('proyecto_id', $proyecto->id)->delete();
         \DB::table('evaluador_proyecto')->where('proyecto_id', $proyecto->id)->delete();
-        Evaluacion::where('proyecto_id', $proyecto->id)->forceDelete();
         $proyecto->forceDelete();
 
         // 3. AuditEvent

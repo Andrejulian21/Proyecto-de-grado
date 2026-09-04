@@ -92,11 +92,7 @@ ENV APP_ENV=production
 EXPOSE 80
 
 # Startup script: start PHP-FPM in background, then Nginx in foreground
-COPY <<EOF /start.sh
-#!/bin/sh
-php-fpm -D
-nginx -g "daemon off;"
-EOF
+COPY docker-start.sh /start.sh
 RUN chmod +x /start.sh
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

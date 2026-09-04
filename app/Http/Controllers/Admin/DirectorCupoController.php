@@ -182,6 +182,7 @@ class DirectorCupoController extends Controller
         }
 
         $updateData = ['max_capacity' => $newCapacity];
+
         if ($request->has('areas')) {
             $updateData['areas'] = $request->areas;
         }

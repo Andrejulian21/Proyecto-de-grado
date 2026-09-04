@@ -19,7 +19,6 @@ uses(RefreshDatabase::class);
  * UserPolicy methods retained:
  *   - viewAny, create, update, delete  : Coordinador only
  */
-
 it('UserPolicy::viewAny allows Coordinador and denies everyone else', function () {
     $policy = new UserPolicy;
 

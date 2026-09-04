@@ -8,6 +8,7 @@ use App\Models\Entrega;
 use App\Models\Proyecto;
 use App\Models\Semestre;
 use App\Models\User;
+use App\Models\VersionDocumento;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 
@@ -88,7 +89,7 @@ it('devuelve estados y conteos correctos tras el refactor', function () {
         'status' => 'enviada',
     ]);
     $entregada->proyectos()->attach($proyecto->id);
-    \App\Models\VersionDocumento::create([
+    VersionDocumento::create([
         'entrega_id' => $entregada->id,
         'version_number' => 1,
         'file_path' => '/tmp/avance1.pdf',

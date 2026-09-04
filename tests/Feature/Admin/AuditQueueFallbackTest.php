@@ -6,6 +6,7 @@ use App\Events\AuditEvent;
 use App\Listeners\WriteAuditLog;
 use App\Models\AuditLog;
 use App\Models\User;
+use Illuminate\Events\CallQueuedListener;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 
@@ -23,7 +24,7 @@ it('WriteAuditLog is queued when dispatched via event()', function () {
     AuditEvent::dispatch($user, 'test.action', 'test description');
 
     // Laravel wraps ShouldQueue listeners in CallQueuedListener.
-    Queue::assertPushed(\Illuminate\Events\CallQueuedListener::class, function ($job) {
+    Queue::assertPushed(CallQueuedListener::class, function ($job) {
         return $job->class === WriteAuditLog::class;
     });
 });
@@ -40,7 +41,7 @@ it('writes audit log synchronously when queue dispatch fails', function () {
         user_agent: 'phpunit',
     );
 
-    $listener = new WriteAuditLog();
+    $listener = new WriteAuditLog;
     $listener->handle($event);
 
     $row = AuditLog::query()

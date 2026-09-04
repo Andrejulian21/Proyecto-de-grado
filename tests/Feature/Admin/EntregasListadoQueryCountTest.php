@@ -17,7 +17,6 @@ uses(RefreshDatabase::class);
  * fija que GET /api/admin/entregas no ejecute consultas N+1 por entrega:
  * con 25 entregas el total debe quedar plano (eager loads), no lineal.
  */
-
 it('listar entregas no ejecuta consultas N+1 por entrega', function () {
     $coordinador = User::factory()->coordinador()->create();
     $semestre = Semestre::factory()->create(['is_active' => true]);

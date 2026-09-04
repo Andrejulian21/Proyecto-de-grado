@@ -17,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
 use Throwable;
@@ -54,6 +55,7 @@ class AuthController extends Controller
         if (self::$dummyHash === null) {
             self::$dummyHash = Hash::make('timing-dummy');
         }
+
         return self::$dummyHash;
     }
 
@@ -376,7 +378,7 @@ class AuthController extends Controller
         $user = $request->user();
 
         if (! $user || ! Hash::check($payload['current_password'], $user->password)) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'current_password' => 'La contraseña actual es incorrecta.',
             ]);
         }
@@ -391,6 +393,7 @@ class AuthController extends Controller
         // one (so the user who just changed the password is not expelled), and
         // regenerate the current session id (rotates the CSRF token too).
         $user->tokens()->delete();
+
         // Invalidate all other sessions except the current one.
         try {
             DB::table('sessions')

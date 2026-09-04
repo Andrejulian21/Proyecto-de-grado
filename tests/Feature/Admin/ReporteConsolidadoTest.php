@@ -50,7 +50,7 @@ describe('T-018: Reporte consolidado', function () {
 
     it('coordinador puede ver reporte consolidado de proyecto', function () {
         $response = $this->actingAs($this->coordinador)
-            ->getJson('/api/admin/reportes/consolidado?proyecto_id=' . $this->proyecto->id);
+            ->getJson('/api/admin/reportes/consolidado?proyecto_id='.$this->proyecto->id);
 
         $response->assertOk();
         $data = $response->json('data');
@@ -96,7 +96,7 @@ describe('T-018: Reporte consolidado', function () {
         ]);
 
         $response = $this->actingAs($this->coordinador)
-            ->getJson('/api/admin/reportes/consolidado?proyecto_id=' . $this->proyecto->id);
+            ->getJson('/api/admin/reportes/consolidado?proyecto_id='.$this->proyecto->id);
 
         $response->assertOk();
         $entregas = collect($response->json('data.entregas'));
@@ -106,7 +106,7 @@ describe('T-018: Reporte consolidado', function () {
 
     it('reporte consolidado calcula promedio general correctamente', function () {
         $response = $this->actingAs($this->coordinador)
-            ->getJson('/api/admin/reportes/consolidado?proyecto_id=' . $this->proyecto->id);
+            ->getJson('/api/admin/reportes/consolidado?proyecto_id='.$this->proyecto->id);
 
         $response->assertOk();
         $data = $response->json('data');
@@ -118,7 +118,7 @@ describe('T-018: Reporte consolidado', function () {
 
     it('no-coordinador NO puede ver reporte consolidado (403)', function () {
         $response = $this->actingAs($this->evaluador)
-            ->getJson('/api/admin/reportes/consolidado?proyecto_id=' . $this->proyecto->id);
+            ->getJson('/api/admin/reportes/consolidado?proyecto_id='.$this->proyecto->id);
 
         $response->assertStatus(403);
     });

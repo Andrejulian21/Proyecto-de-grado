@@ -36,6 +36,7 @@ return new class extends Migration
         $hasProyectoFk = collect(Schema::getForeignKeys('entregas'))->contains(
             fn ($fk) => in_array('proyecto_id', $fk['columns'] ?? [], true),
         );
+
         if ($hasProyectoFk) {
             Schema::table('entregas', function (Blueprint $table) {
                 $table->dropForeign(['proyecto_id']);
@@ -46,14 +47,17 @@ return new class extends Migration
         // environments (e.g. an existing sqlite DB) never created the
         // secondary indexes, so only drop the ones that actually exist.
         $indexesToDrop = [];
+
         foreach (Schema::getIndexes('entregas') as $index) {
             if ($index['primary'] ?? false) {
                 continue;
             }
+
             if (in_array('proyecto_id', $index['columns'] ?? [], true)) {
                 $indexesToDrop[] = $index['name'];
             }
         }
+
         foreach ($indexesToDrop as $indexName) {
             Schema::table('entregas', function (Blueprint $table) use ($indexName) {
                 $table->dropIndex($indexName);

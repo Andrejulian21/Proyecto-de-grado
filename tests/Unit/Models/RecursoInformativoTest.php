@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 use App\Models\RecursoInformativo;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 test('RecursoInformativo model exists and extends Model', function () {
-    $recurso = new RecursoInformativo();
-    expect($recurso)->toBeInstanceOf(Illuminate\Database\Eloquent\Model::class);
+    $recurso = new RecursoInformativo;
+    expect($recurso)->toBeInstanceOf(Model::class);
 });
 
 test('RecursoInformativo fillable fields work correctly', function () {

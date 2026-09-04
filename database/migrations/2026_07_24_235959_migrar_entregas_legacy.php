@@ -47,6 +47,7 @@ return new class extends Migration
             // Step 3: Create pivot entries from the duplicate's proyecto_id.
             foreach ($duplicates as $dupId) {
                 $dup = DB::table('entregas')->find($dupId);
+
                 if ($dup !== null && $dup->proyecto_id !== null) {
                     DB::table('entrega_proyecto')->insertOrIgnore([
                         'entrega_id' => $keepId,

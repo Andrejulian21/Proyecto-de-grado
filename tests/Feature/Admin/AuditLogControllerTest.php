@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Models\AuditLog;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -17,7 +18,6 @@ uses(RefreshDatabase::class);
  * Gated by `role:Coordinador` — only Coordinadores may view the
  * immutable audit trail.
  */
-
 it('returns a paginated list of audit logs', function () {
     $coord = User::factory()->coordinador()->create();
     AuditLog::create(['action' => 'login.success', 'description' => 'first']);
@@ -69,7 +69,7 @@ it('filters by date range', function () {
     // Bypass model immutability guards for test data seeding.
     // created_at is not in $fillable, so we use a raw insert
     // to create an "old" audit entry outside the date_from window.
-    \Illuminate\Support\Facades\DB::table('audit_logs')->insert([
+    DB::table('audit_logs')->insert([
         'action' => 'login.success',
         'description' => 'old',
         'created_at' => now()->subDays(10),

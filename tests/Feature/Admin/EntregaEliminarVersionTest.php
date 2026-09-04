@@ -22,7 +22,6 @@ uses(RefreshDatabase::class);
  * borrado físico (archivo + fila), rechazo por observaciones del director,
  * y rechazo por rol no estudiante.
  */
-
 beforeEach(function () {
     Storage::fake('public');
 

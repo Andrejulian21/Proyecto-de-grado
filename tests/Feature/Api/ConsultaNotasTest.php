@@ -195,6 +195,7 @@ it('una entrega sin nota no aparece como cero y el cero real se conserva', funct
 
     expect($sinNota)->not->toBeNull()
         ->and($sinNota['nota'])->toBeNull();
+
     // cero grade should be 0.0 if it exists
     if ($cero !== null) {
         expect((float) $cero['nota'])->toBe(0.0);

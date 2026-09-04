@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Models\AuthorizedEmail;
 use App\Enums\UserRole;
+use App\Models\AuthorizedEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

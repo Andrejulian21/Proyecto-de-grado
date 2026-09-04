@@ -12,7 +12,7 @@ use Illuminate\Validation\ValidationException;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->service = new EntregaPesoService();
+    $this->service = new EntregaPesoService;
     $this->semestre = Semestre::factory()->create(['is_active' => true]);
     $this->proyecto = Proyecto::factory()->create([
         'semester_id' => $this->semestre->id,
@@ -29,7 +29,7 @@ function seedEntregas(int $semestreId, int $proyectoId, string $phase, array $pe
         $e = Entrega::create([
             'semester_id' => $semestreId,
             'phase' => $phase,
-            'title' => 'Entrega ' . $phase,
+            'title' => 'Entrega '.$phase,
             'description' => 'x',
             'due_date' => '2026-12-01',
             'status' => 'pendiente',

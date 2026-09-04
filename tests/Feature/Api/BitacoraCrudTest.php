@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Enums\EstadoFirma;
 use App\Enums\UserRole;
 use App\Models\Bitacora;
 use App\Models\Proyecto;

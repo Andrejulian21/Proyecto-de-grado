@@ -8,7 +8,6 @@ use App\Enums\EstadoProyecto;
 use App\Events\AuditEvent;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\UpdateProyectoRequest;
-use App\Models\Evaluacion;
 use App\Models\Proyecto;
 use App\Models\Semestre;
 use App\Models\User;

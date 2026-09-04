@@ -49,7 +49,7 @@ class SemestreController extends Controller
     public function update(Request $request, Semestre $semestre): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'name' => 'string|max:255|unique:semestres,name,' . $semestre->id,
+            'name' => 'string|max:255|unique:semestres,name,'.$semestre->id,
             'start_date' => 'date',
             'end_date' => 'date|after_or_equal:start_date',
             'is_active' => 'boolean',
@@ -62,9 +62,11 @@ class SemestreController extends Controller
         $data = $validator->validated();
 
         $activating = $data['is_active'] ?? null;
+
         if ($activating === true && ! $semestre->is_active) {
             $currentActive = Semestre::where('is_active', true)->count();
             $alreadyActiveOthers = $semestre->is_active ? $currentActive - 1 : $currentActive;
+
             if ($alreadyActiveOthers >= 2) {
                 return response()->json([
                     'errors' => ['is_active' => ['Ya existen 2 semestres activos. Desactive uno antes de activar otro.']],

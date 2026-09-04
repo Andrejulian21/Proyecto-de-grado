@@ -95,7 +95,7 @@ it('director NO puede acceder a entregas finales (403)', function () {
 
 it('filtra por proyecto_id', function () {
     $response = $this->actingAs($this->coordinador)
-        ->getJson('/api/admin/entregas/finales?proyecto_id=' . $this->proyecto->id);
+        ->getJson('/api/admin/entregas/finales?proyecto_id='.$this->proyecto->id);
 
     $response->assertOk();
     expect($response->json('data'))->toHaveCount(1);
@@ -137,7 +137,7 @@ it('filtra por director_id', function () {
     $otra->proyectos()->attach($proyectoOtroDirector->id);
 
     $response = $this->actingAs($this->coordinador)
-        ->getJson('/api/admin/entregas/finales?director_id=' . $this->director->id);
+        ->getJson('/api/admin/entregas/finales?director_id='.$this->director->id);
 
     $response->assertOk();
     expect($response->json('data'))->toHaveCount(2);

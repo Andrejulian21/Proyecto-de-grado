@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\AuthorizedEmail;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -20,8 +21,7 @@ uses(RefreshDatabase::class);
 
 test('authorized_emails.created_by has an index', function () {
     $indexes = collect(Schema::getIndexes('authorized_emails'));
-    $hasCreatedAtIndex = $indexes->contains(fn ($idx) =>
-        collect($idx['columns'])->contains('created_by')
+    $hasCreatedAtIndex = $indexes->contains(fn ($idx) => collect($idx['columns'])->contains('created_by')
     );
 
     expect($hasCreatedAtIndex)->toBeTrue();
@@ -31,8 +31,7 @@ test('authorized_emails.created_by has an index', function () {
 
 test('users has a lower(email) functional index', function () {
     $indexes = collect(Schema::getIndexes('users'));
-    $hasLowerEmailIndex = $indexes->contains(fn ($idx) =>
-        str_contains($idx['name'], 'users_email_lower_index')
+    $hasLowerEmailIndex = $indexes->contains(fn ($idx) => str_contains($idx['name'], 'users_email_lower_index')
         || collect($idx['columns'])->contains(fn ($c) => str_contains($c, 'lower'))
     );
 
@@ -43,8 +42,7 @@ test('users has a lower(email) functional index', function () {
 
 test('authorized_emails has a lower(email) functional index', function () {
     $indexes = collect(Schema::getIndexes('authorized_emails'));
-    $hasLowerEmailIndex = $indexes->contains(fn ($idx) =>
-        str_contains($idx['name'], 'authorized_emails_email_lower_index')
+    $hasLowerEmailIndex = $indexes->contains(fn ($idx) => str_contains($idx['name'], 'authorized_emails_email_lower_index')
         || collect($idx['columns'])->contains(fn ($c) => str_contains($c, 'lower'))
     );
 
@@ -85,7 +83,7 @@ test('users.role CHECK constraint rejects invalid role values', function () {
     expect(fn () => DB::statement(
         "INSERT INTO users (name, email, password, role, es_externo, created_at, updated_at)
          VALUES ('Invalid', 'invalid@test.com', 'password', 'InvalidRole', false, now(), now())"
-    ))->toThrow(\Illuminate\Database\QueryException::class);
+    ))->toThrow(QueryException::class);
 });
 
 test('users.role CHECK constraint exists', function () {
@@ -118,6 +116,7 @@ test('Unit ExampleTest stub has been removed', function () {
 
 test('Feature ExampleTest has real tests or has been removed', function () {
     $path = base_path('tests/Feature/ExampleTest.php');
+
     if (file_exists($path)) {
         $content = file_get_contents($path);
         // It should NOT be the default stub — must contain meaningful assertions

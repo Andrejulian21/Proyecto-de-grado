@@ -233,6 +233,7 @@ it('rechaza versiones cuyo contenido no es DOCX ni PDF', function () {
 it('completa analisis preliminar del estudiante a partir de un PDF', function () {
     $relative = 'entregas/'.$this->entrega->id.'/avance.pdf';
     $absolute = Storage::disk('public')->path($relative);
+
     if (! is_dir(dirname($absolute))) {
         mkdir(dirname($absolute), 0777, true);
     }

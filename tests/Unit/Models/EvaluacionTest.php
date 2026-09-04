@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\Entrega;
 use App\Models\Evaluacion;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -13,7 +14,7 @@ uses(RefreshDatabase::class);
 
 test('Evaluacion model existe y extiende Model', function () {
     $evaluacion = new Evaluacion;
-    expect($evaluacion)->toBeInstanceOf(Illuminate\Database\Eloquent\Model::class);
+    expect($evaluacion)->toBeInstanceOf(Model::class);
 });
 
 test('Evaluacion tiene los fillable fields correctos', function () {

@@ -10,6 +10,7 @@ use App\Models\Proyecto;
 use App\Models\SeguimientoObservacion;
 use App\Models\Semestre;
 use App\Models\VersionDocumento;
+use Illuminate\Support\Collection;
 
 class SeguimientoService
 {
@@ -73,7 +74,7 @@ class SeguimientoService
     /**
      * @return array{total: int, grupo_a: int, grupo_b: int}
      */
-    private function contarBitacorasEnMemoria(\Illuminate\Support\Collection $bitacoras): array
+    private function contarBitacorasEnMemoria(Collection $bitacoras): array
     {
         return [
             'total' => $bitacoras->count(),

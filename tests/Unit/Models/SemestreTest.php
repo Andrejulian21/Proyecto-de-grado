@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Proyecto;
 use App\Models\Semestre;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -12,7 +13,7 @@ uses(RefreshDatabase::class);
 
 test('Semestre model existe y extiende Model', function () {
     $semestre = new Semestre;
-    expect($semestre)->toBeInstanceOf(Illuminate\Database\Eloquent\Model::class);
+    expect($semestre)->toBeInstanceOf(Model::class);
 });
 
 test('Semestre tiene los fillable fields correctos', function () {

@@ -12,8 +12,10 @@ use App\Models\User;
 use App\Models\VersionDocumento;
 use App\Services\SeguimientoService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Reader\Xlsx;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 uses(RefreshDatabase::class);
@@ -193,14 +195,14 @@ test('formatea la columna de observaciones con wrapText, etiqueta de fase y anch
     expect($filas[2][$obsIdx])->toContain('Desarrollo: Revisar avance 1');
 
     // La columna de observaciones usa ancho fijo (no autoSize)
-    $obsCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($obsIdx + 1);
+    $obsCol = Coordinate::stringFromColumnIndex($obsIdx + 1);
     expect($sheet->getColumnDimension($obsCol)->getWidth())->toBe(50.0);
 
     // wrapText habilitado con alineación arriba-izquierda en la celda
     $alignment = $sheet->getStyle($obsCol.'3')->getAlignment();
     expect($alignment->getWrapText())->toBeTrue();
-    expect($alignment->getHorizontal())->toBe(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_LEFT);
-    expect($alignment->getVertical())->toBe(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_TOP);
+    expect($alignment->getHorizontal())->toBe(Alignment::HORIZONTAL_LEFT);
+    expect($alignment->getVertical())->toBe(Alignment::VERTICAL_TOP);
 });
 
 test('exporta xlsx con headers y 0 filas para un semestre sin proyectos', function () {

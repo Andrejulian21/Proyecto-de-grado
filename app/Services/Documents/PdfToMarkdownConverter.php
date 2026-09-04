@@ -14,7 +14,7 @@ use Throwable;
 final class PdfToMarkdownConverter
 {
     public function __construct(
-        private readonly Parser $parser = new Parser(),
+        private readonly Parser $parser = new Parser,
     ) {}
 
     /**
@@ -31,6 +31,7 @@ final class PdfToMarkdownConverter
 
             foreach ($pages as $index => $page) {
                 $text = trim((string) $page->getText());
+
                 if ($this->isBlank($text)) {
                     continue;
                 }
@@ -63,6 +64,7 @@ final class PdfToMarkdownConverter
         }
 
         $handle = fopen($path, 'rb');
+
         if ($handle === false) {
             throw DocumentConversionException::emptyDocument();
         }

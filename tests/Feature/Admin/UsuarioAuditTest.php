@@ -13,7 +13,6 @@ uses(RefreshDatabase::class);
  * Aquí se cubren las tres acciones: user.deleted, role.changed y
  * user.password_reset (reset-password).
  */
-
 beforeEach(function () {
     $this->coordinador = User::factory()->coordinador()->create();
 });

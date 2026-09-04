@@ -10,7 +10,6 @@ use App\Services\ConsultaNotasService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -24,10 +23,15 @@ use Throwable;
 class ConsultaNotasController extends Controller
 {
     private const MIME_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
     private const HEADER_FILL = 'FFF7ED';
+
     private const HEADER_TEXT_COLOR = '57534E';
+
     private const FINAL_GRADE_FILL = 'FFF7ED';
+
     private const BORDER_COLOR = 'E5E5E5';
+
     private const MENSAJE_SIN_LIBRERIA = 'Error al generar el archivo Excel. Verifique que la librería esté instalada.';
 
     public function __construct(
@@ -98,7 +102,7 @@ class ConsultaNotasController extends Controller
                     'peso_presentacion' => $validated['peso_presentacion'],
                 ]
             );
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return response()->json([
                 'error' => 'La tabla de pesos no existe. Ejecute la migración: php artisan migrate.',
             ], 500);

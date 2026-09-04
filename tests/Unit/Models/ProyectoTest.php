@@ -9,6 +9,7 @@ use App\Models\Entrega;
 use App\Models\Proyecto;
 use App\Models\Semestre;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -18,7 +19,7 @@ uses(RefreshDatabase::class);
 
 test('Proyecto model existe y extiende Model', function () {
     $proyecto = new Proyecto;
-    expect($proyecto)->toBeInstanceOf(Illuminate\Database\Eloquent\Model::class);
+    expect($proyecto)->toBeInstanceOf(Model::class);
 });
 
 test('Proyecto tiene los fillable fields correctos', function () {

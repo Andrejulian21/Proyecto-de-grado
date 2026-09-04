@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 use App\Models\Notificacion;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 
 uses(RefreshDatabase::class);
 
 test('Notificacion model exists and extends Model', function () {
-    $notificacion = new Notificacion();
-    expect($notificacion)->toBeInstanceOf(Illuminate\Database\Eloquent\Model::class);
+    $notificacion = new Notificacion;
+    expect($notificacion)->toBeInstanceOf(Model::class);
 });
 
 test('Notificacion fillable fields work correctly', function () {
@@ -72,7 +74,7 @@ test('Notificacion casts sent_at to datetime', function () {
         'sent_at' => '2026-07-01 10:00:00',
     ]);
 
-    expect($notificacion->sent_at)->toBeInstanceOf(Illuminate\Support\Carbon::class);
+    expect($notificacion->sent_at)->toBeInstanceOf(Carbon::class);
     expect($notificacion->sent_at->format('Y-m-d H:i'))->toBe('2026-07-01 10:00');
 });
 

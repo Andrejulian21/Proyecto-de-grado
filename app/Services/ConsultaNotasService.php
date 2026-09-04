@@ -501,6 +501,7 @@ final class ConsultaNotasService
             $proyectoAsignaciones = $asignaciones->get($proyecto->id, collect());
 
             $evaluaciones = [];
+
             foreach ($proyectoAsignaciones as $asignacion) {
                 $evaluaciones[] = [
                     'fase' => $asignacion->fase,

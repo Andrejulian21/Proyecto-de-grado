@@ -39,6 +39,7 @@ final class DocumentMarkdownRouter
         }
 
         $temp = $absolutePath.'.docx';
+
         if (! copy($absolutePath, $temp)) {
             throw DocumentConversionException::conversionFailed();
         }

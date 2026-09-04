@@ -6,6 +6,7 @@ use App\Enums\EstadoInvitacionEvaluador;
 use App\Models\EvaluadorProyecto;
 use App\Models\Proyecto;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -14,7 +15,7 @@ uses(RefreshDatabase::class);
 
 test('EvaluadorProyecto model existe y extiende Model', function () {
     $ep = new EvaluadorProyecto;
-    expect($ep)->toBeInstanceOf(Illuminate\Database\Eloquent\Model::class);
+    expect($ep)->toBeInstanceOf(Model::class);
 });
 
 test('EvaluadorProyecto tiene los fillable fields correctos', function () {

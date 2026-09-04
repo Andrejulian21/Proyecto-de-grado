@@ -63,6 +63,7 @@ describe('T-015: Migraciones y modelos EvaluadorProyecto', function () {
         // Same evaluator + same project + SAME fase → unique violation.
         // Use a savepoint so PostgreSQL doesn't abort the entire test transaction.
         DB::beginTransaction();
+
         try {
             EvaluadorProyecto::create([
                 'proyecto_id' => $proyecto->id,

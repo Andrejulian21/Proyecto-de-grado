@@ -320,6 +320,7 @@ it('completa analisis preliminar ABET a partir de un PDF convertido a Markdown',
 it('rechaza un formato no soportado sin llamar al proveedor IA', function () {
     $relative = 'entregas/'.$this->entrega->id.'/notas.txt';
     $absolute = Storage::disk('public')->path($relative);
+
     if (! is_dir(dirname($absolute))) {
         mkdir(dirname($absolute), 0777, true);
     }
@@ -352,6 +353,7 @@ it('rechaza un formato no soportado sin llamar al proveedor IA', function () {
 it('rechaza un PDF corrupto sin llamar al proveedor IA', function () {
     $relative = 'entregas/'.$this->entrega->id.'/roto.pdf';
     $absolute = Storage::disk('public')->path($relative);
+
     if (! is_dir(dirname($absolute))) {
         mkdir(dirname($absolute), 0777, true);
     }

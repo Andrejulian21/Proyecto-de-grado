@@ -7,7 +7,9 @@ use App\Models\Bitacora;
 use App\Models\Proyecto;
 use App\Models\Semestre;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 
 uses(RefreshDatabase::class);
 
@@ -24,8 +26,8 @@ beforeEach(function () {
 });
 
 test('Bitacora model exists and extends Model', function () {
-    $bitacora = new Bitacora();
-    expect($bitacora)->toBeInstanceOf(Illuminate\Database\Eloquent\Model::class);
+    $bitacora = new Bitacora;
+    expect($bitacora)->toBeInstanceOf(Model::class);
 });
 
 test('Bitacora fillable fields work correctly', function () {
@@ -63,7 +65,7 @@ test('Bitacora casts meeting_date to date', function () {
         'meeting_date' => '2026-04-15',
     ]);
 
-    expect($bitacora->meeting_date)->toBeInstanceOf(Illuminate\Support\Carbon::class);
+    expect($bitacora->meeting_date)->toBeInstanceOf(Carbon::class);
     expect($bitacora->meeting_date->format('Y-m-d'))->toBe('2026-04-15');
 });
 
@@ -76,8 +78,8 @@ test('Bitacora casts signed timestamps to datetime', function () {
         'director_signed_at' => '2026-04-11 14:30:00',
     ]);
 
-    expect($bitacora->student_signed_at)->toBeInstanceOf(Illuminate\Support\Carbon::class);
-    expect($bitacora->director_signed_at)->toBeInstanceOf(Illuminate\Support\Carbon::class);
+    expect($bitacora->student_signed_at)->toBeInstanceOf(Carbon::class);
+    expect($bitacora->director_signed_at)->toBeInstanceOf(Carbon::class);
     expect($bitacora->student_signed_at->format('Y-m-d H:i'))->toBe('2026-04-10 10:00');
     expect($bitacora->director_signed_at->format('Y-m-d H:i'))->toBe('2026-04-11 14:30');
 });

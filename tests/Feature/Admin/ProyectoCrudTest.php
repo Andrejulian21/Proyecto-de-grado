@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\EstadoProyecto;
 use App\Enums\FaseProyecto;
 use App\Enums\UserRole;
+use App\Models\Proyecto;
 use App\Models\Semestre;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -22,7 +23,7 @@ beforeEach(function () {
 });
 
 it('coordinador puede listar proyectos', function () {
-    \App\Models\Proyecto::create([
+    Proyecto::create([
         'title' => 'Proyecto Alpha',
         'semester_id' => $this->semestre->id,
     ]);
@@ -50,7 +51,7 @@ it('coordinador puede crear proyecto con título, semestre y director opcional',
 
     $response->assertCreated()
         ->assertJson(['data' => ['title' => 'Sistema de Gestión']]);
-    expect(\App\Models\Proyecto::count())->toBe(1);
+    expect(Proyecto::count())->toBe(1);
 });
 
 it('proyecto creado tiene código auto-generado (PG-20261001)', function () {
@@ -76,7 +77,7 @@ it('asociar 1-3 estudiantes al proyecto', function () {
         ]);
 
     $response->assertCreated();
-    $proyecto = \App\Models\Proyecto::find($response->json('data.id'));
+    $proyecto = Proyecto::find($response->json('data.id'));
     expect($proyecto->estudiantes)->toHaveCount(2);
 });
 
@@ -91,7 +92,7 @@ it('3 estudiantes requiere requires_group_justification=true', function () {
         ]);
 
     $response->assertCreated();
-    $proyecto = \App\Models\Proyecto::find($response->json('data.id'));
+    $proyecto = Proyecto::find($response->json('data.id'));
     expect($proyecto->requires_group_justification)->toBeTrue();
 });
 
@@ -132,17 +133,17 @@ it('kpis con 0 proyectos devuelve tasa 100', function () {
 });
 
 it('kpis reflejan proyectos creados', function () {
-    \App\Models\Proyecto::create([
+    Proyecto::create([
         'title' => 'Proyecto en curso',
         'semester_id' => $this->semestre->id,
         'status' => EstadoProyecto::EnCurso->value,
     ]);
-    \App\Models\Proyecto::create([
+    Proyecto::create([
         'title' => 'Proyecto completado',
         'semester_id' => $this->semestre->id,
         'status' => EstadoProyecto::Completado->value,
     ]);
-    $enRiesgo = \App\Models\Proyecto::create([
+    $enRiesgo = Proyecto::create([
         'title' => 'Proyecto en riesgo',
         'semester_id' => $this->semestre->id,
         'status' => EstadoProyecto::EnRiesgo->value,
@@ -167,7 +168,7 @@ it('kpis solo consideran semestres activos', function () {
         'end_date' => '2025-12-31',
         'is_active' => false,
     ]);
-    \App\Models\Proyecto::create([
+    Proyecto::create([
         'title' => 'Proyecto en semestre inactivo',
         'semester_id' => $inactivo->id,
     ]);
@@ -187,7 +188,7 @@ it('fase y estado son los enums correctos', function () {
         ]);
 
     $response->assertCreated();
-    $proyecto = \App\Models\Proyecto::find($response->json('data.id'));
+    $proyecto = Proyecto::find($response->json('data.id'));
     expect($proyecto->current_phase)->toBe(FaseProyecto::Anteproyecto);
     expect($proyecto->current_phase->value)->toBe('anteproyecto');
     expect($proyecto->status)->toBe(EstadoProyecto::EnCurso);

@@ -21,6 +21,7 @@ final class DocumentFormatDetector
         }
 
         $handle = fopen($absolutePath, 'rb');
+
         if ($handle === false) {
             return DocumentFormat::Unsupported;
         }
@@ -46,6 +47,7 @@ final class DocumentFormatDetector
     private function zipContainsWordDocument(string $path): bool
     {
         $zip = new ZipArchive;
+
         if ($zip->open($path) !== true) {
             return false;
         }

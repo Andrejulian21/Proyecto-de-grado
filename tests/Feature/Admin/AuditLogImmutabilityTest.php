@@ -57,7 +57,7 @@ it('rejects a raw DELETE on audit_logs at the database level', function () {
     ]);
 
     expect(function () {
-        DB::statement("DELETE FROM audit_logs WHERE id = (SELECT id FROM audit_logs LIMIT 1)");
+        DB::statement('DELETE FROM audit_logs WHERE id = (SELECT id FROM audit_logs LIMIT 1)');
     })->toThrow(Exception::class);
 });
 

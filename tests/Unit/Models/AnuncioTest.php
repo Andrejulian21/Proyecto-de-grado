@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 use App\Models\Anuncio;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 
 uses(RefreshDatabase::class);
 
 test('Anuncio model exists and extends Model', function () {
-    $anuncio = new Anuncio();
-    expect($anuncio)->toBeInstanceOf(Illuminate\Database\Eloquent\Model::class);
+    $anuncio = new Anuncio;
+    expect($anuncio)->toBeInstanceOf(Model::class);
 });
 
 test('Anuncio fillable fields work correctly', function () {
@@ -55,7 +57,7 @@ test('Anuncio casts published_at to datetime', function () {
         'published_at' => '2026-07-01 10:00:00',
     ]);
 
-    expect($anuncio->published_at)->toBeInstanceOf(Illuminate\Support\Carbon::class);
+    expect($anuncio->published_at)->toBeInstanceOf(Carbon::class);
     expect($anuncio->published_at->format('Y-m-d H:i'))->toBe('2026-07-01 10:00');
 });
 

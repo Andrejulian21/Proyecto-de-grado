@@ -29,9 +29,7 @@ RUN apk add --no-cache $PHPIZE_DEPS \
         postgresql-dev libzip-dev oniguruma-dev icu-dev libxml2-dev \
         libpng-dev freetype-dev libjpeg-turbo-dev \
     && docker-php-ext-install -j"$(nproc)" \
-        pdo_pgsql bcmath opcache pcntl zip gd intl mbstring xml \
-    && pecl install redis \
-    && docker-php-ext-enable redis
+        pdo_pgsql bcmath opcache pcntl zip gd intl mbstring xml
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 

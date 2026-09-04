@@ -610,7 +610,8 @@ describe('T-016c: update cambia evaluadores y fase', function () {
             ]);
 
         $response->assertOk();
-        expect($response->json('data.hora_inicio'))->toBe('14:00');
+        // PostgreSQL may return '14:00:00' instead of '14:00'
+        expect($response->json('data.hora_inicio'))->toContain('14:00');
     });
 });
 

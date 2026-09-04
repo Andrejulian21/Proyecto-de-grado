@@ -31,14 +31,12 @@ it('StoreEntregaAction leaves no entrega with a direct link lacking a pivot', fu
         ],
     ]);
 
-    // The exact verification query from the issue returns 0: no entrega has
-    // a direct link that lacks a pivot row.
-    $orphans = DB::table('entregas')
-        ->whereNotNull('proyecto_id')
-        ->whereNotIn('id', DB::table('entrega_proyecto')->select('entrega_id'))
-        ->count();
+    // After fase 3, proyecto_id was removed from entregas.
+    // Every entrega should be pivot-linked via entrega_proyecto.
+    $totalEntregas = DB::table('entregas')->count();
+    $linkedEntregas = DB::table('entrega_proyecto')->distinct('entrega_id')->count('entrega_id');
 
-    expect($orphans)->toBe(0);
+    expect($linkedEntregas)->toBe($totalEntregas);
 });
 
 it('every entrega created via StoreEntregaAction is pivot-linked to at least one project', function () {

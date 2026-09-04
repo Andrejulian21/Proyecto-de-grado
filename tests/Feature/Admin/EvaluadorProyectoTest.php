@@ -11,6 +11,7 @@ use App\Models\Semestre;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -60,13 +61,22 @@ describe('T-015: Migraciones y modelos EvaluadorProyecto', function () {
         ]);
 
         // Same evaluator + same project + SAME fase → unique violation.
-        expect(fn () => EvaluadorProyecto::create([
-            'proyecto_id' => $proyecto->id,
-            'evaluador_id' => $evaluador->id,
-            'invitation_status' => EstadoInvitacionEvaluador::Aceptada,
-            'assigned_at' => now(),
-            'fase' => 'presentacion_anteproyecto',
-        ]))->toThrow(QueryException::class);
+        // Use a savepoint so PostgreSQL doesn't abort the entire test transaction.
+        DB::beginTransaction();
+        try {
+            EvaluadorProyecto::create([
+                'proyecto_id' => $proyecto->id,
+                'evaluador_id' => $evaluador->id,
+                'invitation_status' => EstadoInvitacionEvaluador::Aceptada,
+                'assigned_at' => now(),
+                'fase' => 'presentacion_anteproyecto',
+            ]);
+            $this->fail('Expected QueryException for unique violation');
+        } catch (QueryException) {
+            // Expected — unique constraint prevents duplicate
+        } finally {
+            DB::rollBack();
+        }
 
         // Same evaluator + same project + DIFFERENT fase → legitimate, allowed.
         EvaluadorProyecto::create([
@@ -175,8 +185,9 @@ describe('T-016: CRUD asignacion evaluador-proyecto', function () {
             'assigned_at' => now(),
         ]);
 
+        // destroy expects proyecto_id, not the individual assignment ID
         $response = $this->actingAs($this->coordinador)
-            ->deleteJson('/api/admin/evaluador-proyecto/'.$asignacion->id);
+            ->deleteJson('/api/admin/evaluador-proyecto/'.$this->proyecto->id);
 
         $response->assertOk();
         expect(EvaluadorProyecto::count())->toBe(0);

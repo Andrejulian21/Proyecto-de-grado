@@ -51,37 +51,20 @@ RUN { \
         echo 'memory_limit=256M'; \
     } > /usr/local/etc/php/conf.d/99-production.ini
 
-# Nginx config — write with printf to avoid heredoc issues
-RUN rm -f /etc/nginx/http.d/default.conf /etc/nginx/http.d/default.conf.bak
-RUN printf '%s\n' \
-    'server {' \
-    '    listen 80;' \
-    '    server_name _;' \
-    '    root /var/www/html/public;' \
-    '    index index.php;' \
-    '    gzip on;' \
-    '    gzip_types text/plain text/css application/json application/javascript text/xml application/xml text/javascript image/svg+xml;' \
-    '    gzip_min_length 256;' \
-    '    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {' \
-    '        expires 30d;' \
-    '        add_header Cache-Control "public, immutable";' \
-    '        try_files $uri =404;' \
-    '    }' \
-    '    location /api { try_files $uri $uri/ /index.php?$query_string; }' \
-    '    location / { try_files $uri $uri/ /index.php?$query_string; }' \
-    '    location ~ \.php$ {' \
-    '        fastcgi_pass 127.0.0.1:9000;' \
-    '        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;' \
-    '        include fastcgi_params;' \
-    '        fastcgi_read_timeout 300;' \
-    '    }' \
-    '    location ~ /\. { deny all; }' \
-    '}' \
-    > /etc/nginx/http.d/default.conf
-
 WORKDIR /var/www/html
+
+# Copy app from vendor stage
 COPY --from=vendor --chown=www-data:www-data /app /var/www/html
 
+# Nginx config
+RUN rm -f /etc/nginx/http.d/default.conf /etc/nginx/http.d/default.conf.bak
+COPY nginx.conf /etc/nginx/http.d/default.conf
+
+# Startup script
+COPY docker-start.sh /start.sh
+RUN chmod +x /start.sh
+
+# Laravel directories
 RUN mkdir -p storage/framework/cache/data storage/framework/sessions \
         storage/framework/views storage/logs bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache \
@@ -90,8 +73,7 @@ RUN mkdir -p storage/framework/cache/data storage/framework/sessions \
 ENV APP_ENV=production
 EXPOSE 80
 
-# Startup: FPM in background, Nginx in foreground
-CMD ["sh", "-c", "php-fpm -D && nginx -g 'daemon off;'"]
+CMD ["/start.sh"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD wget -qO- http://localhost/api/health || exit 1

@@ -51,6 +51,10 @@ RUN { \
         echo 'memory_limit=256M'; \
     } > /usr/local/etc/php/conf.d/99-production.ini
 
+# Configure PHP-FPM to listen on TCP port 9000 (not Unix socket)
+RUN sed -i 's|listen = /run/php-fpm/www.sock|listen = 0.0.0.0:9000|g' /usr/local/etc/php-fpm.d/www.conf \
+    && sed -i 's|;clear_env = no|clear_env = no|g' /usr/local/etc/php-fpm.d/www.conf
+
 WORKDIR /var/www/html
 
 # Copy app from vendor stage
@@ -75,5 +79,5 @@ EXPOSE 80
 
 CMD ["/start.sh"]
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD php -r "file_get_contents('http://localhost/api/health') || exit(1);" || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD php -r "if(@file_get_contents('http://127.0.0.1/api/health')===false)exit(1);"

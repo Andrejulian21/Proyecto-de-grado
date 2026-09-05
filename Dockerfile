@@ -76,4 +76,4 @@ EXPOSE 80
 CMD ["/start.sh"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget -qO- http://localhost/api/health || exit 1
+    CMD php -r "file_get_contents('http://localhost/api/health') || exit(1);" || exit 1

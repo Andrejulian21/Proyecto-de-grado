@@ -1,0 +1,386 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Sistema Centralizado de Proyectos de Grado — Arquitectura",
+    "output": "../arquitectura.html",
+    "quality_profile": "showcase",
+    "animation": "trace",
+    "repository": {
+      "url": "https://github.com/Andrejulian21/Proyecto-de-grado",
+      "provider": "github",
+      "revision": "a2178658c8daf95d1b8d17e6159a4ccd916ddef5"
+    },
+    "viewBox": [
+      1300,
+      690
+    ],
+    "views": [
+      {
+        "id": "peticion-autenticada",
+        "label": "Petición autenticada",
+        "focus": [
+          "browser",
+          "nginx",
+          "fpm",
+          "laravel",
+          "pg"
+        ],
+        "note": "Camino principal: el SPA pega a Nginx, Nginx entrega por FastCGI y Laravel resuelve contra PostgreSQL."
+      },
+      {
+        "id": "identidad",
+        "label": "Identidad y sesión",
+        "focus": [
+          "browser",
+          "google",
+          "guardias",
+          "laravel"
+        ],
+        "note": "Google OAuth para los usuarios UNAB y la pila de guardias que revisa cada request."
+      },
+      {
+        "id": "entregas",
+        "label": "Entregas y rastro",
+        "focus": [
+          "laravel",
+          "storage",
+          "ia",
+          "pg"
+        ],
+        "note": "Dónde caen los documentos de cada entrega, qué los analiza y dónde queda el rastro auditable."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "google",
+      "type": "security",
+      "label": "Google OAuth 2.0",
+      "sublabel": "identidad UNAB",
+      "tag": "Socialite",
+      "pos": [
+        40,
+        96
+      ],
+      "size": [
+        150,
+        66
+      ]
+    },
+    {
+      "id": "browser",
+      "type": "frontend",
+      "label": "SPA React 19",
+      "sublabel": "React Router 7 · Vite 8",
+      "tag": "~45 vistas por rol",
+      "pos": [
+        40,
+        322
+      ],
+      "size": [
+        150,
+        66
+      ],
+      "sources": [
+        {
+          "path": "resources/js/app.tsx",
+          "line": 98,
+          "label": "rutas del SPA"
+        }
+      ]
+    },
+    {
+      "id": "nginx",
+      "type": "cloud",
+      "label": "Nginx",
+      "sublabel": "listen :80",
+      "pos": [
+        280,
+        322
+      ],
+      "size": [
+        140,
+        66
+      ],
+      "sources": [
+        {
+          "path": "nginx.conf",
+          "line": 2
+        }
+      ]
+    },
+    {
+      "id": "fpm",
+      "type": "backend",
+      "label": "PHP-FPM 8.4",
+      "sublabel": "TCP 127.0.0.1:9000",
+      "pos": [
+        520,
+        322
+      ],
+      "size": [
+        150,
+        66
+      ],
+      "sources": [
+        {
+          "path": "Dockerfile",
+          "line": 55,
+          "label": "www.conf a TCP"
+        }
+      ]
+    },
+    {
+      "id": "guardias",
+      "type": "security",
+      "label": "Pila de guardias",
+      "sublabel": "sanctum · role · single_session",
+      "tag": "activity",
+      "pos": [
+        770,
+        108
+      ],
+      "size": [
+        165,
+        70
+      ],
+      "sources": [
+        {
+          "path": "bootstrap/app.php",
+          "line": 41,
+          "label": "alias de middleware"
+        }
+      ]
+    },
+    {
+      "id": "laravel",
+      "type": "backend",
+      "label": "API Laravel 11",
+      "sublabel": "112 rutas · 21 modelos",
+      "pos": [
+        770,
+        322
+      ],
+      "size": [
+        165,
+        66
+      ],
+      "sources": [
+        {
+          "path": "routes/api.php",
+          "line": 51,
+          "label": "rutas de la API"
+        }
+      ]
+    },
+    {
+      "id": "ia",
+      "type": "external",
+      "label": "Servicios de IA",
+      "sublabel": "asistente · evaluación",
+      "pos": [
+        770,
+        548
+      ],
+      "size": [
+        165,
+        66
+      ],
+      "sources": [
+        {
+          "path": "config/ai.php",
+          "line": 24,
+          "label": "AI_PROVIDER = null"
+        }
+      ],
+      "tag": "sin proveedor"
+    },
+    {
+      "id": "redis",
+      "type": "database",
+      "label": "Redis",
+      "sublabel": "caché y colas :6379",
+      "pos": [
+        1050,
+        108
+      ],
+      "size": [
+        140,
+        66
+      ],
+      "sources": [
+        {
+          "path": "docker-compose.yml",
+          "line": 18
+        }
+      ]
+    },
+    {
+      "id": "pg",
+      "type": "database",
+      "label": "PostgreSQL 16",
+      "sublabel": "proyecto_grado :5432",
+      "pos": [
+        1050,
+        322
+      ],
+      "size": [
+        140,
+        66
+      ],
+      "sources": [
+        {
+          "path": "docker-compose.yml",
+          "line": 2
+        }
+      ]
+    },
+    {
+      "id": "storage",
+      "type": "cloud",
+      "label": "Almacenamiento",
+      "sublabel": "entregas versionadas",
+      "pos": [
+        1050,
+        548
+      ],
+      "size": [
+        140,
+        66
+      ],
+      "sources": [
+        {
+          "path": "routes/web.php",
+          "line": 35,
+          "label": "StorageController"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Contenedor de aplicación (php:8.4-fpm-alpine + nginx)",
+      "wraps": [
+        "nginx",
+        "fpm",
+        "laravel",
+        "guardias"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "Servicios de datos",
+      "wraps": [
+        "redis",
+        "pg",
+        "storage"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "spa-nginx",
+      "from": "browser",
+      "to": "nginx",
+      "label": "HTTP /api",
+      "variant": "emphasis"
+    },
+    {
+      "id": "spa-google",
+      "from": "browser",
+      "to": "google",
+      "label": "consentimiento",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "google-guardias",
+      "from": "google",
+      "to": "guardias",
+      "label": "callback + whitelist",
+      "variant": "security"
+    },
+    {
+      "id": "nginx-fpm",
+      "from": "nginx",
+      "to": "fpm",
+      "label": "FastCGI"
+    },
+    {
+      "id": "fpm-laravel",
+      "from": "fpm",
+      "to": "laravel",
+      "label": "index.php"
+    },
+    {
+      "id": "laravel-guardias",
+      "from": "laravel",
+      "to": "guardias",
+      "label": "valida request",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "laravel-pg",
+      "from": "laravel",
+      "to": "pg",
+      "label": "Eloquent",
+      "labelDx": 32
+    },
+    {
+      "id": "laravel-redis",
+      "from": "laravel",
+      "to": "redis",
+      "label": "caché y colas",
+      "variant": "dashed"
+    },
+    {
+      "id": "laravel-storage",
+      "from": "laravel",
+      "to": "storage",
+      "label": "documentos"
+    },
+    {
+      "id": "laravel-ia",
+      "from": "laravel",
+      "to": "ia",
+      "label": "analiza entregas",
+      "variant": "dashed",
+      "labelDy": 24
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Borde",
+      "items": [
+        "Nginx sirve public/ y entrega PHP por FastCGI en 127.0.0.1:9000",
+        "Todo lo que no empiece por /api ni /storage cae en el catch-all del SPA"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Aplicación",
+      "items": [
+        "112 rutas repartidas por actor: estudiante, director, evaluador y coordinador",
+        "React Router 7 protege las vistas anidadas con allowedRoles por ruta",
+        "El SPA habla por fetch con rutas relativas; no hay cliente axios ni baseURL",
+        "La capa de IA está construida pero sin proveedor conectado: hoy lanza providerNotConfigured"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Identidad y rastro",
+      "items": [
+        "Los usuarios UNAB entran por Google OAuth contra una whitelist de correos",
+        "El evaluador externo entra por credenciales con throttle:login",
+        "Sanctum en modo cookie: la sesión vive en la tabla sessions de PostgreSQL",
+        "audit_logs es una tabla de PostgreSQL; el scheduler archiva el histórico a diario"
+      ]
+    }
+  ]
+}

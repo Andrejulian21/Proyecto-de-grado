@@ -1,0 +1,225 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Cómo se hablan las piezas — del login a una entrega",
+    "output": "../conversacion.html",
+    "quality_profile": "showcase",
+    "animation": "trace",
+    "viewBox": [
+      1050,
+      790
+    ],
+    "views": [
+      {
+        "id": "login-google",
+        "label": "Entrada por Google",
+        "focus": [
+          "usuario",
+          "spa",
+          "laravel",
+          "google"
+        ],
+        "note": "El browser sale del SPA, pasa por Google y vuelve con una sesión de Laravel ya abierta."
+      },
+      {
+        "id": "recuperar-identidad",
+        "label": "El SPA recupera la identidad",
+        "focus": [
+          "spa",
+          "laravel",
+          "pg"
+        ],
+        "note": "Con la cookie puesta, el SPA insiste en /api/auth/user hasta que la sesión responde."
+      },
+      {
+        "id": "subir-entrega",
+        "label": "Subir una entrega",
+        "focus": [
+          "usuario",
+          "spa",
+          "laravel"
+        ],
+        "note": "Una petición autenticada normal: token CSRF en el header y guardias antes del controlador."
+      }
+    ],
+    "column_fit": "spread"
+  },
+  "participants": [
+    {
+      "id": "usuario",
+      "type": "external",
+      "label": "Estudiante",
+      "sublabel": "UNAB"
+    },
+    {
+      "id": "spa",
+      "type": "frontend",
+      "label": "SPA React",
+      "sublabel": "React 19"
+    },
+    {
+      "id": "laravel",
+      "type": "backend",
+      "label": "Laravel 11",
+      "sublabel": "PHP 8.4"
+    },
+    {
+      "id": "google",
+      "type": "security",
+      "label": "Google",
+      "sublabel": "OAuth 2.0"
+    },
+    {
+      "id": "pg",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "PostgreSQL 16"
+    }
+  ],
+  "segments": [
+    {
+      "from": 170,
+      "to": 542,
+      "label": "Autenticación con Google"
+    },
+    {
+      "from": 542,
+      "to": 602,
+      "label": "El SPA recupera la sesión"
+    },
+    {
+      "from": 602,
+      "to": 706,
+      "label": "Petición autenticada"
+    }
+  ],
+  "messages": [
+    {
+      "id": "m1",
+      "from": "usuario",
+      "to": "spa",
+      "y": 190,
+      "label": "clic en Entrar con Google"
+    },
+    {
+      "id": "m2",
+      "from": "spa",
+      "to": "laravel",
+      "y": 236,
+      "label": "GET /auth/redirect",
+      "note": "navegación completa del browser: el SPA se descarga"
+    },
+    {
+      "id": "m3",
+      "from": "laravel",
+      "to": "google",
+      "y": 282,
+      "label": "redirige al consentimiento",
+      "variant": "security"
+    },
+    {
+      "id": "m4",
+      "from": "google",
+      "to": "laravel",
+      "y": 328,
+      "label": "GET /auth/callback con code",
+      "variant": "security"
+    },
+    {
+      "id": "m5",
+      "from": "laravel",
+      "to": "pg",
+      "y": 374,
+      "label": "¿el correo está en la whitelist?",
+      "variant": "security"
+    },
+    {
+      "id": "m6",
+      "from": "pg",
+      "to": "laravel",
+      "y": 420,
+      "label": "correo autorizado",
+      "variant": "return"
+    },
+    {
+      "id": "m7",
+      "from": "laravel",
+      "to": "pg",
+      "y": 466,
+      "label": "abre la sesión en la tabla sessions"
+    },
+    {
+      "id": "m8",
+      "from": "laravel",
+      "to": "spa",
+      "y": 512,
+      "label": "302 al SPA + cookie de sesión y XSRF-TOKEN",
+      "variant": "return"
+    },
+    {
+      "id": "m10",
+      "from": "spa",
+      "to": "laravel",
+      "y": 572,
+      "label": "GET /api/auth/user",
+      "note": "antes pide /sanctum/csrf-cookie; reintenta hasta 6 veces cada 600 ms"
+    },
+    {
+      "id": "m13",
+      "from": "spa",
+      "to": "laravel",
+      "y": 632,
+      "label": "POST /api/entregas/{id}/archivos/{slug}",
+      "variant": "emphasis",
+      "note": "X-XSRF-TOKEN leído de la cookie; las guardias validan antes del controlador"
+    },
+    {
+      "id": "m15",
+      "from": "laravel",
+      "to": "spa",
+      "y": 678,
+      "label": "201 versión registrada",
+      "variant": "return",
+      "note": "el archivo queda en disco y la versión en la base"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "laravel",
+      "from": 236,
+      "to": 512,
+      "type": "backend"
+    },
+    {
+      "participant": "google",
+      "from": 282,
+      "to": 328,
+      "type": "security"
+    },
+    {
+      "participant": "laravel",
+      "from": 632,
+      "to": 678,
+      "type": "backend"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Lo que no se ve en el dibujo",
+      "items": [
+        "Cada flecha HTTP entra por Nginx :80 y llega a PHP-FPM por FastCGI en 127.0.0.1:9000",
+        "auth:sanctum resuelve la identidad, single_session corta la sesión anterior y activity marca la actividad"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Detalles que sorprenden",
+      "items": [
+        "El botón de Google es un enlace normal, no un fetch: por eso el SPA se recarga entero",
+        "El evaluador externo no pasa por Google: entra por POST /api/auth/externo/login con throttle:login"
+      ]
+    }
+  ]
+}

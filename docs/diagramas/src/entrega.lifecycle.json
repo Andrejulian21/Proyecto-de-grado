@@ -1,0 +1,191 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "Ciclo de vida de una entrega",
+    "output": "../entrega.html",
+    "quality_profile": "showcase",
+    "animation": "trace",
+    "viewBox": [
+      1050,
+      660
+    ],
+    "views": [
+      {
+        "id": "camino-feliz",
+        "label": "Camino sin tropiezos",
+        "focus": [
+          "creada",
+          "solicitada",
+          "pendiente",
+          "enviada",
+          "aprobada"
+        ],
+        "note": "La entrega nace configurada, se solicita, se habilita, se envía y termina aprobada con nota."
+      },
+      {
+        "id": "revision",
+        "label": "Revisión del director",
+        "focus": [
+          "enviada",
+          "revisada",
+          "aprobada",
+          "rechazada"
+        ],
+        "note": "Un mismo endpoint mueve la entrega a revisada, aprobada o rechazada."
+      },
+      {
+        "id": "reintentos",
+        "label": "Volver a subir",
+        "focus": [
+          "pendiente",
+          "enviada",
+          "rechazada"
+        ],
+        "note": "Mientras esté pendiente o enviada el estudiante puede subir otra versión; rechazada no vuelve."
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "Estados de la entrega"
+    },
+    {
+      "id": "revision",
+      "label": "Revisión"
+    },
+    {
+      "id": "terminal",
+      "label": "Cierre sin aprobación"
+    }
+  ],
+  "states": [
+    {
+      "id": "creada",
+      "type": "start",
+      "label": "Creada",
+      "sublabel": "la crea el coordinador",
+      "lane": "main",
+      "col": 0,
+      "step": "01",
+      "tag": "creacion"
+    },
+    {
+      "id": "solicitada",
+      "type": "waiting",
+      "label": "Solicitada",
+      "sublabel": "la pide el estudiante",
+      "lane": "main",
+      "col": 1,
+      "step": "02",
+      "tag": "solicitada"
+    },
+    {
+      "id": "pendiente",
+      "type": "active",
+      "label": "Pendiente",
+      "sublabel": "abierta para subir",
+      "lane": "main",
+      "col": 2,
+      "step": "03",
+      "tag": "pendiente"
+    },
+    {
+      "id": "enviada",
+      "type": "decision",
+      "label": "Enviada",
+      "sublabel": "espera revisión",
+      "lane": "main",
+      "col": 3,
+      "step": "04",
+      "tag": "enviada"
+    },
+    {
+      "id": "aprobada",
+      "type": "success",
+      "label": "Aprobada",
+      "sublabel": "con nota del director",
+      "lane": "main",
+      "col": 4,
+      "step": "05",
+      "tag": "aprobada"
+    },
+    {
+      "id": "revisada",
+      "type": "active",
+      "label": "Revisada",
+      "sublabel": "el director ya la vio",
+      "lane": "revision",
+      "col": 1,
+      "tag": "revisada"
+    },
+    {
+      "id": "rechazada",
+      "type": "failure",
+      "label": "Rechazada",
+      "sublabel": "no vuelve sola",
+      "lane": "terminal",
+      "col": 1,
+      "tag": "rechazada"
+    }
+  ],
+  "transitions": [
+    {
+      "id": "enviar",
+      "from": "pendiente",
+      "to": "enviada",
+      "label": "el estudiante la envía",
+      "variant": "emphasis",
+      "labelDy": -18
+    },
+    {
+      "id": "a-revisar",
+      "from": "enviada",
+      "to": "revisada",
+      "label": "el director la revisa",
+      "route": "drop"
+    },
+    {
+      "id": "revisada-aprobada",
+      "from": "revisada",
+      "to": "aprobada",
+      "label": "aprobada + nota",
+      "variant": "emphasis",
+      "labelDx": 40
+    },
+    {
+      "id": "revisada-rechazada",
+      "from": "revisada",
+      "to": "rechazada",
+      "label": "rechazada",
+      "labelDy": 24
+    },
+    {
+      "id": "otra-version",
+      "from": "enviada",
+      "to": "pendiente",
+      "label": "sube otra versión",
+      "variant": "dashed",
+      "labelDy": 55
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Quién mueve cada paso",
+      "items": [
+        "El coordinador crea la entrega; el estudiante la solicita y el director la habilita",
+        "Subir un archivo mientras está pendiente o enviada la devuelve a pendiente"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Reglas que están en el código",
+      "items": [
+        "Solicitar exige estado creacion; habilitar exige estado solicitada; tope de 4 versiones",
+        "Rechazada no tiene retorno: subir otro archivo no la reabre"
+      ]
+    }
+  ]
+}

@@ -417,14 +417,18 @@ class AuthController extends Controller
     }
 
     /**
-     * Logout the current user (T-023).
+     * Logout the current user (T-023, RF-AUTH-LOGOUT-01).
+     *
+     * Revokes EVERY token of the user (not just the current Bearer
+     * token) so no device/session can restore the session after
+     * logout — a refresh on /login must stay unauthenticated.
      */
     public function logout(Request $request): JsonResponse
     {
         $user = $request->user();
 
         if ($user) {
-            $user->currentAccessToken()?->delete();
+            $user->tokens()->delete();
 
             AuditEvent::dispatch(
                 $user,
@@ -433,12 +437,19 @@ class AuthController extends Controller
             );
         }
 
-        // Log out of the session (Sanctum SPA cookie auth).
-        Auth::logout();
+        // Log out of the stateful (cookie) guard explicitly. Auth::logout()
+        // cannot be used here: the `auth:sanctum` middleware rebinds the
+        // default guard to sanctum for the request, and RequestGuard
+        // exposes no logout() (500 BadMethodCallException).
+        Auth::guard('web')->logout();
 
-        // Invalidate the session and regenerate the CSRF token.
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        // Invalidate the session and regenerate the CSRF token. The
+        // session only exists for stateful (cookie) requests; pure
+        // Bearer-token calls have none.
+        if ($request->hasSession()) {
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        }
 
         return response()->json(null, 204);
     }

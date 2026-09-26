@@ -16,6 +16,7 @@ class Anuncio extends Model
 
     protected $fillable = [
         'author_id',
+        'semestre_id',
         'title',
         'content',
         'published_at',
@@ -33,5 +34,10 @@ class Anuncio extends Model
     public function author(): BelongsTo
     {
         return $this->belongsTo(User::class, 'author_id');
+    }
+
+    public function semestre(): BelongsTo
+    {
+        return $this->belongsTo(Semestre::class, 'semestre_id');
     }
 }

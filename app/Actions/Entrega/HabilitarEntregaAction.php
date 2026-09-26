@@ -8,6 +8,7 @@ use App\Actions\Entrega\Exceptions\EntregaActionException;
 use App\Enums\EstadoEntrega;
 use App\Models\AuditLog;
 use App\Models\Entrega;
+use App\Models\EntregaProyecto;
 
 /**
  * Single-purpose use case: a director enables a solicited entrega so the
@@ -18,11 +19,24 @@ final class HabilitarEntregaAction
 {
     public function handle(Entrega $entrega, int $userId, string $ip, ?string $userAgent): Entrega
     {
-        if ($entrega->status->value !== EstadoEntrega::Solicitada->value) {
+        // RF-FREEZE-01: habilitar runs from solicitada (enable uploads) or
+        // from a frozen graded delivery (unfreeze: clear grade, reopen).
+        $isSolicitada = $entrega->status->value === EstadoEntrega::Solicitada->value;
+        $hasGradedPivot = EntregaProyecto::where('entrega_id', $entrega->id)
+            ->whereNotNull('director_grade')
+            ->exists();
+
+        if (! $isSolicitada && ! $hasGradedPivot) {
             throw new EntregaActionException('La entrega no está en estado solicitada.');
         }
 
         $entrega->update(['status' => EstadoEntrega::Pendiente->value]);
+
+        // RF-FREEZE-01: habilitar unfreezes graded pivots so the student can
+        // upload again.
+        EntregaProyecto::where('entrega_id', $entrega->id)
+            ->whereNotNull('director_grade')
+            ->update(['director_grade' => null]);
 
         AuditLog::create([
             'user_id' => $userId,

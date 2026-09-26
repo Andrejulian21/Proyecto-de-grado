@@ -81,8 +81,9 @@ class UpdateEntregaRequest extends FormRequest
     }
 
     /**
-     * Cross-field rules mirroring StoreEntregaRequest plus the 100% pair
-     * rule excluding the entrega's own current value.
+     * Cross-field rules mirroring StoreEntregaRequest plus the pair
+     * weight rule (partial sums allowed, only >100% blocked)
+     * excluding the entrega's own current value.
      */
     public function withValidator($validator): void
     {
@@ -94,13 +95,15 @@ class UpdateEntregaRequest extends FormRequest
                 $this->validarUnicoDocumentoAnalizableIa($validator, $archivos);
             }
 
-            // No weight validation on update — coordinator can adjust freely.
+            $this->validarPesos($validator);
         });
     }
 
     /**
-     * RF-ENT-04: enforce the 100% pair rule, excluding this entrega's own
-     * current value so the update replaces instead of double-counting.
+     * RF-ENT-04: enforce the pair weight rule on update, excluding this
+     * entrega's own current value so the update replaces instead of
+     * double-counting. Partial sums are allowed; only exceeding 100%
+     * is rejected (exact 100% is enforced at pair close time).
      */
     private function validarPesos($validator): void
     {

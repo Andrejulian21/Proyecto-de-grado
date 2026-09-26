@@ -24,6 +24,11 @@ interface Version {
     file_size: number | null;
     original_name: string;
     director_notes: string | null;
+    /**
+     * Director's grade of the per-project delivery this version belongs to
+     * (RF-FREEZE-01). Non-null means the pivot is frozen.
+     */
+    director_grade?: number | null;
     uploaded_at: string;
     created_at: string;
     archivo_requerido_id: string | null;
@@ -89,6 +94,11 @@ function formatDateTime(dateStr: string | null | undefined): string {
 
 function getDownloadUrl(filePath: string): string {
     return `/storage/${filePath}`;
+}
+
+/* RF-NOT-02rev: Spanish decimal comma for grades (4.5 → "4,5"). */
+function formatGrade(grade: number): string {
+    return String(grade).replace('.', ',');
 }
 
 function getReviewStatus(
@@ -324,7 +334,14 @@ export default function DetalleEntregaEstudiante() {
         entrega.versiones ?? [],
     );
 
+    /* RF-FREEZE-01: the pivot grade rides on each version (backend show maps
+       director_grade per version). Non-null freezes this project delivery. */
+    const frozenGrade: number | null =
+        entrega.versiones.find((v) => v.director_grade != null)?.director_grade ?? null;
+
     function canDeleteVersion(v: Version): boolean {
+        /* RF-FREEZE-01: a graded pivot freezes deletes. */
+        if (frozenGrade != null) return false;
         return !v.director_notes || v.director_notes.trim().length === 0;
     }
 
@@ -339,6 +356,9 @@ export default function DetalleEntregaEstudiante() {
     }
 
     function canUpload(doc: DocumentoConVersiones<Version>): boolean {
+        /* RF-FREEZE-01: a graded pivot freezes uploads (rechazada keeps the
+           grade null, so corrections stay open). */
+        if (frozenGrade != null) return false;
         if (vencida) return false;
         if (doc.config.versionamiento) {
             return doc.versiones.length < MAX_VERSIONS_PER_ARCHIVO;
@@ -419,6 +439,14 @@ export default function DetalleEntregaEstudiante() {
                         </div>
                     </div>
 
+                    {/* RF-NOT-02rev §A: Nota del director */}
+                    <div className="rounded-xl border border-[#e5e5e5] bg-white p-4 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
+                        <p className="text-xs text-[#78716c]">Nota del director</p>
+                        <p className="mt-1 text-sm font-semibold text-[#1c1917]">
+                            {frozenGrade != null ? formatGrade(frozenGrade) : 'Sin calificar'}
+                        </p>
+                    </div>
+
                     {/* Proyecto */}
                     <div className="rounded-xl border border-[#e5e5e5] bg-white p-4 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                         <p className="text-xs text-[#78716c]">Proyecto</p>
@@ -480,6 +508,13 @@ export default function DetalleEntregaEstudiante() {
                             <div className="flex items-center gap-2 rounded-lg bg-[#fef3c7] px-4 py-2 text-sm text-[#78350f]">
                                 <AlertTriangle className="h-4 w-4 shrink-0" />
                                 La fecha límite de la entrega ya pasó. Puedes ver los archivos, pero no subir nuevas versiones.
+                            </div>
+                        )}
+                        {/* RF-FREEZE-01: frozen banner on graded pivot */}
+                        {frozenGrade != null && (
+                            <div className="flex items-center gap-2 rounded-lg bg-[#e0e7ff] px-4 py-2 text-sm text-[#3730a3]" role="status">
+                                <Lock className="h-4 w-4 shrink-0" />
+                                Esta entrega fue calificada por el director (nota {formatGrade(frozenGrade)}). Solicita una habilitación para subir nuevas versiones.
                             </div>
                         )}
 

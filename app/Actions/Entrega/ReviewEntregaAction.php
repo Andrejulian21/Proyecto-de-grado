@@ -66,6 +66,12 @@ final class ReviewEntregaAction
                     $pivotData['director_grade'] = $data['director_grade'];
                 }
 
+                // RF-FREEZE-01: rechazada reopens the pivot — the grade stays
+                // null so the student can upload corrections.
+                if ($data['status'] === 'rechazada') {
+                    $pivotData['director_grade'] = null;
+                }
+
                 if (array_key_exists('director_notes', $data) && $data['director_notes'] !== null && $data['director_notes'] !== '') {
                     $pivotData['observaciones_director'] = $data['director_notes'];
                 }

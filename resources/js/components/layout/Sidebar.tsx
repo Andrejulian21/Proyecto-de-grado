@@ -27,16 +27,14 @@ interface SidebarProps {
 const navConfig: Record<string, { to: string; icon: typeof LayoutDashboard; label: string }[]> = {
     Coordinador: [
         { to: '/dashboard/coordinador', label: 'Panel de Control', icon: LayoutDashboard },
-        { to: '/proyectos', label: 'Proyectos', icon: FolderKanban },
         { to: '/directores', label: 'Directores', icon: UserCheck },
+        { to: '/proyectos', label: 'Proyectos', icon: FolderKanban },
         { to: '/evaluadores', label: 'Evaluadores', icon: ClipboardCheck },
-        { to: '/coordinador/usuarios', label: 'Usuarios', icon: Users },
-        { to: '/anuncios', label: 'Anuncios', icon: Megaphone },
-        { to: '/anuncios/admin', label: 'Anuncios Admin', icon: Megaphone },
         { to: '/alertas', label: 'Alertas', icon: Bell },
         { to: '/coordinador/entregas', label: 'Entregas', icon: FolderKanban },
         { to: '/notas', label: 'Notas', icon: Star },
-
+        { to: '/coordinador/usuarios', label: 'Usuarios', icon: Users },
+        { to: '/anuncios/admin', label: 'Anuncios Admin', icon: Megaphone },
         { to: '/recursos/admin', label: 'Recursos Admin', icon: FolderKanban },
     ],
     Director: [

@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { StatCard } from '@/components/ui/StatCard';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { Megaphone, Plus, Trash2, Pin, Send, Loader2, Eye, Pencil } from 'lucide-react';
+import { Megaphone, Plus, Trash2, Pin, Send, Loader2, Pencil } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
 
 interface Announcement {
@@ -14,6 +13,7 @@ interface Announcement {
     status: 'published' | 'draft';
     priority: 'high' | 'normal';
     views: number;
+    semestreId: number | null;
 }
 
 /** Shape returned by GET /api/anuncios and POST|PUT /api/admin/anuncios */
@@ -23,6 +23,12 @@ interface ApiAnnouncement {
     content: string;
     published_at: string | null;
     is_active: boolean;
+    semestre_id: number | null;
+}
+
+interface ApiSemestre {
+    id: number;
+    name: string;
 }
 
 function fromApi(a: ApiAnnouncement): Announcement {
@@ -36,6 +42,7 @@ function fromApi(a: ApiAnnouncement): Announcement {
         status: a.is_active ? 'published' : 'draft',
         priority: 'normal',
         views: 0,
+        semestreId: a.semestre_id ?? null,
     };
 }
 
@@ -51,6 +58,8 @@ export default function AnunciosAdmin() {
     const [formTitle, setFormTitle] = useState('');
     const [formContent, setFormContent] = useState('');
     const [formIsActive, setFormIsActive] = useState(true);
+    const [formSemestreId, setFormSemestreId] = useState('');
+    const [semestres, setSemestres] = useState<ApiSemestre[]>([]);
     const [submitting, setSubmitting] = useState(false);
 
     /** Fetch all announcements from the API */
@@ -71,6 +80,10 @@ export default function AnunciosAdmin() {
 
     useEffect(() => {
         fetchAnnouncements();
+        apiFetch('/api/admin/semestres')
+            .then((res) => (res.ok ? res.json() : { data: [] }))
+            .then((body) => setSemestres(body.data ?? []))
+            .catch(() => setSemestres([]));
     }, []);
 
     /** Open the create form */
@@ -79,6 +92,7 @@ export default function AnunciosAdmin() {
         setFormTitle('');
         setFormContent('');
         setFormIsActive(true);
+        setFormSemestreId('');
         setShowNewForm(true);
     };
 
@@ -88,6 +102,7 @@ export default function AnunciosAdmin() {
         setFormTitle(ann.title);
         setFormContent(ann.content);
         setFormIsActive(ann.status === 'published');
+        setFormSemestreId(ann.semestreId !== null ? String(ann.semestreId) : '');
         setShowNewForm(true);
     };
 
@@ -98,6 +113,7 @@ export default function AnunciosAdmin() {
         setFormTitle('');
         setFormContent('');
         setFormIsActive(true);
+        setFormSemestreId('');
     };
 
     /** Create or update an announcement */
@@ -110,6 +126,7 @@ export default function AnunciosAdmin() {
                 title: formTitle.trim(),
                 content: formContent.trim(),
                 is_active: formIsActive,
+                semestre_id: formSemestreId === '' ? null : Number(formSemestreId),
             };
 
             let res: Response;
@@ -172,8 +189,10 @@ export default function AnunciosAdmin() {
         }
     }
 
-    const publishedCount = announcements.filter((a) => a.status === 'published').length;
-    const totalViews = announcements.reduce((s, a) => s + a.views, 0);
+    const semestreName = (id: number | null): string => {
+        if (id === null) return 'Todos los grupos';
+        return semestres.find((s) => s.id === id)?.name ?? 'Grupo';
+    };
 
     return (
         <div className="flex flex-col gap-6">
@@ -191,13 +210,6 @@ export default function AnunciosAdmin() {
                     </button>
                 }
             />
-
-            {/* Stats */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <StatCard icon={Megaphone} label="Total anuncios" value={announcements.length} />
-                <StatCard icon={Send} label="Publicados" value={publishedCount} variant="success" />
-                <StatCard icon={Eye} label="Vistas totales" value={totalViews} />
-            </div>
 
             {/* Error banner */}
             {error && (
@@ -254,6 +266,22 @@ export default function AnunciosAdmin() {
                                 className="w-full min-h-[80px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y"
                                 required
                             />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                            <label htmlFor="ann-group" className="text-sm font-semibold text-[#1c1917]">Grupo</label>
+                            <select
+                                id="ann-group"
+                                value={formSemestreId}
+                                onChange={(e) => setFormSemestreId(e.target.value)}
+                                className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa]"
+                            >
+                                <option value="">Todos los grupos</option>
+                                {semestres.map((s) => (
+                                    <option key={s.id} value={s.id}>
+                                        {s.name}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
                         <div className="flex items-center gap-3">
                             <label className="flex items-center gap-2 cursor-pointer">
@@ -334,6 +362,7 @@ export default function AnunciosAdmin() {
                                             <p className="mt-1 text-sm text-[#57534e] line-clamp-2">{a.content}</p>
                                             <div className="mt-2 flex items-center gap-3 text-xs text-[#78716c]">
                                                 <span>{a.date}</span>
+                                                <span>{semestreName(a.semestreId)}</span>
                                                 <span>{a.views} vistas</span>
                                             </div>
                                         </div>

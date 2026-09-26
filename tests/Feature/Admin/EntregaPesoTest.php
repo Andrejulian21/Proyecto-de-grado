@@ -117,7 +117,7 @@ it('store rechaza grade_percentage fuera de rango (422)', function () {
 // Each phase (anteproyecto, desarrollo) independently sums to 100%.
 // Presentación phases do NOT participate in the grade_percentage system.
 
-it('store bloquea suma de anteproyecto que no suma exacto 100 (422)', function () {
+it('store bloquea suma de anteproyecto que supera 100 (422)', function () {
     seedEntregaConPeso($this->semestre->id, 'anteproyecto', 70.0);
 
     $response = $this->actingAs($this->coordinador)
@@ -127,10 +127,23 @@ it('store bloquea suma de anteproyecto que no suma exacto 100 (422)', function (
         ]));
 
     $response->assertStatus(422);
-    expect($response->json('errors.grade_percentage.0'))->toContain('exactamente 100%');
+    expect($response->json('errors.grade_percentage.0'))->toContain('superaría el 100%');
 });
 
-it('store bloquea anteproyecto completo que no suma exacto 100 (422)', function () {
+it('store acepta suma parcial de anteproyecto por debajo de 100', function () {
+    seedEntregaConPeso($this->semestre->id, 'anteproyecto', 60.0);
+
+    $response = $this->actingAs($this->coordinador)
+        ->postJson('/api/admin/entregas', baseEntregaPayload($this->semestre->id, [
+            'fase' => 'anteproyecto',
+            'grade_percentage' => 25,
+        ]));
+
+    $response->assertCreated();
+    expect($response->json('data.grade_percentage'))->toBe('25.00');
+});
+
+it('store bloquea anteproyecto que superaria 100 al completar (422)', function () {
     seedEntregaConPeso($this->semestre->id, 'anteproyecto', 50.0);
     seedEntregaConPeso($this->semestre->id, 'anteproyecto', 40.0);
 
@@ -141,7 +154,7 @@ it('store bloquea anteproyecto completo que no suma exacto 100 (422)', function 
         ]));
 
     $response->assertStatus(422);
-    expect($response->json('errors.grade_percentage.0'))->toContain('exactamente 100%');
+    expect($response->json('errors.grade_percentage.0'))->toContain('superaría el 100%');
 });
 
 it('store permite grade_percentage NULL sin bloquear', function () {
@@ -165,7 +178,7 @@ it('store permite completar anteproyecto en exacto 100', function () {
     expect($response->json('data.grade_percentage'))->toBe('60.00');
 });
 
-it('store bloquea suma de desarrollo que no suma exacto 100 (422)', function () {
+it('store bloquea suma de desarrollo que supera 100 (422)', function () {
     seedEntregaConPeso($this->semestre->id, 'desarrollo', 70.0);
 
     $response = $this->actingAs($this->coordinador)
@@ -175,7 +188,7 @@ it('store bloquea suma de desarrollo que no suma exacto 100 (422)', function () 
         ]));
 
     $response->assertStatus(422);
-    expect($response->json('errors.grade_percentage.0'))->toContain('exactamente 100%');
+    expect($response->json('errors.grade_percentage.0'))->toContain('superaría el 100%');
 });
 
 it('store rechaza grade_percentage en presentacion_anteproyecto (422)', function () {
@@ -214,15 +227,27 @@ it('update cambia grade_percentage a NULL sin bloquear', function () {
     expect($a->grade_percentage)->toBeNull();
 });
 
-it('update permite cambiar grade_percentage libremente sin validacion de suma', function () {
+it('update permite suma parcial sin exigir 100 exacto', function () {
     $a = seedEntregaConPeso($this->semestre->id, 'anteproyecto', 70.0);
     seedEntregaConPeso($this->semestre->id, 'anteproyecto', 20.0);
 
-    // Coordinator can adjust freely — no backend restriction on update
+    // Excluding $a itself: 20 + 40 = 60 → partial sum accepted
+    $response = $this->actingAs($this->coordinador)
+        ->putJson("/api/admin/entregas/{$a->id}", ['grade_percentage' => 40]);
+
+    $response->assertOk();
+});
+
+it('update bloquea grade_percentage que supera 100 (422)', function () {
+    $a = seedEntregaConPeso($this->semestre->id, 'anteproyecto', 70.0);
+    seedEntregaConPeso($this->semestre->id, 'anteproyecto', 20.0);
+
+    // Excluding $a itself: 20 + 90 = 110 → rejected for exceeding 100%
     $response = $this->actingAs($this->coordinador)
         ->putJson("/api/admin/entregas/{$a->id}", ['grade_percentage' => 90]);
 
-    $response->assertOk();
+    $response->assertStatus(422);
+    expect($response->json('errors.grade_percentage.0'))->toContain('superaría el 100%');
 });
 
 it('update permite cambiar anteproyecto sin considerar presentacion', function () {

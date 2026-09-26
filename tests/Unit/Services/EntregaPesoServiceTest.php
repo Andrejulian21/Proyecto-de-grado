@@ -103,14 +103,23 @@ it('validarSumaPar allows NULL even when other entregas would push the pair over
     expect(true)->toBeTrue();
 });
 
-// -- validarSumaPar: bloquea suma > 100 --------------------------------------
+// -- validarSumaPar: bloquea suma > 100 (parcial permitido) --------------------
 
-it('validarSumaPar raises when proposal would make phase sum differ from 100', function () {
+it('validarSumaPar raises when proposal would push the phase sum over 100', function () {
     seedEntregas($this->semestre->id, $this->proyecto->id, 'anteproyecto', [70.0]);
 
-    // Phase already has entries → completeness fires: sum must be exactly 100
+    // 70 + 40 = 110 → rejected for exceeding 100%
     $this->service->validarSumaPar($this->semestre->id, 'anteproyecto', 40.0);
-})->throws(ValidationException::class, 'exactamente 100%');
+})->throws(ValidationException::class, 'superaría el 100%');
+
+it('validarSumaPar allows a partial phase sum below 100', function () {
+    seedEntregas($this->semestre->id, $this->proyecto->id, 'anteproyecto', [60.0]);
+
+    // 60 + 25 = 85 → partial sum accepted, exact 100% enforced only at close
+    $this->service->validarSumaPar($this->semestre->id, 'anteproyecto', 25.0);
+
+    expect(true)->toBeTrue();
+});
 
 // -- validarSumaPar: completitud = exacto 100 --------------------------------
 
@@ -119,7 +128,7 @@ it('validarSumaPar raises when completing the phase would overshoot 100%', funct
     seedEntregas($this->semestre->id, $this->proyecto->id, 'anteproyecto', [40.0]);
 
     $this->service->validarSumaPar($this->semestre->id, 'anteproyecto', 20.0);
-})->throws(ValidationException::class, 'exactamente 100%');
+})->throws(ValidationException::class, 'superaría el 100%');
 
 it('validarSumaPar allows completing the phase at exactly 100%', function () {
     seedEntregas($this->semestre->id, $this->proyecto->id, 'anteproyecto', [40.0]);
@@ -153,7 +162,27 @@ it('validarSumaPar applies the same rules to desarrollo phase', function () {
 
     // 60 + 30 = 90, adding 20 → 110 → rejected
     $this->service->validarSumaPar($this->semestre->id, 'desarrollo', 20.0);
+})->throws(ValidationException::class, 'superaría el 100%');
+
+// -- validarCierrePar: exact 100% enforced only at close ---------------------
+
+it('validarCierrePar raises when the closed pair sum differs from 100%', function () {
+    seedEntregas($this->semestre->id, $this->proyecto->id, 'anteproyecto', [60.0]);
+    seedEntregas($this->semestre->id, $this->proyecto->id, 'anteproyecto', [25.0]);
+
+    // 60 + 25 = 85 → close rejected until the pair sums exactly 100%
+    $this->service->validarCierrePar($this->semestre->id, ['anteproyecto']);
 })->throws(ValidationException::class, 'exactamente 100%');
+
+it('validarCierrePar allows closing the pair at exactly 100%', function () {
+    seedEntregas($this->semestre->id, $this->proyecto->id, 'anteproyecto', [60.0]);
+    seedEntregas($this->semestre->id, $this->proyecto->id, 'anteproyecto', [25.0]);
+    seedEntregas($this->semestre->id, $this->proyecto->id, 'anteproyecto', [15.0]);
+
+    $this->service->validarCierrePar($this->semestre->id, ['anteproyecto']);
+
+    expect(true)->toBeTrue();
+});
 
 // -- Cross-phase isolation ---------------------------------------------------
 

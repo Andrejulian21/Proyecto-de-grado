@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '@/lib/utils';
 
 interface User {
@@ -24,7 +23,6 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const navigate = useNavigate();
 
     const isAuthenticated = user !== null;
     const role = user?.role ?? null;
@@ -83,6 +81,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { success: false, error: 'Usa el formulario de inicio de sesión.' } as const;
     }, []);
 
+    // RF-AUTH-LOGOUT-01: await POST /api/auth/logout (204), clear
+    // every client-side identity remnant, then hard-navigate to /login
+    // so a refresh can never restore the session from memory state.
     async function logout() {
         try {
             await apiFetch('/api/auth/logout', {
@@ -90,10 +91,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 headers: { Accept: 'application/json' },
             });
         } catch {
-            /* best-effort */
+            /* best-effort: still wipe local identity below */
         } finally {
             setUser(null);
-            navigate('/login', { replace: true });
+            sessionStorage.removeItem('auth_user');
+            localStorage.removeItem('user_role');
+            window.location.href = '/login';
         }
     }
 

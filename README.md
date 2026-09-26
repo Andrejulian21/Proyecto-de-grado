@@ -2,7 +2,7 @@
 
 Plataforma web para gestionar proyectos de grado de Ingeniería de Sistemas en la **UNAB** (Universidad Autónoma de Bucaramanga). Permite a coordinadores, directores, estudiantes y evaluadores externos gestionar el ciclo de vida completo: inscripción, entregas con versionado, bitácoras firmadas, evaluación y generación de reportes.
 
-Demo en vivo: https://sistemacentralizadodeproyectosdegrado.pisis.link
+Demo en vivo: https://scpgu.pisis.link
 
 ## Stack
 

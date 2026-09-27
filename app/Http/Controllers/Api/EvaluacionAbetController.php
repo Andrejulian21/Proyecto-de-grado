@@ -4,32 +4,36 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
-use App\Enums\AiErrorCode;
 use App\Enums\AiEvaluationStatus;
-use App\Exceptions\AiException;
+use App\Enums\AiEvaluationType;
 use App\Exceptions\DocumentEvaluationException;
 use App\Http\Controllers\Controller;
 use App\Models\AiDocumentEvaluation;
 use App\Models\VersionDocumento;
 use App\Services\Evaluation\Access\DirectorEntregaAccessResolver;
 use App\Services\Evaluation\AiFeedbackPresenter;
-use App\Services\Evaluation\DocumentEvaluationService;
-use App\Services\Evaluation\Interpreters\PreSubmissionResultInterpreter;
-use App\Services\Evaluation\Strategies\AbetDirectorEvaluationStrategy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 /**
- * Director-facing preliminary document analysis.
- * Reuses DocumentEvaluationService and the shared preliminary prompt; never talks to AI vendors.
+ * Read-only director view of the AI analysis requested by the student.
+ *
+ * The student-requested analysis (type pre_submission) is shown on the
+ * delivery from the director side. The director never re-runs the analysis
+ * here: there is no POST endpoint on purpose.
+ *
+ * Version rule: with ?version_id, the latest completed student analysis
+ * attached to that official version is returned; a temporary (temporal)
+ * analysis whose document hash matches the official version file is also
+ * a match, reusing the existing hash cache. Without ?version_id, the
+ * latest completed student analysis of the entrega is returned.
+ * When the student has not requested any analysis yet, data is null.
  */
 class EvaluacionAbetController extends Controller
 {
     public function __construct(
-        private readonly DocumentEvaluationService $evaluationService,
-        private readonly AbetDirectorEvaluationStrategy $strategy,
         private readonly DirectorEntregaAccessResolver $access,
-        private readonly PreSubmissionResultInterpreter $interpreter,
     ) {}
 
     /**
@@ -48,26 +52,42 @@ class EvaluacionAbetController extends Controller
 
         $versionId = $request->query('version_id');
         $versionId = $versionId !== null && $versionId !== '' ? (int) $versionId : null;
+        $versionHash = null;
 
         if ($versionId !== null) {
-            $exists = VersionDocumento::query()
+            $version = VersionDocumento::query()
                 ->where('entrega_id', $entrega)
                 ->where('id', $versionId)
-                ->exists();
+                ->first();
 
-            if (! $exists) {
+            if (! $version) {
                 return response()->json([
                     'error' => 'No se encontró la versión del documento.',
                     'code' => 'not_found',
                 ], 404);
             }
+
+            $versionHash = $this->versionFileHash($version);
         }
 
         $historial = AiDocumentEvaluation::query()
             ->where('entrega_id', $entrega)
+            ->where('type', AiEvaluationType::PreSubmission)
             ->where('status', AiEvaluationStatus::Completed)
-            ->when($versionId !== null, fn ($query) => $query->where('version_documento_id', $versionId))
+            ->when($versionId !== null, function ($query) use ($versionId, $versionHash) {
+                $query->where(function ($scoped) use ($versionId, $versionHash) {
+                    $scoped->where('version_documento_id', $versionId);
+
+                    if ($versionHash !== null) {
+                        $scoped->orWhere(function ($temporal) use ($versionHash) {
+                            $temporal->whereNull('version_documento_id')
+                                ->where('document_hash', $versionHash);
+                        });
+                    }
+                });
+            })
             ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->get();
 
         $latest = $historial->first();
@@ -85,64 +105,20 @@ class EvaluacionAbetController extends Controller
         ]);
     }
 
-    /**
-     * POST /api/director/entregas/{entrega}/evaluacion-abet
-     */
-    public function store(Request $request, int $entrega): JsonResponse
+    private function versionFileHash(VersionDocumento $version): ?string
     {
-        $validated = $request->validate([
-            'version_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
-        ]);
-
         try {
-            $outcome = $this->evaluationService->evaluate(
-                user: $request->user(),
-                entregaId: $entrega,
-                strategy: $this->strategy,
-                access: $this->access,
-                interpreter: $this->interpreter,
-                versionId: isset($validated['version_id']) ? (int) $validated['version_id'] : null,
-            );
-
-            return response()->json([
-                'data' => AiFeedbackPresenter::toArray($outcome['evaluation'], $outcome['result']),
-            ]);
-        } catch (DocumentEvaluationException $exception) {
-            return response()->json([
-                'error' => $exception->getMessage(),
-                'code' => $exception->errorCode,
-            ], $exception->httpStatus);
-        } catch (AiException $exception) {
-            if ($exception->error === AiErrorCode::QuotaExceeded) {
-                return response()->json([
-                    'error' => $exception->getMessage(),
-                    'code' => 'ai_quota_exceeded',
-                ], 429)->withHeaders([
-                    'Retry-After' => (string) ($exception->retryAfter ?? 60),
-                ]);
-            }
-
-            if ($exception->error === AiErrorCode::ProviderTimeout) {
-                return response()->json([
-                    'error' => $exception->getMessage(),
-                    'code' => 'ai_timeout',
-                ], 504);
-            }
-
-            if (in_array($exception->error, [
-                AiErrorCode::ProviderNotConfigured,
-                AiErrorCode::UnknownProvider,
-            ], true)) {
-                return response()->json([
-                    'error' => 'No fue posible conectarse al servicio de Inteligencia Artificial. Inténtalo más tarde.',
-                    'code' => 'ai_unavailable',
-                ], 503);
-            }
-
-            return response()->json([
-                'error' => 'No fue posible completar el análisis con el servicio de Inteligencia Artificial.',
-                'code' => $exception->error->value,
-            ], 502);
+            $absolute = Storage::disk('public')->path($version->file_path);
+        } catch (\Throwable) {
+            return null;
         }
+
+        if (! is_file($absolute)) {
+            return null;
+        }
+
+        $hash = hash_file('sha256', $absolute);
+
+        return $hash === false || $hash === '' ? null : $hash;
     }
 }

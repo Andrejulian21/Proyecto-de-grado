@@ -7,6 +7,18 @@ import { SignatureCodeDisplay } from '@/components/bitacoras/SignatureCode';
 
 const MAX_SEMANAS = 32;
 
+// RF-WK-03rev: fixed 422 codes returned by POST /api/bitacoras, mapped
+// to user-facing Spanish copy. Unknown shapes fall back to the
+// server message / first validation error below.
+const BITACORA_ERROR_BY_CODE: Record<string, string> = {
+    WEEK_THROTTLE: 'Ya registraste una bitácora esta semana (lunes a domingo). Solo puedes crear una por semana.',
+    SEMANA_EXCEEDS_MAX: 'La semana supera la última semana registrada para este proyecto.',
+    MEETING_DATE_DUPLICATE: 'Ya existe una bitácora con esa fecha de reunión en este proyecto.',
+    SEMANA_RANGE: 'La semana debe ser un número entero entre 1 y 32.',
+    SEMANA_DUPLICATE: 'Esa semana ya tiene una bitácora asociada en este proyecto.',
+    SEMANA_ANTERIOR: 'No puedes crear una bitácora de una semana anterior a la última registrada.',
+};
+
 interface BitacoraListItem {
     id: number;
     semana?: number | null;
@@ -160,13 +172,17 @@ export default function NuevaBitacora() {
                 }
             } else {
                 const body = await res.json().catch(() => ({}));
+                // RF-WK-03rev: prefer the fixed-code copy when present.
+                const code = typeof body.code === 'string' ? body.code : null;
+                const codedError = code ? BITACORA_ERROR_BY_CODE[code] : undefined;
                 // Laravel validation errors come back as { errors: { field: [msg] } };
                 // surface the first one so the user sees what went wrong.
                 const firstValidationError = body.errors
                     ? Object.values(body.errors).flat().find((m) => typeof m === 'string')
                     : null;
                 setError(
-                    body.error ||
+                    codedError ||
+                        body.error ||
                         body.message ||
                         firstValidationError ||
                         'Error al crear la bitacora.',

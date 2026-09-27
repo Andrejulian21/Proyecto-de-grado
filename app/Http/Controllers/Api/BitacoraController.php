@@ -83,6 +83,29 @@ class BitacoraController extends Controller
         ]);
 
         if ($validator->fails()) {
+            // RF-WK-03rev: fixed 422 codes for semana violations. The
+            // `errors` bag is kept so historical validation assertions
+            // still pass; `code` is the machine-readable contract.
+            $failed = $validator->failed();
+
+            if (isset($failed['semana'])) {
+                $semanaRules = array_keys($failed['semana']);
+
+                if (in_array('Unique', $semanaRules, true)) {
+                    return response()->json([
+                        'code' => 'SEMANA_DUPLICATE',
+                        'error' => 'La semana '.$request->input('semana').' ya tiene una bitácora asociada en este proyecto.',
+                        'errors' => $validator->errors(),
+                    ], 422);
+                }
+
+                return response()->json([
+                    'code' => 'SEMANA_RANGE',
+                    'error' => 'La semana debe ser un número entero entre 1 y 32.',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
@@ -91,26 +114,58 @@ class BitacoraController extends Controller
         // Issue #38: central rule via BitacoraPolicy.
         $this->authorize('create', [Bitacora::class, Proyecto::findOrFail((int) $data['proyecto_id'])]);
 
-        // PR 4 — RF-WK-05: validar que no exista otra bitácora en la misma
-        // semana calendario (lunes a domingo) para el mismo proyecto.
-        $weekStart = Carbon::parse($data['meeting_date'])->startOfWeek();
-        $weekEnd = Carbon::parse($data['meeting_date'])->endOfWeek();
-        $existingWeek = Bitacora::where('proyecto_id', (int) $data['proyecto_id'])
-            ->whereBetween('meeting_date', [$weekStart, $weekEnd])
+        $proyectoId = (int) $data['proyecto_id'];
+
+        // RF-WK-03rev: one creation per real week (Mon–Sun) anchored on
+        // `created_at`, so backdating `meeting_date` into another week
+        // cannot bypass the limit.
+        $weekStart = now()->startOfWeek();
+        $createdThisWeek = Bitacora::where('proyecto_id', $proyectoId)
+            ->where('created_at', '>=', $weekStart)
             ->exists();
 
-        if ($existingWeek) {
+        if ($createdThisWeek) {
             return response()->json([
-                'error' => 'Ya existe una bitácora para esta semana. Solo puedes crear una por semana.',
+                'code' => 'WEEK_THROTTLE',
+                'error' => 'Ya existe una bitácora creada esta semana (lunes a domingo). Solo puedes crear una por semana.',
             ], 422);
         }
 
-        // Validar que la semana sea mayor a la maxima existente
-        $maxSemana = Bitacora::where('proyecto_id', (int) $data['proyecto_id'])->max('semana');
+        // RF-WK-03rev: `semana` stays user-declared (1–32) but in
+        // practice must be exactly max+1. Going backwards is rejected
+        // with SEMANA_ANTERIOR; duplicates are already rejected above
+        // with SEMANA_DUPLICATE.
+        $maxSemana = Bitacora::where('proyecto_id', $proyectoId)->max('semana');
 
-        if ($maxSemana !== null && (int) $data['semana'] <= (int) $maxSemana) {
+        if ($maxSemana !== null) {
+            $nuevaSemana = (int) $data['semana'];
+            $max = (int) $maxSemana;
+
+            if ($nuevaSemana < $max) {
+                return response()->json([
+                    'code' => 'SEMANA_ANTERIOR',
+                    'error' => 'No puedes crear una bitácora de una semana anterior a la última (Semana '.$max.').',
+                ], 422);
+            }
+
+            if ($nuevaSemana > $max + 1) {
+                return response()->json([
+                    'code' => 'SEMANA_EXCEEDS_MAX',
+                    'error' => 'No puedes crear una bitácora con una semana mayor a la última creada (Semana '.$maxSemana.').',
+                ], 422);
+            }
+        }
+
+        // RF-WK-03rev: `meeting_date` is unique per proyecto (calendar day).
+        $meetingDay = Carbon::parse($data['meeting_date'])->toDateString();
+        $dateExists = Bitacora::where('proyecto_id', $proyectoId)
+            ->whereDate('meeting_date', $meetingDay)
+            ->exists();
+
+        if ($dateExists) {
             return response()->json([
-                'error' => 'No puedes crear una bitacora con una semana anterior o igual a la ultima creada (Semana '.$maxSemana.').',
+                'code' => 'MEETING_DATE_DUPLICATE',
+                'error' => 'Ya existe una bitácora con esa fecha de reunión en este proyecto.',
             ], 422);
         }
 

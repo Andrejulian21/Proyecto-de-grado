@@ -13,7 +13,7 @@ final class PreliminaryAnalysisPrompt
 {
     public function promptVersion(): string
     {
-        return 'preliminary_analysis_v1';
+        return 'preliminary_analysis_v2';
     }
 
     public function systemInstructions(): string
@@ -24,7 +24,7 @@ Tu rol es orientar al estudiante con observaciones generales ANTES o como apoyo 
 NO reemplazas al director ni al evaluador oficial.
 NO asignas nota académica, NO calificas, NO determinas si el trabajo aprueba o reprueba, y NO presentas el análisis como evaluación definitiva.
 
-Usa ÚNICAMENTE la descripción de la entrega como contexto de lo que se espera que el estudiante entregue, y el documento en Markdown.
+Usa ÚNICAMENTE la descripción de la entrega y los criterios de aceptación como contexto de lo que se espera que el estudiante entregue, y el documento en Markdown.
 
 Revisa de forma general:
 - Coherencia
@@ -32,6 +32,7 @@ Revisa de forma general:
 - Estructura
 - Completitud aparente
 - Correspondencia general entre el documento y lo solicitado en la descripción
+- Correspondencia criterio por criterio: evalúa cada criterio de aceptación por separado e indica si el documento lo cumple, lo cumple parcialmente o no lo cumple
 - Observaciones que puedan ayudar al estudiante
 
 Responde ÚNICAMENTE con un JSON válido (sin markdown, sin texto fuera del JSON) con esta forma exacta:
@@ -50,6 +51,8 @@ Responde ÚNICAMENTE con un JSON válido (sin markdown, sin texto fuera del JSON
 Reglas:
 - Sé concreto y comprensible; no inventes contenido que no esté en el documento.
 - Si falta información, indícalo en observaciones; no completes huecos con supuestos.
+- En el campo "correspondencia", evalúa criterio por criterio cada criterio de aceptación (cumple, cumple parcialmente o no cumple); si no se definieron criterios, evalúa solo contra la descripción.
+- Los criterios no cubiertos por el documento menciónalos también en "observaciones".
 - NO incluyas puntajes, notas, porcentajes de aprobación ni rúbricas por métrica.
 - En la conclusión recuerda que se trata de una orientación preliminar y que la evaluación académica corresponde al director.
 - Todo el texto en español.
@@ -65,6 +68,10 @@ PROMPT;
             ? (string) $context->description
             : 'No se definió una descripción de lo esperado para esta entrega.';
 
+        $acceptanceCriteria = filled($context->acceptanceCriteria)
+            ? (string) $context->acceptanceCriteria
+            : 'No se definieron criterios de aceptación para esta entrega.';
+
         return [
             [
                 'title' => 'Proyecto',
@@ -77,6 +84,10 @@ PROMPT;
             [
                 'title' => 'Lo que se espera en esta entrega (descripción)',
                 'body' => $description,
+            ],
+            [
+                'title' => 'Criterios de aceptación',
+                'body' => $acceptanceCriteria,
             ],
             [
                 'title' => 'Documento (Markdown)',

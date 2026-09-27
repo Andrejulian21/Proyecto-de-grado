@@ -126,6 +126,9 @@ final class DocumentEvaluationService
                     proyectoCode: (string) ($proyecto->code ?? ''),
                     description: $entrega->description,
                     originalFileName: $originalName,
+                    acceptanceCriteria: $entrega->acceptance_criteria !== null
+                        ? (string) $entrega->acceptance_criteria
+                        : null,
                 );
 
                 $userPrompt = $this->promptComposer->compose($strategy->contextSections($context));

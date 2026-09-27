@@ -17,5 +17,6 @@ final readonly class EvaluationContext
         public string $proyectoCode,
         public ?string $description,
         public string $originalFileName,
+        public ?string $acceptanceCriteria = null,
     ) {}
 }

@@ -112,6 +112,22 @@ class EvaluacionInteligenteController extends Controller
                 'code' => $exception->errorCode,
             ], $exception->httpStatus);
         } catch (AiException $exception) {
+            if ($exception->error === AiErrorCode::QuotaExceeded) {
+                return response()->json([
+                    'error' => $exception->getMessage(),
+                    'code' => 'ai_quota_exceeded',
+                ], 429)->withHeaders([
+                    'Retry-After' => (string) ($exception->retryAfter ?? 60),
+                ]);
+            }
+
+            if ($exception->error === AiErrorCode::ProviderTimeout) {
+                return response()->json([
+                    'error' => $exception->getMessage(),
+                    'code' => 'ai_timeout',
+                ], 504);
+            }
+
             if (in_array($exception->error, [
                 AiErrorCode::ProviderNotConfigured,
                 AiErrorCode::UnknownProvider,

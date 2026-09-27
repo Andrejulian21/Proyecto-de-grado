@@ -45,5 +45,8 @@
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="AI_PROVIDER" value="null" force="true"/>
+        <env name="GEMINI_API_KEY" value="" force="true"/>
+        <env name="GEMINI_API_KEY_2" value="" force="true"/>
     </php>
 </phpunit>

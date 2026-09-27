@@ -29,6 +29,10 @@ final class AiFeedbackPresenter
             'tiempo_ms' => $evaluation->processing_ms,
             'resultado' => $result ?? $evaluation->result_json,
             'analizado_en' => $evaluation->created_at?->toIso8601String(),
+            'truncado' => (bool) ($evaluation->was_truncated ?? false),
+            'aviso_truncado' => ((bool) ($evaluation->was_truncated ?? false)) && $evaluation->original_chars !== null
+                ? "El documento se recortó de {$evaluation->original_chars} a {$evaluation->kept_chars} caracteres para el análisis."
+                : null,
         ];
     }
 }

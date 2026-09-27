@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Services\Ai\Providers\GeminiProvider;
 use App\Services\Ai\Providers\NullAiProvider;
 
 /**
@@ -34,10 +35,25 @@ return [
     */
     'providers' => [
         'null' => NullAiProvider::class,
+        'gemini' => GeminiProvider::class,
         // Future examples (not implemented in this change):
         // 'fastapi' => App\Services\Ai\Providers\FastApiAiProvider::class,
         // 'openai' => App\Services\Ai\Providers\OpenAiProvider::class,
-        // 'gemini' => App\Services\Ai\Providers\GeminiProvider::class,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Gemini provider settings
+    |--------------------------------------------------------------------------
+    |
+    | Model defaults to gemini-3.8-flash (stable free-tier); override with
+    | AI_GEMINI_MODEL. Timeouts are per feature in seconds.
+    |
+    */
+    'gemini' => [
+        'model' => env('AI_GEMINI_MODEL', 'gemini-3.8-flash'),
+        'chat_timeout' => 30,
+        'analysis_timeout' => 60,
     ],
 
 ];

@@ -13,5 +13,7 @@ enum AiErrorCode: string
     case ProviderNotConfigured = 'provider_not_configured';
     case InvalidRequest = 'invalid_request';
     case ProviderFailed = 'provider_failed';
+    case QuotaExceeded = 'quota_exceeded';
+    case ProviderTimeout = 'provider_timeout';
     case Unexpected = 'unexpected';
 }

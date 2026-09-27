@@ -22,6 +22,8 @@ export interface AnalisisIa {
     estado?: string;
     resultado: ResultadoAnalisisPreliminar | null;
     analizado_en: string | null;
+    truncado?: boolean;
+    aviso_truncado?: string | null;
 }
 
 export interface DocumentoSolicitado {

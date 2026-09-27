@@ -197,9 +197,6 @@ Route::middleware([
         Route::get('/entregas/{entrega}/evaluacion-abet', [EvaluacionAbetController::class, 'show'])
             ->whereNumber('entrega')
             ->name('entregas.evaluacion_abet.show');
-        Route::post('/entregas/{entrega}/evaluacion-abet', [EvaluacionAbetController::class, 'store'])
-            ->whereNumber('entrega')
-            ->name('entregas.evaluacion_abet');
 
         // PR 1 — Cartas de aval (solo director)
         Route::middleware('role:Director')->group(function () {

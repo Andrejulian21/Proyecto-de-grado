@@ -48,7 +48,8 @@ beforeEach(function () {
         'semester_id' => $this->semestre->id,
         'director_id' => $this->director->id,
     ]);
-    $this->proyecto->estudiantes()->attach($this->estudiante);
+    // NOTE: estudiante stays unattached — the orientation chat is single-use
+    // for students without director or project (see GeminiAssistantLimitsTest).
 });
 
 function bindAssistantStubProvider(string $json): void

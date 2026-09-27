@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
+import { toDateInputValue } from '@/lib/fechas';
 import { SignatureCodeDisplay } from '@/components/bitacoras/SignatureCode';
 
 const MAX_SEMANAS = 32;
@@ -27,7 +28,9 @@ interface BitacoraListItem {
 export default function NuevaBitacora() {
     const navigate = useNavigate();
 
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    // RF-DATE-01: local date for the <input type="date"> default —
+    // toISOString() is UTC and can shift the day near midnight.
+    const [date, setDate] = useState(toDateInputValue());
     const [time, setTime] = useState('12:00');
     const [topic, setTopic] = useState('');
     const [description, setDescription] = useState('');

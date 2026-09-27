@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { RevisionBitacoraView, type BitacoraDetail } from '@/components/bitacoras/RevisionBitacoraView';
 import { apiFetch } from '@/lib/utils';
+import { formatFechaHora } from '@/lib/fechas';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function RevisionBitacoraDirector() {
@@ -60,7 +61,7 @@ export default function RevisionBitacoraDirector() {
                             name: directorName,
                             signed: !!b.director_signed_at,
                             signedAt: b.director_signed_at
-                                ? new Date(b.director_signed_at).toLocaleString('es-CO')
+                                ? formatFechaHora(b.director_signed_at)
                                 : null,
                         },
                     ],

@@ -207,11 +207,11 @@ final class AcademicAssistantService
 
     public function remainingMessages(AiAssistantConversation $conversation): int
     {
-        $used = $conversation->messages()
-            ->where('role', AiMessageRole::User->value)
+        $answered = $conversation->messages()
+            ->where('role', AiMessageRole::Assistant->value)
             ->count();
 
-        return max(0, self::MAX_MESSAGES_PER_STUDENT - $used);
+        return max(0, self::MAX_MESSAGES_PER_STUDENT - $answered);
     }
 
     private function assertSingleUseLimit(AiAssistantConversation $conversation): void

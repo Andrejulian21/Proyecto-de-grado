@@ -230,7 +230,7 @@ it('rechaza analizar un documento no configurado para IA', function () {
         ->and(AiDocumentEvaluation::query()->where('status', AiEvaluationStatus::Completed)->count())->toBe(0);
 });
 
-it('conserva el historial cuando se analiza de nuevo la misma version', function () {
+it('reutiliza la evaluacion cacheada cuando se analiza de nuevo la misma version', function () {
     $version = storeHistorialVersion($this->entrega, 'marco-teorico', 1, 'Marco teorico v1');
 
     $stub = bindHistorialIaStub(historialIaPayload('Primer análisis'));
@@ -244,21 +244,21 @@ it('conserva el historial cuando se analiza de nuevo la misma version', function
     $primerJson = $primero->result_json;
     $primeraFecha = $primero->created_at?->toIso8601String();
 
+    // Same document hash + prompt version + model → cached row reused, no new provider call.
     $stub->json = historialIaPayload('Segundo análisis');
     $this->actingAs($this->estudiante)
         ->postJson("/api/estudiante/entregas/{$this->entrega->id}/evaluacion-inteligente", [
             'version_id' => $version->id,
         ])
-        ->assertOk();
+        ->assertOk()
+        ->assertJsonPath('data.resultado.resumen', 'Primer análisis');
 
-    expect(AiDocumentEvaluation::query()->where('version_documento_id', $version->id)->count())->toBe(2);
+    expect(AiDocumentEvaluation::query()->where('version_documento_id', $version->id)->count())->toBe(1);
+    expect($stub->calls)->toBe(1);
 
     $primero->refresh();
     expect($primero->result_json)->toBe($primerJson)
-        ->and($primero->created_at?->toIso8601String())->toBe($primeraFecha)
-        ->and(AiDocumentEvaluation::query()->get()->contains(
-            fn (AiDocumentEvaluation $row): bool => ($row->result_json['resumen'] ?? null) === 'Segundo análisis',
-        ))->toBeTrue();
+        ->and($primero->created_at?->toIso8601String())->toBe($primeraFecha);
 });
 
 it('guarda el analisis temporal en el documento IA sin crear version', function () {

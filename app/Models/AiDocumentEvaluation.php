@@ -21,8 +21,12 @@ class AiDocumentEvaluation extends Model
         'type',
         'status',
         'provider',
+        'model',
         'document_hash',
         'prompt_version',
+        'was_truncated',
+        'original_chars',
+        'kept_chars',
         'processing_ms',
         'result_json',
         'error_code',
@@ -35,6 +39,7 @@ class AiDocumentEvaluation extends Model
             'type' => AiEvaluationType::class,
             'status' => AiEvaluationStatus::class,
             'result_json' => 'array',
+            'was_truncated' => 'boolean',
         ];
     }
 

@@ -25,6 +25,7 @@ use App\Services\Ai\DTO\AiRequest;
 use App\Services\Documents\DocumentFormatDetector;
 use App\Services\Documents\DocumentMarkdownRouter;
 use App\Services\Evaluation\DTO\EvaluationContext;
+use App\Support\Ai\MarkdownTruncator;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -41,6 +42,7 @@ final class DocumentEvaluationService
         private readonly DocumentFormatDetector $formatDetector,
         private readonly AiPromptComposer $promptComposer,
         private readonly AiGateway $aiGateway,
+        private readonly MarkdownTruncator $truncator,
     ) {}
 
     /**
@@ -90,6 +92,15 @@ final class DocumentEvaluationService
 
             $this->assertSupportedDocument($absolutePath, $originalName);
 
+            $model = (string) config('ai.gemini.model', 'gemini-2.0-flash');
+            $promptVersion = $strategy->promptVersion();
+
+            $cached = $this->findCachedEvaluation($entrega->id, $strategy->type()->value, (string) $documentHash, $promptVersion, $model);
+
+            if ($cached !== null) {
+                return ['evaluation' => $cached, 'result' => $cached->result_json ?? []];
+            }
+
             $record = AiDocumentEvaluation::create([
                 'user_id' => $user->id,
                 'entrega_id' => $entrega->id,
@@ -97,15 +108,18 @@ final class DocumentEvaluationService
                 'archivo_requerido_id' => $documentoId,
                 'type' => $strategy->type(),
                 'status' => AiEvaluationStatus::Pending,
+                'provider' => 'gemini',
+                'model' => $model,
                 'document_hash' => $documentHash,
-                'prompt_version' => $strategy->promptVersion(),
+                'prompt_version' => $promptVersion,
             ]);
 
             try {
                 $markdown = $this->markdownRouter->convert($absolutePath, $originalName);
+                $truncated = $this->truncator->truncate($markdown);
 
                 $context = new EvaluationContext(
-                    documentMarkdown: $markdown,
+                    documentMarkdown: $truncated['text'],
                     entregaTitle: (string) $entrega->title,
                     phase: (string) ($entrega->phase?->value ?? $entrega->phase ?? ''),
                     proyectoTitle: (string) $proyecto->title,
@@ -119,7 +133,7 @@ final class DocumentEvaluationService
                 $aiResponse = $this->aiGateway->complete(new AiRequest([
                     AiMessage::system($strategy->systemInstructions()),
                     AiMessage::user($userPrompt),
-                ]));
+                ], options: ['feature' => 'analysis']));
 
                 $result = $interpreter->interpret($aiResponse->content);
                 $processingMs = (int) ((hrtime(true) - $started) / 1_000_000);
@@ -129,6 +143,9 @@ final class DocumentEvaluationService
                     'provider' => $aiResponse->provider,
                     'processing_ms' => $processingMs,
                     'result_json' => $result,
+                    'was_truncated' => $truncated['wasTruncated'],
+                    'original_chars' => $truncated['originalChars'],
+                    'kept_chars' => $truncated['keptChars'],
                     'error_code' => null,
                     'error_message' => null,
                 ]);
@@ -273,6 +290,28 @@ final class DocumentEvaluationService
         if (! $entrega->versionEsAnalizableIa($version)) {
             throw DocumentEvaluationException::notAnalyzable();
         }
+    }
+
+    /**
+     * Deterministic cache: same file hash + prompt version + model reuses
+     * the latest completed evaluation without calling the provider.
+     */
+    private function findCachedEvaluation(
+        int $entregaId,
+        string $type,
+        string $documentHash,
+        string $promptVersion,
+        string $model,
+    ): ?AiDocumentEvaluation {
+        return AiDocumentEvaluation::query()
+            ->where('entrega_id', $entregaId)
+            ->where('type', $type)
+            ->where('status', AiEvaluationStatus::Completed)
+            ->where('document_hash', $documentHash)
+            ->where('prompt_version', $promptVersion)
+            ->where('model', $model)
+            ->orderByDesc('id')
+            ->first();
     }
 
     private function markFailed(

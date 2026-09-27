@@ -12,11 +12,18 @@ use Illuminate\Support\Facades\Validator;
 
 class AnuncioController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $anuncios = Anuncio::where('is_active', true)
-            ->orderByDesc('published_at')
-            ->get();
+        $query = Anuncio::where('is_active', true);
+
+        if ($request->filled('semestre_id')) {
+            $semestreId = (int) $request->query('semestre_id');
+            $query->where(function ($q) use ($semestreId): void {
+                $q->where('semestre_id', $semestreId)->orWhereNull('semestre_id');
+            });
+        }
+
+        $anuncios = $query->orderByDesc('published_at')->get();
 
         return response()->json(['data' => $anuncios]);
     }
@@ -33,6 +40,7 @@ class AnuncioController extends Controller
         $validator = Validator::make($request->all(), [
             'title' => 'required|string|max:500',
             'content' => 'required|string',
+            'semestre_id' => 'nullable|exists:semestres,id',
             'published_at' => 'nullable|date',
             'is_active' => 'boolean',
         ]);
@@ -55,6 +63,7 @@ class AnuncioController extends Controller
         $validator = Validator::make($request->all(), [
             'title' => 'string|max:500',
             'content' => 'string',
+            'semestre_id' => 'nullable|exists:semestres,id',
             'published_at' => 'nullable|date',
             'is_active' => 'boolean',
         ]);

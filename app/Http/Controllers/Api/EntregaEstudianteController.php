@@ -67,7 +67,22 @@ class EntregaEstudianteController extends Controller
             return response()->json(['error' => 'Esta entrega no está asignada a tu proyecto.'], 403);
         }
 
-        // Auto-promote to pendiente if needed
+        // RF-FREEZE-01: a graded pivot (director_grade non-null) freezes
+        // upload for that project delivery only. The shared template never
+        // freezes, so other projects keep uploading.
+        $existingPivot = EntregaProyecto::where('entrega_id', $entrega->id)
+            ->where('proyecto_id', $proyecto->id)
+            ->first();
+
+        if ($existingPivot !== null && $existingPivot->director_grade !== null) {
+            return response()->json([
+                'code' => 'PIVOT_FROZEN',
+                'error' => 'La entrega ya fue calificada por el director. Solicita una habilitación para subir nuevas versiones.',
+            ], 403);
+        }
+
+        // Auto-promote to pendiente if needed (only reached when the pivot
+        // is not frozen — graded pivots return 403 above).
         if (! in_array($entrega->status->value, [EstadoEntrega::Pendiente->value, EstadoEntrega::Enviada->value], true)) {
             $entrega->update(['status' => EstadoEntrega::Pendiente->value]);
         }

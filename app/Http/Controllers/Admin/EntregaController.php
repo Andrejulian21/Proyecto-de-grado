@@ -293,6 +293,17 @@ class EntregaController extends Controller
             return response()->json(['error' => 'No autorizado.'], 404);
         }
 
+        // RF-FREEZE-01: a graded pivot freezes version deletes for that
+        // project delivery only.
+        $pivot = $version->entregaProyecto;
+
+        if ($pivot !== null && $pivot->director_grade !== null) {
+            return response()->json([
+                'code' => 'PIVOT_FROZEN',
+                'error' => 'La entrega ya fue calificada por el director. Solicita una habilitación para modificar las versiones.',
+            ], 403);
+        }
+
         // Can only delete if director hasn't made observations
         if ($version->director_notes && trim($version->director_notes) !== '') {
             return response()->json([

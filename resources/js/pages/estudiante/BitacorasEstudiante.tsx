@@ -7,6 +7,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SignatureCodeDisplay } from '@/components/bitacoras/SignatureCode';
 import { apiFetch } from '@/lib/utils';
+import { formatFecha } from '@/lib/fechas';
 
 /* ── Types ── */
 
@@ -55,9 +56,9 @@ function mapSignStatus(s: string | undefined): 'signed' | 'pending' | 'unsigned'
     return 'unsigned';
 }
 
+/* Dates via @/lib/fechas — RF-DATE-01 (local parse, no TZ shift). */
 function formatDate(d: string | undefined): string {
-    if (!d) return '—';
-    return new Date(d).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' });
+    return formatFecha(d);
 }
 
 /* ── Main component ── */

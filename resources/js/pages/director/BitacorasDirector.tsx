@@ -5,6 +5,7 @@ import { DataTable, type Column } from '@/components/ui/DataTable';
 import { StatCard } from '@/components/ui/StatCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useDirectorBitacoras, type BitacoraEntry } from '@/hooks/useDirectorBitacoras';
+import { formatFecha } from '@/lib/fechas';
 import { SignatureCodeInput } from '@/components/bitacoras/SignatureCode';
 import {
     FileText, Users, Clock, Eye, Loader2,
@@ -40,10 +41,9 @@ export default function BitacorasDirector() {
             key: 'meeting_date',
             label: 'Fecha',
             render: (row) => {
-                const d = row.meeting_date ? new Date(row.meeting_date) : null;
                 return (
                     <span className="whitespace-nowrap text-[#1c1917]">
-                        {d ? d.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
+                        {formatFecha(row.meeting_date)}
                     </span>
                 );
             },

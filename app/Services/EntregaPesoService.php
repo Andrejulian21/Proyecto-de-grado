@@ -8,7 +8,7 @@ use App\Models\Entrega;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Validates the 100% weight rule per phase at semester level (RF-ENT-04).
+ * Validates the weight rule per phase at semester level (RF-ENT-04).
  *
  * Each phase (anteproyecto, desarrollo) independently sums to 100%.
  * Presentación phases (presentacion_anteproyecto, presentacion_final)
@@ -18,9 +18,10 @@ use Illuminate\Validation\ValidationException;
  * and applies on both Store and Update. Entregas with grade_percentage =
  * NULL do not count.
  *
- * Preventive block: (existing NOT NULL phase sum) + (proposed value) > 100.
- * Completeness: when a phase already has at least one entrega with a NOT
- * NULL percentage, the phase sum MUST be exactly 100.
+ * Create/update accept PARTIAL sums: they only block when
+ * (existing NOT NULL phase sum) + (proposed value) exceeds 100%.
+ * The exact-100% completeness check lives ONLY in validarCierrePar(),
+ * which the future pair close/publish endpoint must call.
  */
 final class EntregaPesoService
 {
@@ -61,13 +62,14 @@ final class EntregaPesoService
     }
 
     /**
-     * Enforce the 100% pair rule for a proposed weight.
+     * Enforce the pair weight rule for a proposed weight.
      *
      * A NULL proposal never blocks (RF-ENT-04: NULL does not participate).
+     * Partial sums are allowed on create/update; only exceeding 100%
+     * is rejected. The exact-100% requirement is enforced exclusively
+     * at pair close/publish time via validarCierrePar().
      *
-     * @throws ValidationException when the pair sum would exceed 100% or,
-     *                             when both phases already carry weights,
-     *                             the pair sum is not exactly 100%.
+     * @throws ValidationException when the pair sum would exceed 100%.
      */
     public function validarSumaPar(int $semesterId, string $fase, ?float $nuevoPeso, ?int $excluirEntregaId = null): void
     {
@@ -85,21 +87,10 @@ final class EntregaPesoService
         $sumaActual = $this->obtenerSumaPar($semesterId, $par, $excluirEntregaId);
         $total = $sumaActual + $nuevoPeso;
 
-        if ($this->parCompleto($semesterId, $par, $excluirEntregaId) && abs($total - 100.0) > 0.0001) {
+        if ($total - 100.0 > 0.0001) {
             throw ValidationException::withMessages([
                 'grade_percentage' => sprintf(
-                    'La suma de porcentajes del par de fases debe ser exactamente 100%% (actual %s%% + nuevo %s%% = %s%%)',
-                    $this->formato($sumaActual),
-                    $this->formato($nuevoPeso),
-                    $this->formato($total),
-                ),
-            ]);
-        }
-
-        if ($total > 100.0) {
-            throw ValidationException::withMessages([
-                'grade_percentage' => sprintf(
-                    'La suma de porcentajes del par de fases superaría el 100%% (actual %s%% + nuevo %s%% = %s%%)',
+                    'La suma de porcentajes del par de fases superaría el 100%% (actual %s%% + nuevo %s%% = %s%%). La suma exacta del 100%% se valida al cierre del par.',
                     $this->formato($sumaActual),
                     $this->formato($nuevoPeso),
                     $this->formato($total),
@@ -109,41 +100,32 @@ final class EntregaPesoService
     }
 
     /**
-     * Whether ALL deliveries in the phase already have a NOT NULL
-     * grade_percentage. Only when every delivery has a weight does
-     * the phase become "complete" and the 100% exact rule fires.
+     * Enforce the exact-100% pair rule at pair close/publish time.
      *
-     * @param  list<string>  $par
+     * TODO: no close/publish endpoint calls this yet. When the pair
+     * close endpoint is built, it MUST call validarCierrePar() so a
+     * phase cannot be closed while its weight sum differs from 100%.
+     *
+     * @param  list<string>  $fasesPar
+     *
+     * @throws ValidationException when the pair sum is not exactly 100%.
      */
-    private function parCompleto(int $semesterId, array $par, ?int $excluirEntregaId): bool
+    public function validarCierrePar(int $semesterId, array $fasesPar): void
     {
-        foreach ($par as $fase) {
-            // Total deliveries in this phase for the semester (excluding the one being edited)
-            $total = Entrega::query()
-                ->where('semester_id', $semesterId)
-                ->where('phase', $fase)
-                ->when($excluirEntregaId !== null, fn ($query) => $query->where('id', '!=', $excluirEntregaId))
-                ->count();
-
-            if ($total === 0) {
-                return false;
-            }
-
-            // Deliveries WITH a percentage
-            $conPeso = Entrega::query()
-                ->where('semester_id', $semesterId)
-                ->where('phase', $fase)
-                ->whereNotNull('grade_percentage')
-                ->when($excluirEntregaId !== null, fn ($query) => $query->where('id', '!=', $excluirEntregaId))
-                ->count();
-
-            // If any delivery is missing a percentage, the phase is incomplete
-            if ($conPeso < $total) {
-                return false;
-            }
+        if ($fasesPar === []) {
+            return;
         }
 
-        return true;
+        $sumaActual = $this->obtenerSumaPar($semesterId, $fasesPar);
+
+        if (abs($sumaActual - 100.0) > 0.0001) {
+            throw ValidationException::withMessages([
+                'grade_percentage' => sprintf(
+                    'La suma de porcentajes del par de fases debe ser exactamente 100%% (actual %s%%)',
+                    $this->formato($sumaActual),
+                ),
+            ]);
+        }
     }
 
     private function formato(float $valor): string

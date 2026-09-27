@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { PhaseStepper, type PhaseStep } from '@/components/project/PhaseStepper';
 import { useDirectorProyectos, type DirectorProyecto } from '@/hooks/useDirectorProyectos';
 import { apiFetch } from '@/lib/utils';
+import { formatFecha } from '@/lib/fechas';
 import {
     ArrowLeft, Search, BookOpen, FileText,
     Calendar, Clock, User, Award, ChevronDown, ChevronRight,
@@ -447,7 +448,7 @@ function ProjectDetailView({ proyectoId }: { proyectoId: number }) {
                             <p className="text-xs text-[#78716c]">Inicio</p>
                             <p className="text-sm font-semibold text-[#1c1917]">
                                 {project.start_date
-                                    ? new Date(project.start_date).toLocaleDateString('es-CO')
+                                    ? formatFecha(project.start_date)
                                     : '—'}
                             </p>
                         </div>
@@ -458,7 +459,7 @@ function ProjectDetailView({ proyectoId }: { proyectoId: number }) {
                             <p className="text-xs text-[#78716c]">Fin</p>
                             <p className="text-sm font-semibold text-[#1c1917]">
                                 {project.end_date
-                                    ? new Date(project.end_date).toLocaleDateString('es-CO')
+                                    ? formatFecha(project.end_date)
                                     : '—'}
                             </p>
                         </div>
@@ -520,7 +521,7 @@ function ProjectDetailView({ proyectoId }: { proyectoId: number }) {
                                             <div className="min-w-0">
                                                 <p className="text-sm font-semibold text-[#1c1917] truncate">{d.title}</p>
                                                 <p className="text-xs text-[#78716c]">
-                                                    {new Date(d.due_date).toLocaleDateString('es-CO')}
+                                                    {formatFecha(d.due_date)}
                                                 </p>
                                             </div>
                                         </div>

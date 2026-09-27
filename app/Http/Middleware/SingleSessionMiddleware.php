@@ -6,6 +6,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Laravel\Sanctum\TransientToken;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -42,10 +43,13 @@ class SingleSessionMiddleware
 
         $token = $user->currentAccessToken();
 
-        // Cookie/Sanctum-SPA session auth has no API token. Single-session
-        // is inherent to the session driver (AuthController purges prior
-        // session rows at login), so there is nothing to enforce here.
-        if (! $token) {
+        // Cookie/Sanctum-SPA session auth carries a TransientToken (an
+        // in-memory marker with no database row) or nothing at all.
+        // There is no persisted token to compare — TransientToken has
+        // no getKey(), so it must pass through before the comparison
+        // below. Single-session stays inherent to the session driver
+        // (AuthController purges prior session rows at login).
+        if (! $token || $token instanceof TransientToken) {
             return $next($request);
         }
 

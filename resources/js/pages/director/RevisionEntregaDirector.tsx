@@ -8,6 +8,7 @@ import {
     CheckCircle2, Send,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
+import { formatFecha, formatFechaHora } from '@/lib/fechas';
 import type { AnalisisIa, DocumentoSolicitado } from '@/types/entregas';
 import {
     agruparVersionesPorArchivo,
@@ -74,34 +75,13 @@ function statusConfig(status: string) {
     return STATUS_MAP[status] ?? { label: status, variant: 'inactivo' as const };
 }
 
+/* Dates via @/lib/fechas — RF-DATE-01 (local parse, no TZ shift). */
 function formatDate(dateStr: string | null | undefined): string {
-    if (!dateStr) return '—';
-    try {
-        const d = new Date(dateStr);
-        return d.toLocaleDateString('es-CO', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-        });
-    } catch {
-        return dateStr;
-    }
+    return formatFechaHora(dateStr);
 }
 
 function formatDateShort(dateStr: string | null | undefined): string {
-    if (!dateStr) return '—';
-    try {
-        const d = new Date(dateStr);
-        return d.toLocaleDateString('es-CO', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-        });
-    } catch {
-        return dateStr;
-    }
+    return formatFecha(dateStr);
 }
 function getDownloadUrl(filePath: string): string {
     return `/storage/${filePath}`;
@@ -147,6 +127,10 @@ export default function RevisionEntregaDirector() {
     const [submitting, setSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
+
+    /* ── RF-FREEZE-01: habilitar (unfreeze) state ── */
+    const [habilitando, setHabilitando] = useState(false);
+    const [habilitarMsg, setHabilitarMsg] = useState<string | null>(null);
 
     /* ── Fetch entrega ── */
     useEffect(() => {
@@ -234,6 +218,34 @@ export default function RevisionEntregaDirector() {
             setSubmitError(message);
         } finally {
             setSubmitting(false);
+        }
+    }
+
+    /* ── RF-FREEZE-01: habilitar path — clears the pivot grade and
+       reopens student uploads. ── */
+    async function handleHabilitar() {
+        if (!entregaId) return;
+        setHabilitando(true);
+        setHabilitarMsg(null);
+        try {
+            const res = await apiFetch(`/api/admin/entregas/${entregaId}/habilitar`, {
+                method: 'PUT',
+            });
+            if (!res.ok) {
+                const body = await res.json().catch(() => null);
+                const raw = body?.error ?? body?.message ?? null;
+                throw new Error(typeof raw === 'string' ? raw : `Error ${res.status}`);
+            }
+            const refreshRes = await apiFetch(`/api/admin/entregas/${entregaId}`);
+            if (refreshRes.ok) {
+                const json = await refreshRes.json();
+                setEntrega(json.data ?? json);
+            }
+            setHabilitarMsg('Entrega habilitada: la nota se limpió y el estudiante puede subir nuevas versiones.');
+        } catch (err) {
+            setHabilitarMsg(err instanceof Error ? err.message : 'Error al habilitar la entrega.');
+        } finally {
+            setHabilitando(false);
         }
     }
 
@@ -416,6 +428,16 @@ export default function RevisionEntregaDirector() {
                         </div>
                     </div>
 
+                    {/* RF-NOT-02rev §A: Nota del director (versión seleccionada) */}
+                    <div className="rounded-xl border border-[#e5e5e5] bg-white p-4 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
+                        <p className="text-xs text-[#78716c]">Nota del director</p>
+                        <p className="mt-1 text-sm font-semibold text-[#1c1917]">
+                            {selectedVersion?.director_grade != null
+                                ? String(selectedVersion.director_grade).replace('.', ',')
+                                : 'Sin calificar'}
+                        </p>
+                    </div>
+
                     {/* Proyecto */}
                     <div className="rounded-xl border border-[#e5e5e5] bg-white p-4 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                         <p className="text-xs text-[#78716c]">Proyecto</p>
@@ -446,6 +468,31 @@ export default function RevisionEntregaDirector() {
                         <p className="text-sm leading-relaxed text-[#1c1917] whitespace-pre-wrap">
                             {entrega.acceptance_criteria}
                         </p>
+                    </div>
+                )}
+
+                {/* ── RF-FREEZE-01: frozen banner + habilitar path ── */}
+                {selectedVersion?.director_grade != null && (
+                    <div className="flex flex-col gap-3 rounded-xl border border-[#c7d2fe] bg-[#eef2ff] p-4 sm:flex-row sm:items-center sm:justify-between" role="status">
+                        <p className="text-sm text-[#3730a3]">
+                            Entrega calificada (nota {String(selectedVersion.director_grade).replace('.', ',')}). Las subidas del estudiante están bloqueadas.
+                        </p>
+                        <button
+                            type="button"
+                            onClick={handleHabilitar}
+                            disabled={habilitando}
+                            className="inline-flex min-h-[40px] shrink-0 items-center justify-center gap-2 rounded-lg bg-[#4338ca] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#3730a3] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            {habilitando ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : null}
+                            {habilitando ? 'Habilitando...' : 'Habilitar entrega'}
+                        </button>
+                    </div>
+                )}
+                {habilitarMsg && (
+                    <div className="rounded-lg border border-[#bbf7d0] bg-[#f0fdf4] px-4 py-2 text-sm text-[#166534]">
+                        {habilitarMsg}
                     </div>
                 )}
 

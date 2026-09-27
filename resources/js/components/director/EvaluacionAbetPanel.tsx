@@ -27,6 +27,8 @@ function toAnalisis(payload: Record<string, unknown> | null | undefined): Analis
         estado: payload.estado as string | undefined,
         resultado: (payload.resultado as ResultadoAnalisisPreliminar | null) ?? null,
         analizado_en: (payload.analizado_en as string | null) ?? null,
+        truncado: Boolean(payload.truncado),
+        aviso_truncado: (payload.aviso_truncado as string | null) ?? null,
     };
 }
 
@@ -124,6 +126,20 @@ export function EvaluacionAbetPanel({
                 return;
             }
 
+            if (res.status === 429 || payload?.code === 'ai_quota_exceeded') {
+                setActionError(
+                    payload?.error ?? 'Límite de cuota de IA alcanzado. Inténtalo de nuevo en 60 segundos.',
+                );
+                return;
+            }
+
+            if (res.status === 504 || payload?.code === 'ai_timeout') {
+                setActionError(
+                    payload?.error ?? 'El análisis tardó demasiado. Inténtalo de nuevo.',
+                );
+                return;
+            }
+
             if (!res.ok) {
                 setActionError(payload?.error ?? 'No fue posible completar el análisis preliminar.');
                 return;
@@ -193,6 +209,10 @@ export function EvaluacionAbetPanel({
             )}
 
             <RetroalimentacionIa analisis={historial} />
+
+            {historial[0]?.aviso_truncado && (
+                <p className="mt-3 text-xs text-[#78716c]">{historial[0].aviso_truncado}</p>
+            )}
 
             {!loadingLatest && historial.length === 0 && !actionError && !aiUnavailable && (
                 <p className="text-xs text-[#78716c]">

@@ -55,7 +55,9 @@ export default function AnalisisAutomaticoEntregas() {
     const [processing, setProcessing] = useState(false);
     const [actionError, setActionError] = useState<string | null>(null);
     const [aiUnavailable, setAiUnavailable] = useState(false);
+    const [quotaExceeded, setQuotaExceeded] = useState(false);
     const [resultado, setResultado] = useState<ResultadoAnalisis | null>(null);
+    const [avisoTruncado, setAvisoTruncado] = useState<string | null>(null);
 
     const entregaId = Number(entregaIdParam);
 
@@ -119,6 +121,8 @@ export default function AnalisisAutomaticoEntregas() {
         setProcessing(true);
         setActionError(null);
         setAiUnavailable(false);
+        setQuotaExceeded(false);
+        setAvisoTruncado(null);
         setResultado(null);
 
         try {
@@ -140,6 +144,21 @@ export default function AnalisisAutomaticoEntregas() {
                 return;
             }
 
+            if (res.status === 429 || payload?.code === 'ai_quota_exceeded') {
+                setQuotaExceeded(true);
+                setActionError(
+                    payload?.error ?? 'Límite de cuota de IA alcanzado. Inténtalo de nuevo en 60 segundos.',
+                );
+                return;
+            }
+
+            if (res.status === 504 || payload?.code === 'ai_timeout') {
+                setActionError(
+                    payload?.error ?? 'El análisis tardó demasiado. Inténtalo de nuevo.',
+                );
+                return;
+            }
+
             if (!res.ok) {
                 setActionError(
                     typeof payload?.error === 'string'
@@ -150,6 +169,9 @@ export default function AnalisisAutomaticoEntregas() {
             }
 
             setResultado(payload.data?.resultado ?? null);
+            if (typeof payload.data?.aviso_truncado === 'string') {
+                setAvisoTruncado(payload.data.aviso_truncado);
+            }
         } catch {
             setActionError('No se pudo completar el análisis. Verifica tu conexión e inténtalo de nuevo.');
         } finally {
@@ -273,6 +295,29 @@ export default function AnalisisAutomaticoEntregas() {
                         {actionError && !aiUnavailable && (
                             <div className="rounded-xl border border-[#fecaca] bg-[#fef2f2] p-4 text-xs text-[#991b1b]">
                                 {actionError}
+                            </div>
+                        )}
+
+                        {quotaExceeded && (
+                            <div className="rounded-xl border border-[#fde68a] bg-[#fffbeb] p-4">
+                                <div className="flex items-start gap-2.5">
+                                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#d97706]" />
+                                    <div>
+                                        <p className="text-xs font-semibold text-[#78350f]">
+                                            Límite de cuota de IA alcanzado
+                                        </p>
+                                        <p className="mt-1 text-xs text-[#78350f]">
+                                            {actionError ??
+                                                'Límite de cuota de IA alcanzado. Inténtalo de nuevo en 60 segundos.'}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {avisoTruncado && (
+                            <div className="rounded-xl border border-[#e5e5e5] bg-[#fafaf9] p-4">
+                                <p className="text-xs text-[#57534e]">{avisoTruncado}</p>
                             </div>
                         )}
 

@@ -172,8 +172,14 @@ export default function RevisionEntregaDirector() {
         if (!entregaId || !decision) return;
 
         // RF-NOT-02: the note is captured when the review approves the delivery.
+        // New contract: the grade is REQUIRED to approve — block the submit
+        // with a visible error instead of letting the backend 422.
         let directorGradePayload: number | undefined;
-        if (decision === 'aprobada' && directorGrade.trim() !== '') {
+        if (decision === 'aprobada') {
+            if (directorGrade.trim() === '') {
+                setSubmitError('La nota del director es obligatoria al aprobar la entrega.');
+                return;
+            }
             const nota = Number(directorGrade);
             if (!Number.isFinite(nota) || nota < 0 || nota > 5) {
                 setSubmitError('La nota del director debe estar entre 0 y 5.');
@@ -207,8 +213,21 @@ export default function RevisionEntregaDirector() {
 
             if (!res.ok) {
                 const body = await res.json().catch(() => null);
-                const raw = body?.error ?? body?.message ?? body?.errors ?? null;
-                const msg = typeof raw === 'string' ? raw : `Error ${res.status}`;
+                // Backend error envelope: {"error": {"message": "..."}}.
+                // Validator failures: {"errors": {...}}. Map both to Spanish.
+                const raw: unknown =
+                    body?.error?.message ?? body?.error ?? body?.message ?? null;
+                let msg: string;
+                if (typeof raw === 'string') {
+                    msg = raw;
+                } else if (body?.errors && typeof body.errors === 'object') {
+                    const first = Object.values(body.errors)
+                        .flat()
+                        .find((v): v is string => typeof v === 'string');
+                    msg = first ?? `Error ${res.status}`;
+                } else {
+                    msg = `Error ${res.status}`;
+                }
                 throw new Error(msg);
             }
 
@@ -747,7 +766,7 @@ export default function RevisionEntregaDirector() {
                                     htmlFor="director-grade"
                                     className="text-xs font-bold uppercase tracking-[0.05em] text-[#57534e]"
                                 >
-                                    Nota del director (0 – 5)
+                                    Nota del director (0 – 5) · obligatoria para aprobar
                                 </label>
                                 <input
                                     id="director-grade"
@@ -755,14 +774,16 @@ export default function RevisionEntregaDirector() {
                                     min={0}
                                     max={5}
                                     step={0.1}
+                                    required
                                     value={directorGrade}
                                     onChange={(e) => setDirectorGrade(e.target.value)}
                                     disabled={cerrada}
                                     placeholder="Ej: 4.5"
+                                    aria-describedby="director-grade-hint"
                                     className="w-full min-h-[40px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] disabled:bg-[#f5f5f4] disabled:opacity-70 tabular-nums"
                                 />
-                                <p className="text-xs text-[#a8a29e]">
-                                    La nota se guarda al aprobar la entrega (escala 0-5).
+                                <p id="director-grade-hint" className="text-xs text-[#a8a29e]">
+                                    La nota es obligatoria para aprobar la entrega (escala 0-5, máximo 2 decimales).
                                 </p>
                             </div>
                         )}

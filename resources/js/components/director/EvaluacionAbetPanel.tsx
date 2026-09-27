@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/utils';
 import { RetroalimentacionIa } from '@/components/entregas/RetroalimentacionIa';
 import type { AnalisisIa, ResultadoAnalisisPreliminar } from '@/types/entregas';
-import { AlertTriangle, Brain, Loader2 } from 'lucide-react';
+import { Brain, Loader2 } from 'lucide-react';
 
 interface Props {
     entregaId: number;
@@ -32,6 +32,11 @@ function toAnalisis(payload: Record<string, unknown> | null | undefined): Analis
     };
 }
 
+/** Only student-requested analyses are shown to the director. */
+function soloAnalisisEstudiante(items: AnalisisIa[]): AnalisisIa[] {
+    return items.filter((item) => item.tipo === undefined || item.tipo === 'pre_submission');
+}
+
 export function EvaluacionAbetPanel({
     entregaId,
     versionId,
@@ -39,16 +44,15 @@ export function EvaluacionAbetPanel({
     isConvertible,
     analisisInicial = [],
 }: Props) {
-    const [processing, setProcessing] = useState(false);
     const [loadingLatest, setLoadingLatest] = useState(true);
-    const [historial, setHistorial] = useState<AnalisisIa[]>(analisisInicial);
-    const [actionError, setActionError] = useState<string | null>(null);
-    const [aiUnavailable, setAiUnavailable] = useState(false);
+    const [historial, setHistorial] = useState<AnalisisIa[]>(() =>
+        soloAnalisisEstudiante(analisisInicial),
+    );
+    const [loadError, setLoadError] = useState<string | null>(null);
 
     useEffect(() => {
-        setHistorial(analisisInicial);
-        setActionError(null);
-        setAiUnavailable(false);
+        setHistorial(soloAnalisisEstudiante(analisisInicial));
+        setLoadError(null);
         // Reset when the selected version changes; do not depend on array identity.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [versionId]);
@@ -63,27 +67,36 @@ export function EvaluacionAbetPanel({
             }
 
             setLoadingLatest(true);
+            setLoadError(null);
             try {
                 const res = await apiFetch(
                     `/api/director/entregas/${entregaId}/evaluacion-abet?version_id=${versionId}`,
                 );
                 const payload = await res.json().catch(() => ({}));
-                if (!res.ok || cancelled) return;
+                if (!res.ok || cancelled) {
+                    if (!res.ok && !cancelled) {
+                        setLoadError(
+                            typeof payload?.error === 'string'
+                                ? payload.error
+                                : 'No se pudo cargar el análisis de IA.',
+                        );
+                    }
+                    return;
+                }
                 const items = Array.isArray(payload?.historial)
                     ? (payload.historial as Record<string, unknown>[])
                         .map((row) => toAnalisis(row))
                         .filter((row): row is AnalisisIa => row !== null)
                     : [];
                 const latest = toAnalisis(payload?.data);
-                if (items.length > 0) {
-                    setHistorial(items);
-                } else if (latest) {
-                    setHistorial([latest]);
-                } else {
-                    setHistorial([]);
-                }
+                const estudiante = soloAnalisisEstudiante(
+                    items.length > 0 ? items : latest ? [latest] : [],
+                );
+                setHistorial(estudiante);
             } catch {
-                // Optional preload — keep analisisInicial
+                if (!cancelled) {
+                    setLoadError('No se pudo cargar el análisis de IA. Inténtalo de nuevo.');
+                }
             } finally {
                 if (!cancelled) setLoadingLatest(false);
             }
@@ -95,109 +108,35 @@ export function EvaluacionAbetPanel({
         };
     }, [entregaId, versionId]);
 
-    async function handleEvaluate() {
-        if (!versionId) {
-            setActionError('Selecciona una versión DOCX o PDF para analizar.');
-            return;
-        }
-        if (!isConvertible) {
-            setActionError('Solo se aceptan documentos en formato DOCX o PDF.');
-            return;
-        }
-
-        setProcessing(true);
-        setActionError(null);
-        setAiUnavailable(false);
-
-        try {
-            const res = await apiFetch(`/api/director/entregas/${entregaId}/evaluacion-abet`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ version_id: versionId }),
-            });
-            const payload = await res.json().catch(() => ({}));
-
-            if (res.status === 503 || payload?.code === 'ai_unavailable') {
-                setAiUnavailable(true);
-                setActionError(
-                    payload?.error ??
-                        'El servicio de Inteligencia Artificial no se encuentra disponible temporalmente.',
-                );
-                return;
-            }
-
-            if (res.status === 429 || payload?.code === 'ai_quota_exceeded') {
-                setActionError(
-                    payload?.error ?? 'Límite de cuota de IA alcanzado. Inténtalo de nuevo en 60 segundos.',
-                );
-                return;
-            }
-
-            if (res.status === 504 || payload?.code === 'ai_timeout') {
-                setActionError(
-                    payload?.error ?? 'El análisis tardó demasiado. Inténtalo de nuevo.',
-                );
-                return;
-            }
-
-            if (!res.ok) {
-                setActionError(payload?.error ?? 'No fue posible completar el análisis preliminar.');
-                return;
-            }
-
-            const created = toAnalisis(payload?.data);
-            if (created) {
-                setHistorial((prev) => [created, ...prev.filter((item) => item.id !== created.id)]);
-            }
-        } catch {
-            setActionError('No fue posible contactar al servicio de análisis. Inténtalo de nuevo.');
-        } finally {
-            setProcessing(false);
-        }
-    }
-
     return (
         <div className="rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                    <Brain className="h-5 w-5 text-[#c2410c]" />
-                    <div>
-                        <h3 className="text-base font-bold text-[#1c1917]">Análisis preliminar de IA</h3>
-                        <p className="text-xs text-[#78716c]">
-                            Retroalimentación informativa sobre el documento oficial seleccionado
-                            {versionLabel ? ` · ${versionLabel}` : ''}. No es una calificación académica.
-                        </p>
-                    </div>
+            <div className="mb-4 flex items-center gap-2">
+                <Brain className="h-5 w-5 text-[#c2410c]" />
+                <div>
+                    <h3 className="text-base font-bold text-[#1c1917]">
+                        Análisis de IA solicitado por el estudiante
+                    </h3>
+                    <p className="text-xs text-[#78716c]">
+                        Último análisis preliminar pedido por el estudiante
+                        {versionLabel ? ` · ${versionLabel}` : ''}. Es orientación
+                        informativa, no una calificación académica.
+                    </p>
                 </div>
-                <button
-                    type="button"
-                    onClick={() => void handleEvaluate()}
-                    disabled={processing || !versionId || !isConvertible}
-                    className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-lg bg-[#c2410c] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#9a330a] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                    {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
-                    {processing ? 'Analizando…' : 'Ejecutar análisis preliminar'}
-                </button>
             </div>
 
-            {(aiUnavailable || actionError) && (
+            {loadError && (
                 <div
-                    className="mb-4 flex items-start gap-3 rounded-lg border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm text-[#991b1b]"
+                    className="mb-4 rounded-lg border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm text-[#991b1b]"
                     role="alert"
                 >
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                    <p>
-                        {aiUnavailable
-                            ? 'El servicio de Inteligencia Artificial no se encuentra disponible temporalmente. Inténtalo más tarde.'
-                            : actionError}
-                    </p>
+                    {loadError}
                 </div>
             )}
 
             {!isConvertible && versionId && (
                 <p className="mb-4 text-xs text-[#78716c]">
-                    La versión seleccionada no es DOCX ni PDF. Selecciona un documento Word o PDF para
-                    analizar.
+                    La versión seleccionada no es DOCX ni PDF. El análisis de IA solo está
+                    disponible para documentos Word o PDF.
                 </p>
             )}
 
@@ -214,10 +153,10 @@ export function EvaluacionAbetPanel({
                 <p className="mt-3 text-xs text-[#78716c]">{historial[0].aviso_truncado}</p>
             )}
 
-            {!loadingLatest && historial.length === 0 && !actionError && !aiUnavailable && (
+            {!loadingLatest && historial.length === 0 && !loadError && (
                 <p className="text-xs text-[#78716c]">
-                    Ejecuta el análisis para obtener una orientación preliminar de esta versión. No sustituye
-                    tu evaluación académica como director.
+                    El estudiante aún no ha solicitado un análisis de IA para esta versión.
+                    Cuando lo pida desde su panel, el resultado aparecerá aquí.
                 </p>
             )}
         </div>

@@ -46,12 +46,12 @@ return [
     | Gemini provider settings
     |--------------------------------------------------------------------------
     |
-    | Model defaults to gemini-2.0-flash (stable free-tier); override with
+    | Model defaults to gemini-3.8-flash (stable free-tier); override with
     | AI_GEMINI_MODEL. Timeouts are per feature in seconds.
     |
     */
     'gemini' => [
-        'model' => env('AI_GEMINI_MODEL', 'gemini-2.0-flash'),
+        'model' => env('AI_GEMINI_MODEL', 'gemini-3.8-flash'),
         'chat_timeout' => 30,
         'analysis_timeout' => 60,
     ],

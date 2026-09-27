@@ -658,6 +658,7 @@ export default function RevisionEntregaDirector() {
                     <EvaluacionAbetPanel
                         entregaId={entrega.id}
                         versionId={selectedVersion.id}
+                        proyectoId={proyectoId ?? null}
                         versionLabel={`${activeArchivo?.config.nombre ?? 'Documento'} · Versión ${selectedVersion.version_number}`}
                         isConvertible={/\.(docx|pdf)$/i.test(
                             selectedVersion.original_name || selectedVersion.file_path || '',

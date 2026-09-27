@@ -14,7 +14,6 @@ use App\Services\Evaluation\Access\DirectorEntregaAccessResolver;
 use App\Services\Evaluation\AiFeedbackPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * Read-only director view of the AI analysis requested by the student.
@@ -23,12 +22,12 @@ use Illuminate\Support\Facades\Storage;
  * delivery from the director side. The director never re-runs the analysis
  * here: there is no POST endpoint on purpose.
  *
- * Version rule: with ?version_id, the latest completed student analysis
- * attached to that official version is returned; a temporary (temporal)
- * analysis whose document hash matches the official version file is also
- * a match, reusing the existing hash cache. Without ?version_id, the
- * latest completed student analysis of the entrega is returned.
- * When the student has not requested any analysis yet, data is null.
+ * Group rule: with ?proyecto_id, the latest completed student analysis
+ * attributed to that project group is returned (official versions linked
+ * to the group pivot, or temporal analyses authored by a group student).
+ * Without ?proyecto_id, the latest completed student analysis of the
+ * entrega is returned. When the student has not requested any analysis
+ * yet, data is null.
  */
 class EvaluacionAbetController extends Controller
 {
@@ -52,38 +51,34 @@ class EvaluacionAbetController extends Controller
 
         $versionId = $request->query('version_id');
         $versionId = $versionId !== null && $versionId !== '' ? (int) $versionId : null;
-        $versionHash = null;
+        $proyectoId = $request->query('proyecto_id');
+        $proyectoId = $proyectoId !== null && $proyectoId !== '' ? (int) $proyectoId : null;
 
         if ($versionId !== null) {
-            $version = VersionDocumento::query()
+            $versionExists = VersionDocumento::query()
                 ->where('entrega_id', $entrega)
                 ->where('id', $versionId)
-                ->first();
+                ->exists();
 
-            if (! $version) {
+            if (! $versionExists) {
                 return response()->json([
                     'error' => 'No se encontró la versión del documento.',
                     'code' => 'not_found',
                 ], 404);
             }
-
-            $versionHash = $this->versionFileHash($version);
         }
 
         $historial = AiDocumentEvaluation::query()
             ->where('entrega_id', $entrega)
             ->where('type', AiEvaluationType::PreSubmission)
             ->where('status', AiEvaluationStatus::Completed)
-            ->when($versionId !== null, function ($query) use ($versionId, $versionHash) {
-                $query->where(function ($scoped) use ($versionId, $versionHash) {
-                    $scoped->where('version_documento_id', $versionId);
-
-                    if ($versionHash !== null) {
-                        $scoped->orWhere(function ($temporal) use ($versionHash) {
-                            $temporal->whereNull('version_documento_id')
-                                ->where('document_hash', $versionHash);
-                        });
-                    }
+            ->when($proyectoId !== null, function ($query) use ($proyectoId) {
+                $query->where(function ($scoped) use ($proyectoId) {
+                    $scoped->whereHas('versionDocumento.entregaProyecto', function ($pivot) use ($proyectoId) {
+                        $pivot->where('proyecto_id', $proyectoId);
+                    })->orWhereHas('user.proyectosComoEstudiante', function ($members) use ($proyectoId) {
+                        $members->where('proyectos.id', $proyectoId);
+                    });
                 });
             })
             ->orderByDesc('created_at')
@@ -103,22 +98,5 @@ class EvaluacionAbetController extends Controller
             'data' => AiFeedbackPresenter::toArray($latest),
             'historial' => $historial->map(fn (AiDocumentEvaluation $row) => AiFeedbackPresenter::toArray($row))->values(),
         ]);
-    }
-
-    private function versionFileHash(VersionDocumento $version): ?string
-    {
-        try {
-            $absolute = Storage::disk('public')->path($version->file_path);
-        } catch (\Throwable) {
-            return null;
-        }
-
-        if (! is_file($absolute)) {
-            return null;
-        }
-
-        $hash = hash_file('sha256', $absolute);
-
-        return $hash === false || $hash === '' ? null : $hash;
     }
 }

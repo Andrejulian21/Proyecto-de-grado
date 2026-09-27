@@ -128,25 +128,24 @@ it('muestra al director el ultimo analisis pedido por el estudiante', function (
         ->assertJsonPath('historial.0.id', $latest->id);
 });
 
-it('empareja el analisis temporal del estudiante con la version oficial por hash', function () {
+it('muestra el ultimo analisis del grupo aunque el borrador difiera del oficial', function () {
     $version = storeLecturaDocxVersion($this->entrega);
-    $hash = hash_file('sha256', Storage::disk('public')->path($version->file_path));
 
     $temporal = makeStudentEvaluation($this->entrega, $this->estudiante, [
         'version_documento_id' => null,
-        'document_hash' => $hash,
+        'document_hash' => 'hash-borrador-distinto',
         'result_json' => ['resumen' => 'Análisis del borrador.', 'conclusion' => 'Borrador.'],
     ]);
 
     $response = $this->actingAs($this->director)
-        ->getJson("/api/director/entregas/{$this->entrega->id}/evaluacion-abet?version_id={$version->id}");
+        ->getJson("/api/director/entregas/{$this->entrega->id}/evaluacion-abet?version_id={$version->id}&proyecto_id={$this->proyecto->id}");
 
     $response->assertOk()
         ->assertJsonPath('data.id', $temporal->id)
         ->assertJsonPath('data.resultado.resumen', 'Análisis del borrador.');
 });
 
-it('filtra por version oficial exacta cuando existe analisis de version', function () {
+it('version_id solo valida existencia y devuelve el ultimo del grupo', function () {
     $version = storeLecturaDocxVersion($this->entrega);
     $otra = storeLecturaDocxVersion($this->entrega, 'otro.docx');
     $otra->update(['version_number' => 2]);
@@ -155,17 +154,43 @@ it('filtra por version oficial exacta cuando existe analisis de version', functi
         'version_documento_id' => $otra->id,
         'document_hash' => 'hash-otra',
     ]);
-    $exacta = makeStudentEvaluation($this->entrega, $this->estudiante, [
-        'version_documento_id' => $version->id,
-        'document_hash' => 'hash-exacta',
-        'result_json' => ['resumen' => 'Análisis de esta versión.', 'conclusion' => 'Exacta.'],
+    $ultimo = makeStudentEvaluation($this->entrega, $this->estudiante, [
+        'version_documento_id' => null,
+        'document_hash' => 'hash-temporal-ultimo',
+        'result_json' => ['resumen' => 'Análisis más reciente.', 'conclusion' => 'Reciente.'],
     ]);
 
     $response = $this->actingAs($this->director)
-        ->getJson("/api/director/entregas/{$this->entrega->id}/evaluacion-abet?version_id={$version->id}");
+        ->getJson("/api/director/entregas/{$this->entrega->id}/evaluacion-abet?version_id={$version->id}&proyecto_id={$this->proyecto->id}");
 
     $response->assertOk()
-        ->assertJsonPath('data.id', $exacta->id)
+        ->assertJsonPath('data.id', $ultimo->id)
+        ->assertJsonCount(2, 'historial');
+});
+
+it('con proyecto_id solo muestra analisis de ese grupo', function () {
+    $otroEstudiante = User::factory()->create(['role' => UserRole::Estudiante->value]);
+    $otroProyecto = Proyecto::create([
+        'title' => 'Otro proyecto mismo entrega',
+        'semester_id' => $this->semestre->id,
+        'director_id' => $this->director->id,
+    ]);
+    $otroProyecto->estudiantes()->attach($otroEstudiante);
+    // Nota: ProyectoObserver ya vincula la entrega al proyecto recién creado.
+
+    $propio = makeStudentEvaluation($this->entrega, $this->estudiante, [
+        'document_hash' => 'hash-propio',
+        'result_json' => ['resumen' => 'Análisis propio.', 'conclusion' => 'Propio.'],
+    ]);
+    makeStudentEvaluation($this->entrega, $otroEstudiante, [
+        'document_hash' => 'hash-otro',
+        'result_json' => ['resumen' => 'Análisis otro grupo.', 'conclusion' => 'Otro.'],
+    ]);
+
+    $this->actingAs($this->director)
+        ->getJson("/api/director/entregas/{$this->entrega->id}/evaluacion-abet?proyecto_id={$this->proyecto->id}")
+        ->assertOk()
+        ->assertJsonPath('data.id', $propio->id)
         ->assertJsonCount(1, 'historial');
 });
 

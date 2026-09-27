@@ -429,7 +429,7 @@ export default function LandingPage() {
                                     <ul className="mt-4 space-y-2">
                                         <li className="flex items-center gap-2.5 rounded-lg border border-[#e5e5e5] bg-[#fafaf9] px-3 py-2">
                                             <FileUp className="h-4 w-4 shrink-0 text-[#c2410c]" />
-                                            <p className="truncate text-xs font-semibold text-[#1c1917]">Entrega v3 recibida por tu director</p>
+                                            <p className="truncate text-xs font-semibold text-[#1c1917]">Anteproyecto aprobado por tu director</p>
                                         </li>
                                         <li className="flex items-center gap-2.5 rounded-lg border border-[#e5e5e5] bg-[#fafaf9] px-3 py-2">
                                             <Fingerprint className="h-4 w-4 shrink-0 text-[#c2410c]" />
@@ -437,13 +437,14 @@ export default function LandingPage() {
                                         </li>
                                         <li className="flex items-center gap-2.5 rounded-lg border border-[#e5e5e5] bg-[#fafaf9] px-3 py-2">
                                             <ClipboardCheck className="h-4 w-4 shrink-0 text-[#c2410c]" />
-                                            <p className="truncate text-xs font-semibold text-[#1c1917]">Rúbrica de evaluación disponible</p>
+                                            <p className="truncate text-xs font-semibold text-[#1c1917]">Sustentación calificada por jurados</p>
                                         </li>
                                     </ul>
                                 </div>
                             </div>
                         </div>
-                        <div className="absolute -left-3 bottom-10 hidden items-center gap-2.5 rounded-xl border border-[#e5e5e5] bg-white px-4 py-3 shadow-warm-md md:flex lg:-left-8">
+                        <div className="mt-3 hidden grid-cols-2 gap-3 md:grid">
+                        <div className="flex flex-1 items-center gap-2.5 rounded-xl border border-[#e5e5e5] bg-white px-4 py-3 shadow-warm-md">
                             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#dcfce7]">
                                 <Check className="h-5 w-5 text-[#14532d]" />
                             </span>
@@ -452,7 +453,7 @@ export default function LandingPage() {
                                 <span className="block text-[11px] text-[#78716c]">Firma registrada hoy</span>
                             </span>
                         </div>
-                        <div className="absolute -right-2 top-8 hidden items-center gap-2.5 rounded-xl border border-[#e5e5e5] bg-white px-4 py-3 shadow-warm-md md:flex lg:-right-6">
+                        <div className="flex flex-1 items-center gap-2.5 rounded-xl border border-[#e5e5e5] bg-white px-4 py-3 shadow-warm-md">
                             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#fed7aa]">
                                 <Sparkles className="h-5 w-5 text-[#c2410c]" />
                             </span>
@@ -460,6 +461,7 @@ export default function LandingPage() {
                                 <span className="block text-xs font-bold text-[#1c1917]">Orientación IA</span>
                                 <span className="block text-[11px] text-[#78716c]">Sugerencia lista para ti</span>
                             </span>
+                        </div>
                         </div>
                     </div>
                 </div>

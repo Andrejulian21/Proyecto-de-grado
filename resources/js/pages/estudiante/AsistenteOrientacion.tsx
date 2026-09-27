@@ -129,10 +129,10 @@ export default function AsistenteOrientacion() {
     const [chatBlocked, setChatBlocked] = useState(false);
     const [mensajesRestantes, setMensajesRestantes] = useState<number | null>(null);
     const [resultado, setResultado] = useState<ResultadoAsistente | null>(null);
-    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const chatScrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: 'smooth' });
     }, [messages, sending]);
 
     useEffect(() => {
@@ -347,7 +347,7 @@ export default function AsistenteOrientacion() {
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
                 <div className="lg:col-span-3">
                     <div className="flex h-[600px] flex-col rounded-xl border border-[#e5e5e5] bg-white shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
-                        <div className="flex-1 space-y-4 overflow-y-auto p-4">
+                        <div ref={chatScrollRef} className="flex-1 space-y-4 overflow-y-auto p-4">
                             {loading ? (
                                 <div className="flex h-full items-center justify-center text-sm text-[#78716c]">
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -401,7 +401,6 @@ export default function AsistenteOrientacion() {
                                     El asistente está elaborando una respuesta…
                                 </div>
                             )}
-                            <div ref={messagesEndRef} />
                         </div>
 
                         <div className="border-t border-[#e5e5e5] p-4">

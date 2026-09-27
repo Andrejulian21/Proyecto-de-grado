@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/utils';
+import { formatFechaHora } from '@/lib/fechas';
 import { RetroalimentacionIa } from '@/components/entregas/RetroalimentacionIa';
 import type { AnalisisIa, ResultadoAnalisisPreliminar } from '@/types/entregas';
 import { Brain, Loader2 } from 'lucide-react';
@@ -7,6 +8,7 @@ import { Brain, Loader2 } from 'lucide-react';
 interface Props {
     entregaId: number;
     versionId: number | null;
+    proyectoId?: number | null;
     versionLabel?: string;
     isConvertible: boolean;
     analisisInicial?: AnalisisIa[];
@@ -40,6 +42,7 @@ function soloAnalisisEstudiante(items: AnalisisIa[]): AnalisisIa[] {
 export function EvaluacionAbetPanel({
     entregaId,
     versionId,
+    proyectoId = null,
     versionLabel,
     isConvertible,
     analisisInicial = [],
@@ -55,7 +58,7 @@ export function EvaluacionAbetPanel({
         setLoadError(null);
         // Reset when the selected version changes; do not depend on array identity.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [versionId]);
+    }, [versionId, proyectoId]);
 
     useEffect(() => {
         let cancelled = false;
@@ -69,8 +72,12 @@ export function EvaluacionAbetPanel({
             setLoadingLatest(true);
             setLoadError(null);
             try {
+                const params = new URLSearchParams({ version_id: String(versionId) });
+                if (proyectoId !== null) {
+                    params.set('proyecto_id', String(proyectoId));
+                }
                 const res = await apiFetch(
-                    `/api/director/entregas/${entregaId}/evaluacion-abet?version_id=${versionId}`,
+                    `/api/director/entregas/${entregaId}/evaluacion-abet?${params.toString()}`,
                 );
                 const payload = await res.json().catch(() => ({}));
                 if (!res.ok || cancelled) {
@@ -114,10 +121,10 @@ export function EvaluacionAbetPanel({
                 <Brain className="h-5 w-5 text-[#c2410c]" />
                 <div>
                     <h3 className="text-base font-bold text-[#1c1917]">
-                        Análisis de IA solicitado por el estudiante
+                        Observaciones de la IA
                     </h3>
                     <p className="text-xs text-[#78716c]">
-                        Último análisis preliminar pedido por el estudiante
+                        Análisis preliminar solicitado por el estudiante
                         {versionLabel ? ` · ${versionLabel}` : ''}. Es orientación
                         informativa, no una calificación académica.
                     </p>
@@ -148,6 +155,12 @@ export function EvaluacionAbetPanel({
             )}
 
             <RetroalimentacionIa analisis={historial} />
+
+            {historial[0]?.temporal && historial[0]?.analizado_en && (
+                <p className="mt-3 text-xs text-[#78716c]">
+                    Análisis sobre borrador, analizado el {formatFechaHora(historial[0].analizado_en)}.
+                </p>
+            )}
 
             {historial[0]?.aviso_truncado && (
                 <p className="mt-3 text-xs text-[#78716c]">{historial[0].aviso_truncado}</p>

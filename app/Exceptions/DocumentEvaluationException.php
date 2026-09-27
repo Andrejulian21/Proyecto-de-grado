@@ -39,4 +39,10 @@ final class DocumentEvaluationException extends RuntimeException
     ): self {
         return new self('document_not_analyzable', $message, 422);
     }
+
+    public static function analisisYaExiste(
+        string $message = 'Ya existe un análisis completado para esta entrega en tu grupo.',
+    ): self {
+        return new self('ANALISIS_YA_EXISTE', $message, 422);
+    }
 }

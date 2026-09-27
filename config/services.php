@@ -63,4 +63,14 @@ return [
         'prompt' => 'select_account',
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Gemini IA (Google AI Studio) — keys only via server env, never committed
+    |--------------------------------------------------------------------------
+    */
+    'gemini' => [
+        'key' => env('GEMINI_API_KEY'),
+        'key_2' => env('GEMINI_API_KEY_2'),
+    ],
+
 ];

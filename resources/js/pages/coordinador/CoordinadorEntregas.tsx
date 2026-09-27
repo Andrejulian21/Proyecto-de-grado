@@ -367,7 +367,7 @@ export default function CoordinadorEntregas() {
                                 value={formDesc}
                                 onChange={(e) => setFormDesc(e.target.value)}
                                 rows={4}
-                                maxLength={2000}
+                                maxLength={5000}
                                 placeholder="Ej: En esta entrega el estudiante debe presentar el planteamiento del problema, incluyendo contexto, situación problemática, causas y consecuencias."
                                 className="w-full min-h-[80px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y"
                                 required
@@ -775,7 +775,7 @@ export default function CoordinadorEntregas() {
                                     value={editDesc}
                                     onChange={(e) => setEditDesc(e.target.value)}
                                     rows={4}
-                                    maxLength={2000}
+                                    maxLength={5000}
                                     placeholder="Explique qué debe entregar el estudiante. Este texto es el contexto del análisis preliminar de IA."
                                     className="w-full min-h-[80px] rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] resize-y"
                                 />

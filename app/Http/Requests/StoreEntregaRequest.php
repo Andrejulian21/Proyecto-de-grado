@@ -56,7 +56,7 @@ class StoreEntregaRequest extends FormRequest
             'grupo_id' => ['required', 'exists:semestres,id'],
             'fase' => ['required', 'string', 'max:50'],
             'titulo' => ['required', 'string', 'max:255'],
-            'descripcion' => ['required', 'string', 'max:2000'],
+            'descripcion' => ['required', 'string', 'max:5000'],
             'fecha_limite' => ['required', 'date'],
             'fecha_inicio' => ['nullable', 'date', 'before_or_equal:fecha_limite'],
             'hora_inicio' => ['nullable', 'string', 'max:10'],

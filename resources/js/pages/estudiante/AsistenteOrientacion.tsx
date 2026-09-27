@@ -55,7 +55,7 @@ const WELCOME_MESSAGE: Message = {
     id: 'welcome',
     role: 'assistant',
     content:
-        '¡Hola! Soy tu asistente académico para proyectos de grado de Ingeniería de Sistemas.\n\nPuedo ayudarte a:\n\n• Refinar la idea de tu proyecto\n• Sugerir líneas de investigación, tecnologías y metodologías\n• Recomendar Directores según perfiles reales del sistema\n\nCuéntame tu idea o en qué necesitas orientación.',
+        '¡Hola! Soy tu asistente académico para proyectos de grado de Ingeniería de Sistemas.\n\nEste chat es de orientación inicial y de un solo uso: tienes un máximo de 20 mensajes y está disponible solo mientras no tengas director ni proyecto asignado.\n\nPuedo ayudarte a:\n\n• Refinar la idea de tu proyecto\n• Sugerir líneas de investigación, tecnologías y metodologías\n• Recomendar Directores según perfiles reales del sistema\n\nCuéntame tu idea o en qué necesitas orientación.',
     timestamp: '',
 };
 
@@ -125,11 +125,14 @@ export default function AsistenteOrientacion() {
     const [loadError, setLoadError] = useState<string | null>(null);
     const [actionError, setActionError] = useState<string | null>(null);
     const [aiUnavailable, setAiUnavailable] = useState(false);
+    const [quotaExceeded, setQuotaExceeded] = useState(false);
+    const [chatBlocked, setChatBlocked] = useState(false);
+    const [mensajesRestantes, setMensajesRestantes] = useState<number | null>(null);
     const [resultado, setResultado] = useState<ResultadoAsistente | null>(null);
-    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const chatScrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        chatScrollRef.current?.scrollTo({ top: chatScrollRef.current.scrollHeight, behavior: 'smooth' });
     }, [messages, sending]);
 
     useEffect(() => {
@@ -173,6 +176,12 @@ export default function AsistenteOrientacion() {
                     if (lastResult) {
                         setResultado(lastResult);
                     }
+
+                    if (typeof payload?.data?.mensajes_restantes === 'number') {
+                        const remaining = payload.data.mensajes_restantes as number;
+                        setMensajesRestantes(remaining);
+                        if (remaining <= 0) setChatBlocked(true);
+                    }
                 }
             } catch {
                 if (!cancelled) {
@@ -191,11 +200,12 @@ export default function AsistenteOrientacion() {
 
     async function sendMessage(text: string) {
         const trimmed = text.trim();
-        if (!trimmed || sending) return;
+        if (!trimmed || sending || chatBlocked) return;
 
         setSending(true);
         setActionError(null);
         setAiUnavailable(false);
+        setQuotaExceeded(false);
 
         const optimistic: Message = {
             id: `local-${Date.now()}`,
@@ -224,6 +234,33 @@ export default function AsistenteOrientacion() {
                 return;
             }
 
+            if (res.status === 429 || payload?.code === 'ai_quota_exceeded') {
+                setQuotaExceeded(true);
+                setActionError(
+                    payload?.error ?? 'Límite de cuota de IA alcanzado. Inténtalo de nuevo en 60 segundos.',
+                );
+                return;
+            }
+
+            if (res.status === 504 || payload?.code === 'ai_timeout') {
+                setActionError(
+                    payload?.error ?? 'El análisis tardó demasiado. Inténtalo de nuevo.',
+                );
+                return;
+            }
+
+            if (
+                res.status === 403 &&
+                (payload?.code === 'chat_single_use_exhausted' || payload?.code === 'chat_not_eligible')
+            ) {
+                setChatBlocked(payload?.code === 'chat_single_use_exhausted');
+                setActionError(
+                    payload?.error ??
+                        'Este chat de orientación es de un solo uso y está disponible solo para estudiantes sin director ni proyecto asignado.',
+                );
+                return;
+            }
+
             if (!res.ok) {
                 setActionError(
                     payload?.error ?? 'No fue posible obtener una respuesta del asistente.',
@@ -248,6 +285,12 @@ export default function AsistenteOrientacion() {
 
             if (structured) {
                 setResultado(structured);
+            }
+
+            if (typeof payload?.data?.mensajes_restantes === 'number') {
+                const remaining = payload.data.mensajes_restantes as number;
+                setMensajesRestantes(remaining);
+                if (remaining <= 0) setChatBlocked(true);
             }
         } catch {
             setActionError('No fue posible contactar al asistente. Inténtalo de nuevo.');
@@ -281,7 +324,7 @@ export default function AsistenteOrientacion() {
                 }
             />
 
-            {(aiUnavailable || actionError || loadError) && (
+            {(aiUnavailable || quotaExceeded || actionError || loadError) && (
                 <div
                     className="flex items-start gap-3 rounded-xl border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm text-[#991b1b]"
                     role="alert"
@@ -295,10 +338,16 @@ export default function AsistenteOrientacion() {
                 </div>
             )}
 
+            {mensajesRestantes !== null && !chatBlocked && (
+                <p className="text-xs text-[#78716c]">
+                    Te quedan {mensajesRestantes} de 20 mensajes de orientación de un solo uso.
+                </p>
+            )}
+
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
                 <div className="lg:col-span-3">
                     <div className="flex h-[600px] flex-col rounded-xl border border-[#e5e5e5] bg-white shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
-                        <div className="flex-1 space-y-4 overflow-y-auto p-4">
+                        <div ref={chatScrollRef} className="flex-1 space-y-4 overflow-y-auto p-4">
                             {loading ? (
                                 <div className="flex h-full items-center justify-center text-sm text-[#78716c]">
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -352,7 +401,6 @@ export default function AsistenteOrientacion() {
                                     El asistente está elaborando una respuesta…
                                 </div>
                             )}
-                            <div ref={messagesEndRef} />
                         </div>
 
                         <div className="border-t border-[#e5e5e5] p-4">
@@ -364,13 +412,17 @@ export default function AsistenteOrientacion() {
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') handleSend();
                                     }}
-                                    placeholder="Escribe tu pregunta o idea de proyecto…"
-                                    disabled={loading || sending}
+                                    placeholder={
+                                        chatBlocked
+                                            ? 'Alcanzaste el límite de 20 mensajes de orientación.'
+                                            : 'Escribe tu pregunta o idea de proyecto…'
+                                    }
+                                    disabled={loading || sending || chatBlocked}
                                     className="min-h-[40px] flex-1 rounded-lg border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#1c1917] outline-none transition-colors placeholder:text-[#78716c] focus:border-[#c2410c] focus:shadow-[0_0_0_3px_#fed7aa] disabled:opacity-60"
                                 />
                                 <button
                                     onClick={handleSend}
-                                    disabled={!input.trim() || sending || loading}
+                                    disabled={!input.trim() || sending || loading || chatBlocked}
                                     className="inline-flex h-10 w-10 min-h-[40px] items-center justify-center rounded-lg bg-[#c2410c] text-white transition-colors hover:bg-[#9a330a] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                                     aria-label="Enviar mensaje"
                                 >

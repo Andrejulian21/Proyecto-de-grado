@@ -60,7 +60,7 @@ class UpdateEntregaRequest extends FormRequest
             'fase' => ['sometimes', 'required', 'string', 'max:50'],
             'phase' => ['sometimes', 'required', 'string', 'max:50'],
             'titulo' => ['sometimes', 'required', 'string', 'max:255'],
-            'descripcion' => ['sometimes', 'required', 'string', 'max:2000'],
+            'descripcion' => ['sometimes', 'required', 'string', 'max:5000'],
             'fecha_limite' => ['sometimes', 'required', 'date'],
             'fecha_inicio' => ['sometimes', 'nullable', 'date', 'before_or_equal:fecha_limite'],
             'hora_inicio' => ['sometimes', 'nullable', 'string', 'max:10'],

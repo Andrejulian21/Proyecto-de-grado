@@ -41,6 +41,9 @@ class AsistenteAcademicoController extends Controller
                 'proveedor' => $conversation->provider,
                 'tiempo_ms' => $conversation->processing_ms,
                 'resultado' => $conversation->result_json,
+                'aviso_uso_unico' => 'Este chat es de orientación inicial y de un solo uso: tienes un máximo de 20 mensajes y está disponible solo mientras no tengas director ni proyecto asignado.',
+                'limite_mensajes' => AcademicAssistantService::MAX_MESSAGES_PER_STUDENT,
+                'mensajes_restantes' => $this->assistantService->remainingMessages($conversation),
                 'mensajes' => array_map(
                     fn (AiAssistantMessage $message): array => $this->mapMessage($message),
                     $bundle['messages'],
@@ -75,17 +78,41 @@ class AsistenteAcademicoController extends Controller
                     'estado' => $conversation->status->value,
                     'proveedor' => $conversation->provider,
                     'tiempo_ms' => $conversation->processing_ms,
+                    'limite_mensajes' => AcademicAssistantService::MAX_MESSAGES_PER_STUDENT,
+                    'mensajes_restantes' => $this->assistantService->remainingMessages($conversation->fresh()),
                     'mensaje_usuario' => $this->mapMessage($outcome['user_message']),
                     'mensaje_asistente' => $this->mapMessage($outcome['assistant_message']),
                     'resultado' => $result->toArray(),
                 ],
             ]);
         } catch (AcademicAssistantException $exception) {
-            return response()->json([
+            $response = response()->json([
                 'error' => $exception->getMessage(),
                 'code' => $exception->errorCode,
             ], $exception->httpStatus);
+
+            if ($exception->retryAfter !== null) {
+                $response->headers->set('Retry-After', (string) $exception->retryAfter);
+            }
+
+            return $response;
         } catch (AiException $exception) {
+            if ($exception->error === AiErrorCode::QuotaExceeded) {
+                return response()->json([
+                    'error' => $exception->getMessage(),
+                    'code' => 'ai_quota_exceeded',
+                ], 429)->withHeaders([
+                    'Retry-After' => (string) ($exception->retryAfter ?? 60),
+                ]);
+            }
+
+            if ($exception->error === AiErrorCode::ProviderTimeout) {
+                return response()->json([
+                    'error' => $exception->getMessage(),
+                    'code' => 'ai_timeout',
+                ], 504);
+            }
+
             if (in_array($exception->error, [
                 AiErrorCode::ProviderNotConfigured,
                 AiErrorCode::UnknownProvider,

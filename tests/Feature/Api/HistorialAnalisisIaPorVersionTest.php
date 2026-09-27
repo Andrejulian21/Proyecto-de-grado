@@ -230,7 +230,7 @@ it('rechaza analizar un documento no configurado para IA', function () {
         ->and(AiDocumentEvaluation::query()->where('status', AiEvaluationStatus::Completed)->count())->toBe(0);
 });
 
-it('conserva el historial cuando se analiza de nuevo la misma version', function () {
+it('reutiliza la evaluacion cacheada cuando se analiza de nuevo la misma version', function () {
     $version = storeHistorialVersion($this->entrega, 'marco-teorico', 1, 'Marco teorico v1');
 
     $stub = bindHistorialIaStub(historialIaPayload('Primer análisis'));
@@ -244,21 +244,21 @@ it('conserva el historial cuando se analiza de nuevo la misma version', function
     $primerJson = $primero->result_json;
     $primeraFecha = $primero->created_at?->toIso8601String();
 
+    // Same document hash + prompt version + model → cached row reused, no new provider call.
     $stub->json = historialIaPayload('Segundo análisis');
     $this->actingAs($this->estudiante)
         ->postJson("/api/estudiante/entregas/{$this->entrega->id}/evaluacion-inteligente", [
             'version_id' => $version->id,
         ])
-        ->assertOk();
+        ->assertOk()
+        ->assertJsonPath('data.resultado.resumen', 'Primer análisis');
 
-    expect(AiDocumentEvaluation::query()->where('version_documento_id', $version->id)->count())->toBe(2);
+    expect(AiDocumentEvaluation::query()->where('version_documento_id', $version->id)->count())->toBe(1);
+    expect($stub->calls)->toBe(1);
 
     $primero->refresh();
     expect($primero->result_json)->toBe($primerJson)
-        ->and($primero->created_at?->toIso8601String())->toBe($primeraFecha)
-        ->and(AiDocumentEvaluation::query()->get()->contains(
-            fn (AiDocumentEvaluation $row): bool => ($row->result_json['resumen'] ?? null) === 'Segundo análisis',
-        ))->toBeTrue();
+        ->and($primero->created_at?->toIso8601String())->toBe($primeraFecha);
 });
 
 it('guarda el analisis temporal en el documento IA sin crear version', function () {
@@ -360,7 +360,7 @@ it('no inventa la relacion si el archivo subido no coincide con el analisis temp
     @unlink($uploadVersion->getPathname());
 });
 
-it('el estudiante consulta la retroalimentacion de la version seleccionada', function () {
+it('el estudiante no puede re-analizar el grupo y el historial conserva el unico analisis', function () {
     $v1 = storeHistorialVersion($this->entrega, 'marco-teorico', 1, 'Version uno');
     $v2 = storeHistorialVersion($this->entrega, 'marco-teorico', 2, 'Version dos');
 
@@ -369,14 +369,23 @@ it('el estudiante consulta la retroalimentacion de la version seleccionada', fun
         ->postJson("/api/estudiante/entregas/{$this->entrega->id}/evaluacion-inteligente", [
             'version_id' => $v1->id,
         ])
-        ->assertOk();
+        ->assertOk()
+        ->assertJsonPath('data.version_id', $v1->id)
+        ->assertJsonPath('data.documento_id', 'marco-teorico')
+        ->assertJsonPath('data.resultado.resumen', 'IA de v1');
 
-    $stub->json = historialIaPayload('IA de v2');
+    // One completed analysis per group: analyzing another version of the same
+    // group is rejected and the provider is not called again.
     $this->actingAs($this->estudiante)
         ->postJson("/api/estudiante/entregas/{$this->entrega->id}/evaluacion-inteligente", [
             'version_id' => $v2->id,
         ])
-        ->assertOk();
+        ->assertStatus(422)
+        ->assertJsonPath('code', 'ANALISIS_YA_EXISTE')
+        ->assertJsonPath('error', 'Ya existe un análisis completado para esta entrega en tu grupo.');
+
+    expect($stub->calls)->toBe(1)
+        ->and(AiDocumentEvaluation::query()->where('status', AiEvaluationStatus::Completed)->count())->toBe(1);
 
     $this->actingAs($this->estudiante)
         ->getJson("/api/estudiante/entregas/{$this->entrega->id}/evaluacion-inteligente?version_id={$v1->id}")
@@ -384,45 +393,56 @@ it('el estudiante consulta la retroalimentacion de la version seleccionada', fun
         ->assertJsonPath('data.version_id', $v1->id)
         ->assertJsonPath('data.documento_id', 'marco-teorico')
         ->assertJsonPath('data.resultado.resumen', 'IA de v1')
+        ->assertJsonCount(1, 'historial')
         ->assertJsonPath('historial.0.resultado.resumen', 'IA de v1');
 
+    // The per-version filter still applies: v2 has no analysis linked to it.
     $this->actingAs($this->estudiante)
         ->getJson("/api/estudiante/entregas/{$this->entrega->id}/evaluacion-inteligente?version_id={$v2->id}")
         ->assertOk()
-        ->assertJsonPath('data.version_id', $v2->id)
-        ->assertJsonPath('data.resultado.resumen', 'IA de v2');
+        ->assertJsonPath('data', null)
+        ->assertJsonCount(0, 'historial');
 });
 
-it('el director consulta la retroalimentacion IA de la version y no la de otra', function () {
+it('el director ve el unico analisis del grupo sin importar la version consultada', function () {
     $v1 = storeHistorialVersion($this->entrega, 'marco-teorico', 1, 'Director v1');
     $v2 = storeHistorialVersion($this->entrega, 'marco-teorico', 2, 'Director v2');
 
-    $stub = bindHistorialIaStub(historialIaPayload('Director IA v1'));
-    $this->actingAs($this->director)
-        ->postJson("/api/director/entregas/{$this->entrega->id}/evaluacion-abet", [
+    // The student requests the analysis; the director only reads it.
+    $stub = bindHistorialIaStub(historialIaPayload('Estudiante IA v1'));
+    $this->actingAs($this->estudiante)
+        ->postJson("/api/estudiante/entregas/{$this->entrega->id}/evaluacion-inteligente", [
             'version_id' => $v1->id,
         ])
         ->assertOk();
 
-    $stub->json = historialIaPayload('Director IA v2');
-    $this->actingAs($this->director)
-        ->postJson("/api/director/entregas/{$this->entrega->id}/evaluacion-abet", [
+    $this->actingAs($this->estudiante)
+        ->postJson("/api/estudiante/entregas/{$this->entrega->id}/evaluacion-inteligente", [
             'version_id' => $v2->id,
         ])
-        ->assertOk();
+        ->assertStatus(422)
+        ->assertJsonPath('code', 'ANALISIS_YA_EXISTE');
 
+    expect($stub->calls)->toBe(1);
+
+    // Scoped by proyecto_id, the director gets the group's single analysis.
     $this->actingAs($this->director)
-        ->getJson("/api/director/entregas/{$this->entrega->id}/evaluacion-abet?version_id={$v1->id}")
+        ->getJson("/api/director/entregas/{$this->entrega->id}/evaluacion-abet?proyecto_id={$this->proyecto->id}")
         ->assertOk()
         ->assertJsonPath('data.version_id', $v1->id)
         ->assertJsonPath('data.documento_id', 'marco-teorico')
-        ->assertJsonPath('data.resultado.resumen', 'Director IA v1')
-        ->assertJsonMissingPath('data.resultado.puntaje_orientativo');
+        ->assertJsonPath('data.tipo', 'pre_submission')
+        ->assertJsonPath('data.resultado.resumen', 'Estudiante IA v1')
+        ->assertJsonMissingPath('data.resultado.puntaje_orientativo')
+        ->assertJsonCount(1, 'historial');
 
+    // version_id only validates existence: the group's latest analysis is
+    // returned even when asking for a version that has no analysis linked.
     $this->actingAs($this->director)
-        ->getJson("/api/director/entregas/{$this->entrega->id}/evaluacion-abet?version_id={$v2->id}")
+        ->getJson("/api/director/entregas/{$this->entrega->id}/evaluacion-abet?version_id={$v2->id}&proyecto_id={$this->proyecto->id}")
         ->assertOk()
-        ->assertJsonPath('data.resultado.resumen', 'Director IA v2');
+        ->assertJsonPath('data.version_id', $v1->id)
+        ->assertJsonPath('data.resultado.resumen', 'Estudiante IA v1');
 });
 
 it('el detalle de entrega separa observacion del director y retroalimentacion IA', function () {

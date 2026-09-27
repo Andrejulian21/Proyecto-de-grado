@@ -189,6 +189,7 @@ it('director puede aprobar entrega con nota y feedback', function () {
             'status' => 'aprobada',
             'consolidated_grade' => 4.5,
             'director_notes' => 'Buen trabajo',
+            'director_grade' => 4.5,
             'version_id' => $version->id,
         ]);
 
@@ -270,6 +271,7 @@ it('al aprobar ultima entrega de fase avanza proyecto a siguiente fase', functio
             'status' => 'aprobada',
             'consolidated_grade' => 4.5,
             'director_notes' => 'Aprobado',
+            'director_grade' => 4.5,
             'version_id' => $version->id,
         ]);
 

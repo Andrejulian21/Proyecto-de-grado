@@ -367,7 +367,13 @@ class EntregaController extends Controller
 
         // RF-NOT-01 / D7: director_grade range (0-5) and max 2 decimals,
         // validated only when the review approves (RF-NOT-02).
-        if (($data['status'] ?? null) === 'aprobada' && isset($data['director_grade'])) {
+        // New contract: the grade is REQUIRED when approving; it stays
+        // optional (nullable) for rechazada/revisada.
+        if (($data['status'] ?? null) === 'aprobada') {
+            if (! isset($data['director_grade'])) {
+                return $this->errorEnvelope(422, 'La nota del director es obligatoria al aprobar la entrega');
+            }
+
             $grade = (float) $data['director_grade'];
 
             if ($grade < 0 || $grade > 5) {

@@ -3,6 +3,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { GroupSelector } from '@/components/forms/GroupSelector';
 import { useEntregas, FASE_SEQUENCE, type Fase, type Entrega, type UpdateEntregaPayload } from '@/hooks/useEntregas';
+import { formatFecha, parseDateOnlyLocal, toDateInputValue } from '@/lib/fechas';
 import ArchivosRequeridosBuilder from '@/components/entregas/ArchivosRequeridosBuilder';
 import IndicadorSumaPar from '@/components/entregas/IndicadorSumaPar';
 import type { ArchivoRequeridoConfig } from '@/types/entregas';
@@ -34,16 +35,7 @@ function archivosPorDefecto(): ArchivoRequeridoConfig[] {
 }
 
 function formatDate(dateStr: string): string {
-    if (!dateStr) return '—';
-    try {
-        return new Date(dateStr).toLocaleDateString('es-CO', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-        });
-    } catch {
-        return dateStr;
-    }
+    return formatFecha(dateStr);
 }
 
 export default function CoordinadorEntregas() {
@@ -156,12 +148,14 @@ export default function CoordinadorEntregas() {
     const openEditModal = useCallback((entrega: Entrega) => {
         setEditingEntrega(entrega);
         try {
-            setEditFecha(new Date(entrega.due_date).toISOString().slice(0, 10));
+            const d = parseDateOnlyLocal(entrega.due_date);
+            setEditFecha(d ? toDateInputValue(d) : '');
         } catch {
             setEditFecha('');
         }
         try {
-            setEditFechaInicio(entrega.start_date ? new Date(entrega.start_date).toISOString().slice(0, 10) : '');
+            const d = entrega.start_date ? parseDateOnlyLocal(entrega.start_date) : null;
+            setEditFechaInicio(d ? toDateInputValue(d) : '');
         } catch {
             setEditFechaInicio('');
         }

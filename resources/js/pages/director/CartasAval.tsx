@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { formatFechaHora } from '@/lib/fechas';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import {
@@ -49,11 +50,7 @@ function tooltipText(proyecto: ProyectoCartas): string {
 }
 
 function formatCierre(iso: string | null): string {
-    if (!iso) return '—';
-    return new Date(iso).toLocaleString('es-CO', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-    });
+    return formatFechaHora(iso);
 }
 
 const NOMBRE_CARTA_1 = 'Aval Sustentacion Publica';

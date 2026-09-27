@@ -4,6 +4,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Megaphone, Plus, Trash2, Pin, Send, Loader2, Pencil } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
+import { formatFecha } from '@/lib/fechas';
 
 interface Announcement {
     id: number;
@@ -36,9 +37,7 @@ function fromApi(a: ApiAnnouncement): Announcement {
         id: a.id,
         title: a.title,
         content: a.content,
-        date: a.published_at
-            ? new Date(a.published_at).toLocaleDateString('es-CO')
-            : '—',
+        date: formatFecha(a.published_at),
         status: a.is_active ? 'published' : 'draft',
         priority: 'normal',
         views: 0,

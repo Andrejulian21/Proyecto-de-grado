@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
+import { formatFechaHora } from '@/lib/fechas';
 import { Search, ChevronLeft, ChevronRight, Loader2, RotateCcw } from 'lucide-react';
 
 interface AuditEntry {
@@ -32,16 +33,7 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 function formatDateTime(dateStr: string) {
-    if (!dateStr) return '—';
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('es-CO', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-    });
+    return formatFechaHora(dateStr);
 }
 
 export default function AuditLog() {

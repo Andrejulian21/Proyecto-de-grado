@@ -128,7 +128,7 @@ export default function RevisionBitacoraDirector() {
                         status: b.signature_status ?? 'Completada',
                         signatures: prev.signatures.map((s) =>
                             s.role === 'director'
-                                ? { ...s, signed: true, signedAt: new Date().toLocaleString('es-CO') }
+                                ? { ...s, signed: true, signedAt: formatFechaHora(new Date()) }
                                 : s,
                         ),
                     };

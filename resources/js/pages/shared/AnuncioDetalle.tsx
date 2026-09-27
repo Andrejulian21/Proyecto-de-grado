@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Loader2, ArrowLeft, Calendar, User, Paperclip, FileDown, AlertCircle } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
+import { formatFecha } from '@/lib/fechas';
 
 interface Attachment {
     name: string;
@@ -34,9 +35,7 @@ function fromApi(a: ApiAnnouncement): AnnouncementDetail {
         id: a.id,
         title: a.title,
         category: 'informativo',
-        date: a.published_at
-            ? new Date(a.published_at).toLocaleDateString('es-CO')
-            : '—',
+        date: formatFecha(a.published_at),
         author: a.author?.name ?? '—',
         body: a.content,
         attachments: [],

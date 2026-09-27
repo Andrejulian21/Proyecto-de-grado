@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { SignatureCodeInput } from '@/components/bitacoras/SignatureCode';
 import { apiFetch } from '@/lib/utils';
+import { formatFecha } from '@/lib/fechas';
 import { ArrowLeft, ShieldCheck, User, Calendar, Clock, FileText, Loader2, CheckCircle } from 'lucide-react';
 
 interface BitacoraDetalle {
@@ -110,7 +111,7 @@ export default function DetalleFirmaBitacora() {
                             {bitacora.project_code && (
                                 <SessionRow icon={FileText} label="Proyecto" value={`${bitacora.project_code} — ${bitacora.project_title ?? ''}`} />
                             )}
-                            <SessionRow icon={Calendar} label="Fecha de la sesión" value={new Date(bitacora.meeting_date).toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' })} />
+                            <SessionRow icon={Calendar} label="Fecha de la sesión" value={formatFecha(bitacora.meeting_date)} />
                             <SessionRow icon={Clock} label="Duración" value={`${bitacora.duration_hours} hora(s)`} />
                         </div>
 

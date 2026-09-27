@@ -7,6 +7,7 @@ import {
     AlertTriangle, Trash2, Lock, Upload,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
+import { formatFecha, formatFechaHora } from '@/lib/fechas';
 import type { AnalisisIa, DocumentoSolicitado } from '@/types/entregas';
 import {
     agruparVersionesPorArchivo,
@@ -60,36 +61,14 @@ interface EntregaDetail {
 
 const MAX_VERSIONS_PER_ARCHIVO = 4;
 
-/* ── Helpers ── */
+/* ── Helpers (dates via @/lib/fechas — RF-DATE-01) ── */
 
 function formatDate(dateStr: string | null | undefined): string {
-    if (!dateStr) return '—';
-    try {
-        const d = new Date(dateStr);
-        return d.toLocaleDateString('es-CO', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-        });
-    } catch {
-        return dateStr;
-    }
+    return formatFecha(dateStr);
 }
 
 function formatDateTime(dateStr: string | null | undefined): string {
-    if (!dateStr) return '—';
-    try {
-        const d = new Date(dateStr);
-        return d.toLocaleDateString('es-CO', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-        });
-    } catch {
-        return dateStr;
-    }
+    return formatFechaHora(dateStr);
 }
 
 function getDownloadUrl(filePath: string): string {

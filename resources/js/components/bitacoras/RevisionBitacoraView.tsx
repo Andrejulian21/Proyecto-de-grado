@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { cn, apiFetch } from '@/lib/utils';
+import { formatFecha, formatFechaHora } from '@/lib/fechas';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { SignatureCodeInput } from '@/components/bitacoras/SignatureCode';
@@ -199,7 +200,7 @@ export function RevisionBitacoraView({
             <PageHeader
                 eyebrow="Bitácora"
                 title={bitacora.topic || 'Revisar Bitácora'}
-                subtitle={`${bitacora.projectCode} · ${bitacora.date ? new Date(bitacora.date).toLocaleString('es-CO') : '—'}`}
+                subtitle={`${bitacora.projectCode} · ${bitacora.date ? formatFecha(bitacora.date) : '—'}`}
                 actions={
                     <button
                         type="button"
@@ -230,14 +231,14 @@ export function RevisionBitacoraView({
                                 <Calendar className="h-5 w-5 text-[#c2410c]" />
                                 <div>
                                     <p className="text-xs text-[#78716c]">Fecha de reunión</p>
-                                    <p className="text-sm font-semibold text-[#1c1917]">{bitacora.date ? new Date(bitacora.date).toLocaleString('es-CO') : '—'}</p>
+                                    <p className="text-sm font-semibold text-[#1c1917]">{bitacora.date ? formatFechaHora(bitacora.date) : '—'}</p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3 rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-3.5">
                                 <Calendar className="h-5 w-5 text-[#4f46e5]" />
                                 <div>
                                     <p className="text-xs text-[#78716c]">Creada el</p>
-                                    <p className="text-sm font-semibold text-[#1c1917]">{bitacora.createdAt ? new Date(bitacora.createdAt).toLocaleString('es-CO') : '—'}</p>
+                                    <p className="text-sm font-semibold text-[#1c1917]">{bitacora.createdAt ? formatFechaHora(bitacora.createdAt) : '—'}</p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3 rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-3.5">
@@ -424,7 +425,7 @@ export function RevisionBitacoraView({
                                             ...prev,
                                             signatures: prev.signatures.map((s) =>
                                                 s.role === 'director'
-                                                    ? { ...s, signed: true, signedAt: new Date().toLocaleString('es-CO') }
+                                                    ? { ...s, signed: true, signedAt: formatFechaHora(new Date()) }
                                                     : s,
                                             ),
                                         }));

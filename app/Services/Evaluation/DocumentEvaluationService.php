@@ -16,6 +16,7 @@ use App\Exceptions\DocumentConversionException;
 use App\Exceptions\DocumentEvaluationException;
 use App\Models\AiDocumentEvaluation;
 use App\Models\Entrega;
+use App\Models\Proyecto;
 use App\Models\User;
 use App\Models\VersionDocumento;
 use App\Services\Ai\AiGateway;
@@ -100,6 +101,8 @@ final class DocumentEvaluationService
             if ($cached !== null) {
                 return ['evaluation' => $cached, 'result' => $cached->result_json ?? []];
             }
+
+            $this->assertNoCompletedAnalysisForGroup($entrega, $proyecto, $strategy->type()->value);
 
             $record = AiDocumentEvaluation::create([
                 'user_id' => $user->id,
@@ -292,6 +295,33 @@ final class DocumentEvaluationService
     {
         if (! $entrega->versionEsAnalizableIa($version)) {
             throw DocumentEvaluationException::notAnalyzable();
+        }
+    }
+
+    /**
+     * One completed analysis per entrega per project at group level.
+     * Failed attempts never block: only completed rows count. A row belongs
+     * to the group when its official version is linked to the project pivot
+     * (entrega_proyecto) or when its author is a student of the project
+     * (covers temporary uploads and legacy versions without a pivot).
+     */
+    private function assertNoCompletedAnalysisForGroup(Entrega $entrega, Proyecto $proyecto, string $type): void
+    {
+        $exists = AiDocumentEvaluation::query()
+            ->where('entrega_id', $entrega->id)
+            ->where('type', $type)
+            ->where('status', AiEvaluationStatus::Completed)
+            ->where(function ($query) use ($proyecto) {
+                $query->whereHas('versionDocumento.entregaProyecto', function ($pivot) use ($proyecto) {
+                    $pivot->where('proyecto_id', $proyecto->id);
+                })->orWhereHas('user.proyectosComoEstudiante', function ($members) use ($proyecto) {
+                    $members->where('proyectos.id', $proyecto->id);
+                });
+            })
+            ->exists();
+
+        if ($exists) {
+            throw DocumentEvaluationException::analisisYaExiste();
         }
     }
 

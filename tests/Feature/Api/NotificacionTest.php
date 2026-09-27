@@ -175,6 +175,7 @@ it('al revisar entrega se genera notificacion para el estudiante', function () {
             'status' => 'aprobada',
             'consolidated_grade' => 4.5,
             'director_notes' => 'Buen trabajo',
+            'director_grade' => 4.5,
             'version_id' => $version->id,
         ]);
 

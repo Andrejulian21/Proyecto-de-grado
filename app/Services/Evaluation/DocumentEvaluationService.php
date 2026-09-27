@@ -119,7 +119,11 @@ final class DocumentEvaluationService
 
             try {
                 $markdown = $this->markdownRouter->convert($absolutePath, $originalName);
-                $truncated = $this->truncator->truncate($markdown);
+                $signals = MarkdownTruncator::signalsFromTexts(
+                    $entrega->acceptance_criteria !== null ? (string) $entrega->acceptance_criteria : null,
+                    is_string($entrega->description) ? $entrega->description : null,
+                );
+                $truncated = $this->truncator->truncate($markdown, $signals);
 
                 $context = new EvaluationContext(
                     documentMarkdown: $truncated['text'],

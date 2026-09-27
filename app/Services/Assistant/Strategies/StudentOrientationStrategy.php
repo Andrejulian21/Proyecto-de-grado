@@ -55,6 +55,7 @@ Responde ÚNICAMENTE con un JSON válido (sin markdown, sin texto fuera del JSON
 
 Reglas:
 - "mensaje" es la respuesta conversacional clara para el estudiante (español).
+- "mensaje" debe estar en texto plano en español, sin formato markdown (sin **, sin #, sin `, sin enlaces). Si necesitas enumerar puntos, usa texto simple con guiones o números.
 - Fundamenta cada Director recomendado en líneas, tecnologías, metodologías, experiencia y cupo disponible del catálogo.
 - Prefiere Directores con "disponible": true cuando sea razonable; si no hay cupo, explícalo en la justificación.
 - "afinidad" es un número entre 0 y 1.

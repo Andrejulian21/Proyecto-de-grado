@@ -140,11 +140,13 @@ final class AcademicAssistantService
             $result = $this->resultParser->parse($aiResponse->content, $directors);
             $processingMs = (int) ((hrtime(true) - $started) / 1_000_000);
 
+            $displayMessage = $this->displayMessage($result->mensaje);
+
             $assistantMessage = AiAssistantMessage::create([
                 'conversation_id' => $conversation->id,
                 'role' => AiMessageRole::Assistant,
-                'content' => $result->mensaje !== ''
-                    ? $result->mensaje
+                'content' => $displayMessage !== ''
+                    ? $displayMessage
                     : 'He actualizado la orientación de tu proyecto de grado.',
                 'structured_json' => $result->toArray(),
             ]);
@@ -181,6 +183,15 @@ final class AcademicAssistantService
 
             throw AiException::unexpected($exception);
         }
+    }
+
+    /**
+     * Strips residual markdown bold markers from the visible message.
+     * Structured payloads stay untouched so parsing remains stable.
+     */
+    private function displayMessage(string $raw): string
+    {
+        return str_replace('**', '', $raw);
     }
 
     /**

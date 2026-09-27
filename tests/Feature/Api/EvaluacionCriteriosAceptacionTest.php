@@ -194,7 +194,7 @@ it('usa el texto de respaldo cuando la entrega no define criterios', function ()
     expect(criteriosPromptText($stub))->toContain('No se definieron criterios de aceptación');
 });
 
-it('no reutiliza la caché de la versión v1 del prompt', function () {
+it('no permite un segundo analisis aunque cambie la version del prompt', function () {
     $entrega = criteriosEntrega('1. El documento incluye el planteamiento del problema.', $this->semestre, $this->proyecto);
     $version = storeCriteriosVersion($entrega, 'Planteamiento caché v1');
     $model = (string) config('ai.gemini.model', 'gemini-2.0-flash');
@@ -220,9 +220,9 @@ it('no reutiliza la caché de la versión v1 del prompt', function () {
         ->postJson("/api/estudiante/entregas/{$entrega->id}/evaluacion-inteligente", [
             'version_id' => $version->id,
         ])
-        ->assertOk()
-        ->assertJsonPath('data.resultado.resumen', 'Análisis nuevo v2');
+        ->assertStatus(422)
+        ->assertJsonPath('code', 'ANALISIS_YA_EXISTE');
 
-    expect($stub->calls)->toBe(1)
-        ->and(AiDocumentEvaluation::query()->where('prompt_version', 'preliminary_analysis_v2')->count())->toBe(1);
+    expect($stub->calls)->toBe(0)
+        ->and(AiDocumentEvaluation::query()->count())->toBe(1);
 });

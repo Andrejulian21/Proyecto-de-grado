@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Contracts\Ai\AiProvider;
 use App\Enums\AiEvaluationStatus;
+use App\Enums\AiEvaluationType;
 use App\Enums\UserRole;
 use App\Models\AiDocumentEvaluation;
 use App\Models\Entrega;
@@ -373,6 +374,117 @@ it('rechaza el analisis de una version que no es el documento analizable', funct
     $response->assertStatus(422)
         ->assertJsonPath('code', 'document_not_analyzable');
     expect(AiDocumentEvaluation::query()->count())->toBe(0);
+});
+
+function storeGrupoDocxVersion(Entrega $entrega, string $name, string $text): VersionDocumento
+{
+    $phpWord = new PhpWord;
+    $phpWord->addSection()->addText($text);
+
+    $relative = 'entregas/'.$entrega->id.'/'.$name;
+    $absolute = Storage::disk('public')->path($relative);
+
+    if (! is_dir(dirname($absolute))) {
+        mkdir(dirname($absolute), 0777, true);
+    }
+    IOFactory::createWriter($phpWord, 'Word2007')->save($absolute);
+
+    return VersionDocumento::create([
+        'entrega_id' => $entrega->id,
+        'version_number' => 2,
+        'file_path' => $relative,
+        'original_name' => $name,
+        'file_size' => filesize($absolute) ?: 0,
+        'uploaded_at' => now(),
+        'archivo_requerido_id' => 'documento-proyecto',
+    ]);
+}
+
+it('rechaza con 422 un segundo analisis cuando el grupo ya tiene uno completado', function () {
+    $version = storeDocxVersion($this->entrega);
+    bindStubAiProvider(samplePreliminaryPayload());
+
+    $this->actingAs($this->estudiante)
+        ->postJson("/api/estudiante/entregas/{$this->entrega->id}/evaluacion-inteligente", [
+            'version_id' => $version->id,
+        ])
+        ->assertOk();
+
+    $otraVersion = storeGrupoDocxVersion($this->entrega, 'avance2.docx', 'Segundo documento con contenido distinto del mismo grupo.');
+
+    $companero = User::factory()->create(['role' => UserRole::Estudiante->value]);
+    $this->proyecto->estudiantes()->attach($companero);
+
+    $this->actingAs($companero)
+        ->postJson("/api/estudiante/entregas/{$this->entrega->id}/evaluacion-inteligente", [
+            'version_id' => $otraVersion->id,
+        ])
+        ->assertStatus(422)
+        ->assertJsonPath('code', 'ANALISIS_YA_EXISTE')
+        ->assertJsonPath('error', 'Ya existe un análisis completado para esta entrega en tu grupo.');
+
+    expect(AiDocumentEvaluation::query()->where('status', AiEvaluationStatus::Completed)->count())->toBe(1);
+});
+
+it('permite reintentar el analisis tras un intento fallido', function () {
+    $version = storeDocxVersion($this->entrega);
+
+    AiDocumentEvaluation::create([
+        'user_id' => $this->estudiante->id,
+        'entrega_id' => $this->entrega->id,
+        'version_documento_id' => $version->id,
+        'archivo_requerido_id' => 'documento-proyecto',
+        'type' => AiEvaluationType::PreSubmission,
+        'status' => AiEvaluationStatus::Failed,
+        'provider' => 'stub',
+        'model' => 'stub-model',
+        'document_hash' => hash_file('sha256', Storage::disk('public')->path($version->file_path)),
+        'prompt_version' => 'v1',
+        'error_code' => 'provider_timeout',
+        'error_message' => 'El análisis tardó demasiado.',
+    ]);
+
+    bindStubAiProvider(samplePreliminaryPayload());
+
+    $this->actingAs($this->estudiante)
+        ->postJson("/api/estudiante/entregas/{$this->entrega->id}/evaluacion-inteligente", [
+            'version_id' => $version->id,
+        ])
+        ->assertOk()
+        ->assertJsonPath('data.estado', 'completed');
+
+    expect(AiDocumentEvaluation::query()->where('status', AiEvaluationStatus::Completed)->count())->toBe(1);
+});
+
+it('permite el analisis a otro proyecto sobre la misma entrega', function () {
+    $version = storeDocxVersion($this->entrega);
+    bindStubAiProvider(samplePreliminaryPayload());
+
+    $this->actingAs($this->estudiante)
+        ->postJson("/api/estudiante/entregas/{$this->entrega->id}/evaluacion-inteligente", [
+            'version_id' => $version->id,
+        ])
+        ->assertOk();
+
+    $otroProyecto = Proyecto::create([
+        'title' => 'Otro proyecto IA',
+        'semester_id' => $this->semestre->id,
+    ]);
+    $this->entrega->proyectos()->syncWithoutDetaching([$otroProyecto->id]);
+
+    $estudianteOtro = User::factory()->create(['role' => UserRole::Estudiante->value]);
+    $otroProyecto->estudiantes()->attach($estudianteOtro);
+
+    $otraVersion = storeGrupoDocxVersion($this->entrega, 'avance-otro.docx', 'Documento de otro proyecto con contenido propio.');
+
+    $this->actingAs($estudianteOtro)
+        ->postJson("/api/estudiante/entregas/{$this->entrega->id}/evaluacion-inteligente", [
+            'version_id' => $otraVersion->id,
+        ])
+        ->assertOk()
+        ->assertJsonPath('data.estado', 'completed');
+
+    expect(AiDocumentEvaluation::query()->where('status', AiEvaluationStatus::Completed)->count())->toBe(2);
 });
 
 it('rechaza el analisis cuando la entrega no tiene documento analizable', function () {

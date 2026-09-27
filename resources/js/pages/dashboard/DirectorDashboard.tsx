@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { StatCard } from '@/components/ui/StatCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { DataTable, type Column } from '@/components/ui/DataTable';
@@ -19,7 +20,7 @@ import {
 
 /* ── Columns for deliveries table ── */
 
-const deliveryColumns: Column<DirectorEntrega>[] = [
+const getDeliveryColumns = (navigate: (to: string) => void): Column<DirectorEntrega>[] => [
     {
         key: 'codigo',
         label: 'Código',
@@ -57,8 +58,9 @@ const deliveryColumns: Column<DirectorEntrega>[] = [
         key: 'actions',
         label: 'Acciones',
         className: 'text-right',
-        render: () => (
+        render: (row: DirectorEntrega) => (
             <button
+                onClick={() => navigate(`/entregas/${row.id}/revisar`)}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-alt hover:text-primary"
                 aria-label="Revisar entrega"
             >
@@ -138,6 +140,7 @@ function ErrorBanner({ message, onRetry }: { message: string; onRetry: () => voi
 /* ── Main component ── */
 
 export default function DirectorDashboard() {
+    const navigate = useNavigate();
     const {
         data: proyectos,
         loading: loadingProyectos,
@@ -270,7 +273,7 @@ export default function DirectorDashboard() {
                     Últimas Entregas
                 </h2>
                 <DataTable<DirectorEntrega>
-                    columns={deliveryColumns}
+                    columns={getDeliveryColumns(navigate)}
                     data={entregas}
                     loading={loadingEntregas}
                     emptyMessage={errorEntregas ? 'Error al cargar las entregas.' : 'No hay entregas pendientes por revisar.'}

@@ -206,13 +206,70 @@ it('rechaza director_grade con más de 2 decimales (D7)', function () {
     expect($response->json('error.message'))->toBe('La nota del director debe tener máximo 2 decimales');
 });
 
+// -- Nota obligatoria al aprobar -------------------------------------------------
+
+it('rechaza aprobar sin director_grade (nota obligatoria al aprobar)', function () {
+    ['entrega' => $entrega, 'version' => $version] = crearEntregaRevisable($this->proyecto);
+
+    $payload = payloadRevisar(['version_id' => $version->id]);
+    unset($payload['director_grade']);
+
+    $response = $this->actingAs($this->director)
+        ->putJson("/api/admin/entregas/{$entrega->id}/revisar", $payload);
+
+    $response->assertStatus(422);
+    expect($response->json('error.message'))->toBe('La nota del director es obligatoria al aprobar la entrega');
+});
+
+it('aprueba con director_grade 4.5 (nota obligatoria cumplida)', function () {
+    ['entrega' => $entrega, 'version' => $version, 'pivot' => $pivot] = crearEntregaRevisable($this->proyecto);
+
+    $response = $this->actingAs($this->director)
+        ->putJson("/api/admin/entregas/{$entrega->id}/revisar", payloadRevisar([
+            'director_grade' => 4.5,
+            'version_id' => $version->id,
+        ]));
+
+    $response->assertOk();
+    $this->assertDatabaseHas('entrega_proyecto', ['id' => $pivot->id, 'director_grade' => 4.5]);
+});
+
+it('permite rechazada sin director_grade y guarda null', function () {
+    ['entrega' => $entrega, 'version' => $version, 'pivot' => $pivot] = crearEntregaRevisable($this->proyecto);
+
+    $response = $this->actingAs($this->director)
+        ->putJson("/api/admin/entregas/{$entrega->id}/revisar", payloadRevisar([
+            'status' => 'rechazada',
+            'version_id' => $version->id,
+        ]));
+
+    $response->assertOk();
+    $this->assertDatabaseHas('entrega_proyecto', ['id' => $pivot->id, 'director_grade' => null]);
+});
+
+it('aprueba con nota límite 0 (triangulación del contrato obligatorio)', function () {
+    ['entrega' => $entrega, 'version' => $version, 'pivot' => $pivot] = crearEntregaRevisable($this->proyecto);
+
+    $response = $this->actingAs($this->director)
+        ->putJson("/api/admin/entregas/{$entrega->id}/revisar", payloadRevisar([
+            'director_grade' => 0,
+            'version_id' => $version->id,
+        ]));
+
+    $response->assertOk();
+    $this->assertDatabaseHas('entrega_proyecto', ['id' => $pivot->id, 'director_grade' => 0]);
+});
+
 // -- RF-NOT-03: closed entregas reject any edit --------------------------------
 
 it('rechaza revisar cuando la entrega ya está cerrada por status terminal (RF-NOT-03)', function (string $status) {
     ['entrega' => $entrega, 'version' => $version] = crearEntregaRevisable($this->proyecto, ['status' => $status]);
 
     $response = $this->actingAs($this->director)
-        ->putJson("/api/admin/entregas/{$entrega->id}/revisar", payloadRevisar(['version_id' => $version->id]));
+        ->putJson("/api/admin/entregas/{$entrega->id}/revisar", payloadRevisar([
+            'director_grade' => 4.5,
+            'version_id' => $version->id,
+        ]));
 
     $response->assertStatus(422);
     expect($response->json('error.message'))
@@ -225,7 +282,10 @@ it('el director puede revisar aunque la due_date haya vencido (solo status termi
     ]);
 
     $response = $this->actingAs($this->director)
-        ->putJson("/api/admin/entregas/{$entrega->id}/revisar", payloadRevisar(['version_id' => $version->id]));
+        ->putJson("/api/admin/entregas/{$entrega->id}/revisar", payloadRevisar([
+            'director_grade' => 4.5,
+            'version_id' => $version->id,
+        ]));
 
     // Director CAN review after due_date — only terminal status (aprobada/rechazada) blocks
     $response->assertOk();

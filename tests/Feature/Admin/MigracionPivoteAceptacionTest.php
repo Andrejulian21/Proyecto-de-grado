@@ -187,6 +187,7 @@ describe('ReviewEntregaAction — notifica SOLO al proyecto revisado (issue #49)
                 'status' => 'aprobada',
                 'consolidated_grade' => 4.5,
                 'director_notes' => 'Buen trabajo',
+                'director_grade' => 4.5,
                 'version_id' => $version->id,
             ])->assertOk();
 

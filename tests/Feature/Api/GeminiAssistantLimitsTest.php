@@ -224,3 +224,18 @@ it('maps provider timeout to 504 with Spanish copy', function () {
         ->assertJsonPath('code', 'ai_timeout')
         ->assertJsonPath('error', 'El análisis tardó demasiado. Inténtalo de nuevo.');
 });
+
+it('does not consume quota when the AI provider fails', function () {
+    bindCountingStubProvider('{}', AiException::providerTimeout());
+
+    for ($i = 1; $i <= 2; $i++) {
+        $this->actingAs($this->estudiante)
+            ->postJson('/api/estudiante/asistente/mensajes', ['mensaje' => "Consulta {$i}"])
+            ->assertStatus(504);
+    }
+
+    $this->actingAs($this->estudiante)
+        ->getJson('/api/estudiante/asistente/conversacion')
+        ->assertOk()
+        ->assertJsonPath('data.mensajes_restantes', 20);
+});

@@ -16,6 +16,7 @@ const BITACORA_ERROR_BY_CODE: Record<string, string> = {
     MEETING_DATE_DUPLICATE: 'Ya existe una bitácora con esa fecha de reunión en este proyecto.',
     SEMANA_RANGE: 'La semana debe ser un número entero entre 1 y 32.',
     SEMANA_DUPLICATE: 'Esa semana ya tiene una bitácora asociada en este proyecto.',
+    SEMANA_ANTERIOR: 'No puedes crear una bitácora de una semana anterior a la última registrada.',
 };
 
 interface BitacoraListItem {

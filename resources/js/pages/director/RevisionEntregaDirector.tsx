@@ -8,6 +8,7 @@ import {
     CheckCircle2, Send,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/utils';
+import { formatFecha, formatFechaHora } from '@/lib/fechas';
 import type { AnalisisIa, DocumentoSolicitado } from '@/types/entregas';
 import {
     agruparVersionesPorArchivo,
@@ -74,34 +75,13 @@ function statusConfig(status: string) {
     return STATUS_MAP[status] ?? { label: status, variant: 'inactivo' as const };
 }
 
+/* Dates via @/lib/fechas — RF-DATE-01 (local parse, no TZ shift). */
 function formatDate(dateStr: string | null | undefined): string {
-    if (!dateStr) return '—';
-    try {
-        const d = new Date(dateStr);
-        return d.toLocaleDateString('es-CO', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-        });
-    } catch {
-        return dateStr;
-    }
+    return formatFechaHora(dateStr);
 }
 
 function formatDateShort(dateStr: string | null | undefined): string {
-    if (!dateStr) return '—';
-    try {
-        const d = new Date(dateStr);
-        return d.toLocaleDateString('es-CO', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-        });
-    } catch {
-        return dateStr;
-    }
+    return formatFecha(dateStr);
 }
 function getDownloadUrl(filePath: string): string {
     return `/storage/${filePath}`;

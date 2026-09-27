@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { apiFetch } from '@/lib/utils';
+import { formatFechaHora } from '@/lib/fechas';
 import {
     ArrowLeft,
     Download,
@@ -444,13 +445,7 @@ export default function DetalleEntregaDirector() {
                                             Versión {v.version_number}
                                         </span>
                                         <span className="text-xs text-[#57534e]">
-                                            {new Date(v.uploaded_at).toLocaleDateString('es-CO', {
-                                                day: '2-digit',
-                                                month: '2-digit',
-                                                year: 'numeric',
-                                                hour: '2-digit',
-                                                minute: '2-digit',
-                                            })}
+                                            {formatFechaHora(v.uploaded_at)}
                                         </span>
                                         <span className="truncate text-xs text-[#78716c]">{v.original_name}</span>
                                     </div>

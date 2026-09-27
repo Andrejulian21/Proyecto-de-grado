@@ -14,6 +14,8 @@ import {
     AlertTriangle,
     Loader2,
     Upload,
+    Copy,
+    Check,
 } from 'lucide-react';
 
 interface ResultadoAnalisis {
@@ -58,6 +60,7 @@ export default function AnalisisAutomaticoEntregas() {
     const [quotaExceeded, setQuotaExceeded] = useState(false);
     const [resultado, setResultado] = useState<ResultadoAnalisis | null>(null);
     const [avisoTruncado, setAvisoTruncado] = useState<string | null>(null);
+    const [copiado, setCopiado] = useState(false);
 
     const entregaId = Number(entregaIdParam);
 
@@ -104,6 +107,54 @@ export default function AnalisisAutomaticoEntregas() {
         return `${file.name} (${Math.max(1, Math.round(file.size / 1024))} KB)`;
     }, [file]);
 
+    function resultadoATextoPlano(): string {
+        if (!resultado) return '';
+        const partes: string[] = [];
+        if (resultado.resumen) partes.push(`Resumen\n${resultado.resumen}`);
+        if (resultado.coherencia) partes.push(`Coherencia\n${resultado.coherencia}`);
+        if (resultado.claridad) partes.push(`Claridad\n${resultado.claridad}`);
+        if (resultado.estructura) partes.push(`Estructura\n${resultado.estructura}`);
+        if (resultado.completitud_aparente)
+            partes.push(`Completitud aparente\n${resultado.completitud_aparente}`);
+        if (resultado.correspondencia)
+            partes.push(`Correspondencia con lo solicitado\n${resultado.correspondencia}`);
+        if ((resultado.observaciones ?? []).length > 0)
+            partes.push(`Observaciones\n${(resultado.observaciones ?? []).map((o) => `- ${o}`).join('\n')}`);
+        if ((resultado.recomendaciones ?? []).length > 0)
+            partes.push(
+                `Recomendaciones\n${(resultado.recomendaciones ?? []).map((r) => `- ${r}`).join('\n')}`,
+            );
+        if (resultado.conclusion) partes.push(`Conclusión\n${resultado.conclusion}`);
+        return partes.join('\n\n');
+    }
+
+    async function handleCopy() {
+        const texto = resultadoATextoPlano();
+        if (!texto) return;
+        setCopiado(false);
+        try {
+            await navigator.clipboard.writeText(texto);
+            setCopiado(true);
+            return;
+        } catch {
+            // Fallback for contexts without async clipboard access.
+        }
+        try {
+            const area = document.createElement('textarea');
+            area.value = texto;
+            area.setAttribute('readonly', '');
+            area.style.position = 'absolute';
+            area.style.left = '-9999px';
+            document.body.appendChild(area);
+            area.select();
+            document.execCommand('copy');
+            document.body.removeChild(area);
+            setCopiado(true);
+        } catch {
+            setActionError('No se pudo copiar el texto. Selecciónalo manualmente.');
+        }
+    }
+
     async function handleAnalyze() {
         if (!entrega?.documento_analizable_ia) {
             setActionError('Esta entrega no tiene un documento configurado para análisis mediante IA.');
@@ -124,6 +175,7 @@ export default function AnalisisAutomaticoEntregas() {
         setQuotaExceeded(false);
         setAvisoTruncado(null);
         setResultado(null);
+        setCopiado(false);
 
         try {
             const body = new FormData();
@@ -237,39 +289,65 @@ export default function AnalisisAutomaticoEntregas() {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-                <div className="lg:col-span-3">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                <div className="lg:col-span-1">
                     <div className="rounded-xl border border-[#e5e5e5] bg-white p-6 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                         <div className="mb-4 flex items-center gap-2">
                             <FileText className="h-5 w-5 text-[#c2410c]" />
                             <h3 className="text-base font-bold text-[#1c1917]">Archivo temporal para IA</h3>
                         </div>
-                        <div className="flex aspect-[8.5/11] w-full flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-[#e5e5e5] bg-[#fafaf9] px-4 text-center">
-                            <Eye className="h-12 w-12 text-[#78716c]" />
-                            <p className="text-sm font-medium text-[#1c1917]">
-                                {fileLabel ?? 'Selecciona un borrador DOCX o PDF'}
-                            </p>
-                            <p className="max-w-md text-xs text-[#78716c]">
-                                Este archivo no se guarda como versión oficial. La retroalimentación de IA sí
-                                se conserva asociada al documento analizable y, si más adelante subes el mismo
-                                archivo, a esa versión.
-                            </p>
-                            <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[#e5e5e5] bg-white px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:border-[#c2410c] hover:bg-[#fed7aa]">
-                                <Upload className="h-4 w-4" />
-                                Elegir DOCX o PDF
-                                <input
-                                    type="file"
-                                    accept=".docx,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf"
-                                    className="hidden"
-                                    onChange={(e) => {
-                                        const next = e.target.files?.[0] ?? null;
-                                        setFile(next);
-                                        setResultado(null);
-                                        setActionError(null);
-                                    }}
-                                />
-                            </label>
-                        </div>
+                        {file ? (
+                            <div className="flex flex-col gap-3 rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-4">
+                                <p className="flex items-center gap-2 text-sm font-medium text-[#1c1917]">
+                                    <Eye className="h-4 w-4 shrink-0 text-[#78716c]" />
+                                    <span className="truncate">{fileLabel}</span>
+                                </p>
+                                <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#e5e5e5] bg-white px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:border-[#c2410c] hover:bg-[#fed7aa]">
+                                    <Upload className="h-4 w-4" />
+                                    Cambiar archivo
+                                    <input
+                                        type="file"
+                                        accept=".docx,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                            const next = e.target.files?.[0] ?? null;
+                                            setFile(next);
+                                            setResultado(null);
+                                            setCopiado(false);
+                                            setActionError(null);
+                                        }}
+                                    />
+                                </label>
+                            </div>
+                        ) : (
+                            <div className="flex w-full flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-[#e5e5e5] bg-[#fafaf9] px-4 py-10 text-center">
+                                <Eye className="h-10 w-10 text-[#78716c]" />
+                                <p className="text-sm font-medium text-[#1c1917]">
+                                    Selecciona un borrador DOCX o PDF
+                                </p>
+                                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[#e5e5e5] bg-white px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:border-[#c2410c] hover:bg-[#fed7aa]">
+                                    <Upload className="h-4 w-4" />
+                                    Elegir DOCX o PDF
+                                    <input
+                                        type="file"
+                                        accept=".docx,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                            const next = e.target.files?.[0] ?? null;
+                                            setFile(next);
+                                            setResultado(null);
+                                            setCopiado(false);
+                                            setActionError(null);
+                                        }}
+                                    />
+                                </label>
+                            </div>
+                        )}
+                        <p className="mt-3 text-xs text-[#78716c]">
+                            Este archivo no se guarda como versión oficial. La retroalimentación de IA sí
+                            se conserva asociada al documento analizable y, si más adelante subes el mismo
+                            archivo, a esa versión.
+                        </p>
                     </div>
                 </div>
 
@@ -376,6 +454,19 @@ export default function AnalisisAutomaticoEntregas() {
                                         <p className="text-xs text-[#57534e]">{resultado.conclusion}</p>
                                     </div>
                                 )}
+
+                                <button
+                                    type="button"
+                                    onClick={() => void handleCopy()}
+                                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[#e5e5e5] bg-white px-4 py-2.5 text-sm font-semibold text-[#1c1917] transition-colors hover:border-[#c2410c] hover:bg-[#fed7aa] hover:text-[#c2410c] active:scale-[0.98]"
+                                >
+                                    {copiado ? (
+                                        <Check className="h-4 w-4" />
+                                    ) : (
+                                        <Copy className="h-4 w-4" />
+                                    )}
+                                    {copiado ? 'Análisis copiado' : 'Copiar análisis'}
+                                </button>
                             </>
                         )}
 
@@ -393,6 +484,30 @@ export default function AnalisisAutomaticoEntregas() {
                                 </div>
                             </div>
                         </div>
+
+                        <div className="rounded-xl border border-[#f59e0b] bg-[#fffbeb] p-4" role="alert">
+                            <div className="flex items-start gap-2.5">
+                                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#d97706]" />
+                                <div>
+                                    <p className="text-xs font-semibold text-[#78350f]">
+                                        Este análisis NO se guarda como entrega
+                                    </p>
+                                    <p className="mt-1 text-xs text-[#78350f]">
+                                        Es solo orientación preliminar para mejorar tu borrador. Cuando esté
+                                        listo, súbelo por el flujo normal de entregas: este análisis no
+                                        reemplaza la evaluación de tu director.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {processing && (
+                            <div className="flex items-center gap-2 text-xs text-[#57534e]" role="status">
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                Analizando tu borrador… Recuerda: el resultado no quedará guardado como
+                                entrega oficial.
+                            </div>
+                        )}
 
                         <button
                             onClick={() => void handleAnalyze()}

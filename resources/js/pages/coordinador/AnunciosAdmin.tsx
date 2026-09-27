@@ -57,7 +57,6 @@ export default function AnunciosAdmin() {
 
     const [formTitle, setFormTitle] = useState('');
     const [formContent, setFormContent] = useState('');
-    const [formIsActive, setFormIsActive] = useState(true);
     const [formSemestreId, setFormSemestreId] = useState('');
     const [semestres, setSemestres] = useState<ApiSemestre[]>([]);
     const [submitting, setSubmitting] = useState(false);
@@ -91,7 +90,6 @@ export default function AnunciosAdmin() {
         setEditingId(null);
         setFormTitle('');
         setFormContent('');
-        setFormIsActive(true);
         setFormSemestreId('');
         setShowNewForm(true);
     };
@@ -101,7 +99,6 @@ export default function AnunciosAdmin() {
         setEditingId(ann.id);
         setFormTitle(ann.title);
         setFormContent(ann.content);
-        setFormIsActive(ann.status === 'published');
         setFormSemestreId(ann.semestreId !== null ? String(ann.semestreId) : '');
         setShowNewForm(true);
     };
@@ -112,7 +109,6 @@ export default function AnunciosAdmin() {
         setEditingId(null);
         setFormTitle('');
         setFormContent('');
-        setFormIsActive(true);
         setFormSemestreId('');
     };
 
@@ -125,7 +121,7 @@ export default function AnunciosAdmin() {
             const payload: Record<string, unknown> = {
                 title: formTitle.trim(),
                 content: formContent.trim(),
-                is_active: formIsActive,
+                is_active: true,
                 semestre_id: formSemestreId === '' ? null : Number(formSemestreId),
             };
 
@@ -282,17 +278,6 @@ export default function AnunciosAdmin() {
                                     </option>
                                 ))}
                             </select>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={formIsActive}
-                                    onChange={(e) => setFormIsActive(e.target.checked)}
-                                    className="rounded border-[#e5e5e5] text-[#c2410c] focus:ring-[#c2410c]"
-                                />
-                                <span className="text-sm text-[#1c1917]">Publicar inmediatamente</span>
-                            </label>
                         </div>
                         <div className="flex items-center gap-3">
                             <button

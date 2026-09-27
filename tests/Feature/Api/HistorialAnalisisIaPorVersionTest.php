@@ -393,20 +393,21 @@ it('el estudiante consulta la retroalimentacion de la version seleccionada', fun
         ->assertJsonPath('data.resultado.resumen', 'IA de v2');
 });
 
-it('el director consulta la retroalimentacion IA de la version y no la de otra', function () {
+it('el director consulta el analisis pedido por el estudiante de la version y no el de otra', function () {
     $v1 = storeHistorialVersion($this->entrega, 'marco-teorico', 1, 'Director v1');
     $v2 = storeHistorialVersion($this->entrega, 'marco-teorico', 2, 'Director v2');
 
-    $stub = bindHistorialIaStub(historialIaPayload('Director IA v1'));
-    $this->actingAs($this->director)
-        ->postJson("/api/director/entregas/{$this->entrega->id}/evaluacion-abet", [
+    // The student requests the analysis; the director only reads it.
+    $stub = bindHistorialIaStub(historialIaPayload('Estudiante IA v1'));
+    $this->actingAs($this->estudiante)
+        ->postJson("/api/estudiante/entregas/{$this->entrega->id}/evaluacion-inteligente", [
             'version_id' => $v1->id,
         ])
         ->assertOk();
 
-    $stub->json = historialIaPayload('Director IA v2');
-    $this->actingAs($this->director)
-        ->postJson("/api/director/entregas/{$this->entrega->id}/evaluacion-abet", [
+    $stub->json = historialIaPayload('Estudiante IA v2');
+    $this->actingAs($this->estudiante)
+        ->postJson("/api/estudiante/entregas/{$this->entrega->id}/evaluacion-inteligente", [
             'version_id' => $v2->id,
         ])
         ->assertOk();
@@ -416,13 +417,14 @@ it('el director consulta la retroalimentacion IA de la version y no la de otra',
         ->assertOk()
         ->assertJsonPath('data.version_id', $v1->id)
         ->assertJsonPath('data.documento_id', 'marco-teorico')
-        ->assertJsonPath('data.resultado.resumen', 'Director IA v1')
+        ->assertJsonPath('data.tipo', 'pre_submission')
+        ->assertJsonPath('data.resultado.resumen', 'Estudiante IA v1')
         ->assertJsonMissingPath('data.resultado.puntaje_orientativo');
 
     $this->actingAs($this->director)
         ->getJson("/api/director/entregas/{$this->entrega->id}/evaluacion-abet?version_id={$v2->id}")
         ->assertOk()
-        ->assertJsonPath('data.resultado.resumen', 'Director IA v2');
+        ->assertJsonPath('data.resultado.resumen', 'Estudiante IA v2');
 });
 
 it('el detalle de entrega separa observacion del director y retroalimentacion IA', function () {

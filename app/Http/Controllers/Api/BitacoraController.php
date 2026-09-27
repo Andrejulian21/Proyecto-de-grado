@@ -131,16 +131,29 @@ class BitacoraController extends Controller
             ], 422);
         }
 
-        // RF-WK-03rev: `semana` stays user-declared (1–32) but must not
-        // exceed the proyecto max. Gap-filling below the max is allowed;
-        // duplicates are already rejected above with SEMANA_DUPLICATE.
+        // RF-WK-03rev: `semana` stays user-declared (1–32) but in
+        // practice must be exactly max+1. Going backwards is rejected
+        // with SEMANA_ANTERIOR; duplicates are already rejected above
+        // with SEMANA_DUPLICATE.
         $maxSemana = Bitacora::where('proyecto_id', $proyectoId)->max('semana');
 
-        if ($maxSemana !== null && (int) $data['semana'] > (int) $maxSemana) {
-            return response()->json([
-                'code' => 'SEMANA_EXCEEDS_MAX',
-                'error' => 'No puedes crear una bitácora con una semana mayor a la última creada (Semana '.$maxSemana.').',
-            ], 422);
+        if ($maxSemana !== null) {
+            $nuevaSemana = (int) $data['semana'];
+            $max = (int) $maxSemana;
+
+            if ($nuevaSemana < $max) {
+                return response()->json([
+                    'code' => 'SEMANA_ANTERIOR',
+                    'error' => 'No puedes crear una bitácora de una semana anterior a la última (Semana '.$max.').',
+                ], 422);
+            }
+
+            if ($nuevaSemana > $max + 1) {
+                return response()->json([
+                    'code' => 'SEMANA_EXCEEDS_MAX',
+                    'error' => 'No puedes crear una bitácora con una semana mayor a la última creada (Semana '.$maxSemana.').',
+                ], 422);
+            }
         }
 
         // RF-WK-03rev: `meeting_date` is unique per proyecto (calendar day).

@@ -113,14 +113,13 @@ it('duplicate meeting_date returns 422 MEETING_DATE_DUPLICATE', function () {
         $seed->forceFill(['created_at' => now()->subWeek()])->save();
     }
 
-    // semana 4 fills a gap (<= max, not duplicate) so only the date
-    // rule fires.
+    // semana 7 is exactly max+1 so only the date rule fires.
     $response = $this->actingAs($this->estudiante)
         ->postJson('/api/bitacoras', [
             'proyecto_id' => $this->proyecto->id,
             'topic' => 'Same date replay',
             'meeting_date' => '2026-04-10',
-            'semana' => 4,
+            'semana' => 7,
         ]);
 
     $response->assertStatus(422)
@@ -162,4 +161,49 @@ it('duplicate semana returns 422 SEMANA_DUPLICATE', function () {
     $response->assertStatus(422)
         ->assertJsonPath('code', 'SEMANA_DUPLICATE')
         ->assertJsonValidationErrors(['semana']);
+});
+
+it('semana below the proyecto max returns 422 SEMANA_ANTERIOR', function () {
+    $seed = Bitacora::create([
+        'proyecto_id' => $this->proyecto->id,
+        'topic' => 'Week eight',
+        'meeting_date' => '2026-04-01',
+        'semana' => 8,
+    ]);
+    // Backdate out of the current real week so only the max rule fires.
+    $seed->forceFill(['created_at' => now()->subWeek()])->save();
+
+    $response = $this->actingAs($this->estudiante)
+        ->postJson('/api/bitacoras', [
+            'proyecto_id' => $this->proyecto->id,
+            'topic' => 'Week six gap-fill attempt',
+            'meeting_date' => '2026-06-02',
+            'semana' => 6,
+        ]);
+
+    $response->assertStatus(422)
+        ->assertJsonPath('code', 'SEMANA_ANTERIOR');
+    expect(Bitacora::count())->toBe(1);
+});
+
+it('semana exactly max+1 succeeds', function () {
+    $seed = Bitacora::create([
+        'proyecto_id' => $this->proyecto->id,
+        'topic' => 'Week five',
+        'meeting_date' => '2026-04-01',
+        'semana' => 5,
+    ]);
+    // Backdate out of the current real week so the throttle does not fire.
+    $seed->forceFill(['created_at' => now()->subWeek()])->save();
+
+    $response = $this->actingAs($this->estudiante)
+        ->postJson('/api/bitacoras', [
+            'proyecto_id' => $this->proyecto->id,
+            'topic' => 'Week six follows five',
+            'meeting_date' => '2026-06-03',
+            'semana' => 6,
+        ]);
+
+    $response->assertStatus(201);
+    expect(Bitacora::count())->toBe(2);
 });

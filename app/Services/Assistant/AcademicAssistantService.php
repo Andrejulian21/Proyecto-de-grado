@@ -20,6 +20,7 @@ use App\Services\Ai\DTO\AiMessage;
 use App\Services\Ai\DTO\AiRequest;
 use App\Services\Assistant\DTO\AssistantContext;
 use App\Services\Assistant\DTO\StructuredAssistantResult;
+use Illuminate\Support\Facades\RateLimiter;
 use Throwable;
 
 /**
@@ -28,6 +29,11 @@ use Throwable;
  */
 final class AcademicAssistantService
 {
+    public const MAX_MESSAGES_PER_STUDENT = 20;
+
+    public const THROTTLE_MAX_ATTEMPTS = 10;
+
+    public const THROTTLE_DECAY_SECONDS = 60;
     public function __construct(
         private readonly AiPromptComposer $promptComposer,
         private readonly AiGateway $aiGateway,
@@ -86,10 +92,15 @@ final class AcademicAssistantService
             throw AcademicAssistantException::invalidMessage('El mensaje supera el límite de 4000 caracteres.');
         }
 
+        $this->assertEligibleForOrientation($user);
+
         $started = hrtime(true);
         $bundle = $this->getOrCreateConversation($user, $strategy);
         /** @var AiAssistantConversation $conversation */
         $conversation = $bundle['conversation'];
+
+        $this->assertSingleUseLimit($conversation);
+        $this->assertThrottle($user);
 
         $conversation->update([
             'status' => AiAssistantStatus::Pending,
@@ -124,7 +135,7 @@ final class AcademicAssistantService
             $aiResponse = $this->aiGateway->complete(new AiRequest([
                 AiMessage::system($strategy->systemInstructions()),
                 AiMessage::user($userPrompt),
-            ]));
+            ], options: ['feature' => 'chat']));
 
             $result = $this->resultParser->parse($aiResponse->content, $directors);
             $processingMs = (int) ((hrtime(true) - $started) / 1_000_000);
@@ -170,6 +181,44 @@ final class AcademicAssistantService
 
             throw AiException::unexpected($exception);
         }
+    }
+
+    /**
+     * Single-use orientation chat: only students without director or project.
+     * Strict per-user isolation — counts never leak across students.
+     */
+    public function assertEligibleForOrientation(User $user): void
+    {
+        if ($this->resolveStudentProjectSummary($user) !== null) {
+            throw AcademicAssistantException::notEligible();
+        }
+    }
+
+    public function remainingMessages(AiAssistantConversation $conversation): int
+    {
+        $used = $conversation->messages()
+            ->where('role', AiMessageRole::User->value)
+            ->count();
+
+        return max(0, self::MAX_MESSAGES_PER_STUDENT - $used);
+    }
+
+    private function assertSingleUseLimit(AiAssistantConversation $conversation): void
+    {
+        if ($this->remainingMessages($conversation) <= 0) {
+            throw AcademicAssistantException::singleUseExhausted();
+        }
+    }
+
+    private function assertThrottle(User $user): void
+    {
+        $key = "ai-chat:{$user->id}";
+
+        if (RateLimiter::tooManyAttempts($key, self::THROTTLE_MAX_ATTEMPTS)) {
+            throw AcademicAssistantException::throttleExceeded(self::THROTTLE_DECAY_SECONDS);
+        }
+
+        RateLimiter::hit($key, self::THROTTLE_DECAY_SECONDS);
     }
 
     /**

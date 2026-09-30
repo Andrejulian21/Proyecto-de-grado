@@ -7,7 +7,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AiDocumentEvaluation;
 use App\Models\Entrega;
+use App\Models\EntregaProyecto;
 use App\Models\Proyecto;
+use App\Services\Entregas\NotaEntregaResolver;
 use App\Services\Entregas\VersionIsolationScope;
 use App\Services\Evaluation\AiFeedbackPresenter;
 use Illuminate\Http\JsonResponse;
@@ -19,6 +21,7 @@ class EstudianteController extends Controller
 {
     public function __construct(
         private readonly VersionIsolationScope $versionIsolation,
+        private readonly NotaEntregaResolver $notas,
     ) {}
 
     /**
@@ -122,9 +125,23 @@ class EstudianteController extends Controller
                 ->orderBy('version_number')
                 ->with('analisisIa')])
             ->orderBy('due_date')
+            ->get();
+
+        // The grade and the verdict of a delivery belong to THIS project, so
+        // they are read from its own entrega_proyecto pivot. The shared
+        // semester template is only the legacy fallback (see
+        // NotaEntregaResolver) — without it the student stops seeing a grade
+        // that was recorded before the pivot existed.
+        $pivotes = EntregaProyecto::query()
+            ->where('proyecto_id', $proyecto->id)
+            ->whereIn('entrega_id', $entregas->pluck('id'))
             ->get()
-            ->map(function ($entrega) {
-                $statusValue = $entrega->status?->value ?? $entrega->status;
+            ->keyBy('entrega_id');
+
+        $entregas = $entregas
+            ->map(function (Entrega $entrega) use ($pivotes) {
+                $pivot = $pivotes->get($entrega->id);
+                $statusValue = $this->notas->estado($entrega, $pivot);
 
                 $versiones = $entrega->versiones->map(function ($version) use ($statusValue) {
                     $hasNotes = filled($version->director_notes);
@@ -160,7 +177,9 @@ class EstudianteController extends Controller
                     'descripcion' => $entrega->description,
                     'fecha_limite' => $entrega->due_date?->toDateString(),
                     'estado' => $statusValue,
-                    'nota' => $entrega->consolidated_grade,
+                    'nota' => $this->notas->nota($entrega, $pivot),
+                    'observaciones' => $this->notas->observaciones($pivot),
+                    'evaluacion_completa' => $this->notas->evaluacionCompleta($entrega, $pivot),
                     'criterios' => $entrega->acceptance_criteria,
                     'archivos_requeridos' => $entrega->archivos_requeridos,
                     'documento_analizable_ia' => $entrega->idDocumentoAnalizableIa(),

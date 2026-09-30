@@ -10,6 +10,7 @@ use App\Models\EntregaProyecto;
 use App\Models\Notificacion;
 use App\Models\Proyecto;
 use App\Models\VersionDocumento;
+use App\Services\Entregas\NotaEntregaResolver;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -28,6 +29,10 @@ use Illuminate\Support\Facades\DB;
  */
 final class ReviewEntregaAction
 {
+    public function __construct(
+        private readonly NotaEntregaResolver $notas,
+    ) {}
+
     /**
      * @param  array<string, mixed>  $data  validated review payload
      * @param  EntregaProyecto|null  $entregaProyecto  project-scoped delivery; null = legacy global review
@@ -194,6 +199,13 @@ final class ReviewEntregaAction
     /**
      * Auto-advance the phase of the REVIEWED project only when all its
      * entregas in the current phase are approved.
+     *
+     * "Approved" is a PER-PROJECT verdict: a project-scoped review writes it
+     * on the pivot and leaves `entregas.status` (the shared semester
+     * template) untouched, so filtering this gate by the template column
+     * would find a non-approved delivery forever and the project would never
+     * advance. Pivots without a verdict still fall back to the template, the
+     * behaviour that applied before the pivot existed.
      */
     private function autoAdvancePhase(Entrega $entrega, ?Proyecto $proyectoRevisado): void
     {
@@ -201,12 +213,19 @@ final class ReviewEntregaAction
             return;
         }
 
-        // Check if there are any non-approved entregas in this phase for this
-        // project (scope only uses the pivot table).
-        $pendingInPhase = Entrega::paraProyecto($proyectoRevisado->id)
+        $entregasDeLaFase = Entrega::paraProyecto($proyectoRevisado->id)
             ->where('phase', $entrega->phase)
-            ->where('status', '!=', 'aprobada')
-            ->exists();
+            ->get(['id', 'status']);
+
+        $pivotes = EntregaProyecto::query()
+            ->where('proyecto_id', $proyectoRevisado->id)
+            ->whereIn('entrega_id', $entregasDeLaFase->pluck('id'))
+            ->get()
+            ->keyBy('entrega_id');
+
+        $pendingInPhase = $entregasDeLaFase->contains(
+            fn (Entrega $e) => ! $this->notas->estaAprobada($e, $pivotes->get($e->id))
+        );
 
         if (! $pendingInPhase) {
             $currentPhase = $proyectoRevisado->current_phase;

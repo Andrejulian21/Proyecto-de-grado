@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\EstadoEntrega;
+use App\Enums\EstadoEntregaNota;
 use App\Enums\FaseProyecto;
 use App\Enums\UserRole;
 use App\Models\CoordinadorGradeWeight;
@@ -13,6 +15,7 @@ use App\Models\EvaluadorProyecto;
 use App\Models\Proyecto;
 use App\Models\Semestre;
 use App\Models\User;
+use App\Models\VersionDocumento;
 use App\Services\Entregas\NotaEntregaResolver;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
@@ -112,6 +115,10 @@ final class ConsultaNotasService
 
         $evaluacionesPorProyecto = $this->evaluacionesEvaluadorPorProyecto($proyectoIds->all());
 
+        // Which (project, delivery) pairs already carry a submitted version.
+        // One query for the whole page: the graded average depends on it.
+        $pivotesConVersiones = $this->pivotesConVersiones($pivotesPorProyecto->flatten());
+
         $payload = [];
 
         foreach ($proyectos as $proyecto) {
@@ -136,9 +143,9 @@ final class ConsultaNotasService
             ];
 
             if ($tipo === 'pg1') {
-                $row += $this->calcularPG1($idsDeEsteProyecto, $entregas, $pivotes, $evaluacionesPorProyecto[$proyecto->id] ?? [], $pesos);
+                $row += $this->calcularPG1($idsDeEsteProyecto, $entregas, $pivotes, $pivotesConVersiones, $evaluacionesPorProyecto[$proyecto->id] ?? [], $pesos);
             } else {
-                $row += $this->calcularPG2($idsDeEsteProyecto, $entregas, $pivotes, $evaluacionesPorProyecto[$proyecto->id] ?? [], $pesos);
+                $row += $this->calcularPG2($idsDeEsteProyecto, $entregas, $pivotes, $pivotesConVersiones, $evaluacionesPorProyecto[$proyecto->id] ?? [], $pesos);
             }
 
             $payload[] = $row;
@@ -167,6 +174,7 @@ final class ConsultaNotasService
      * @param  Collection<int, int>  $idsDeEsteProyecto
      * @param  Collection<int, Entrega>  $entregas
      * @param  Collection<int, EntregaProyecto>  $pivotes
+     * @param  Collection<int, true>  $pivotesConVersiones
      * @param  list<array{nota: float|null, fase: string}>  $evaluaciones
      * @param  array{entregas: float, evaluadores: float, presentacion: float}  $pesos
      * @return array<string, mixed>
@@ -175,30 +183,18 @@ final class ConsultaNotasService
         Collection $idsDeEsteProyecto,
         Collection $entregas,
         Collection $pivotes,
+        Collection $pivotesConVersiones,
         array $evaluaciones,
         array $pesos,
     ): array {
         // 1. Nota Entregas — anteproyecto phase deliveries
-        $entregasAnteproyecto = [];
-        $notaEntregasPonderada = null;
-
-        foreach ($idsDeEsteProyecto as $entregaId) {
-            $entrega = $entregas->get($entregaId);
-
-            if ($entrega === null || $entrega->phase !== FaseProyecto::Anteproyecto->value) {
-                continue;
-            }
-
-            $pivot = $pivotes->get($entregaId);
-            $nota = $this->notaDePivot($pivot, $entregas);
-            $peso = $entrega->grade_percentage !== null ? (float) $entrega->grade_percentage : null;
-
-            $entregasAnteproyecto[] = [
-                'titulo' => $entrega->title,
-                'nota' => $nota,
-                'peso' => $peso,
-            ];
-        }
+        $entregasAnteproyecto = $this->entregasDeFase(
+            $idsDeEsteProyecto,
+            $entregas,
+            $pivotes,
+            $pivotesConVersiones,
+            FaseProyecto::Anteproyecto->value,
+        );
 
         $notaEntregasPonderada = $this->calcularNotaPonderada($entregasAnteproyecto);
 
@@ -235,6 +231,7 @@ final class ConsultaNotasService
      * @param  Collection<int, int>  $idsDeEsteProyecto
      * @param  Collection<int, Entrega>  $entregas
      * @param  Collection<int, EntregaProyecto>  $pivotes
+     * @param  Collection<int, true>  $pivotesConVersiones
      * @param  list<array{nota: float|null, fase: string}>  $evaluaciones
      * @param  array{entregas: float, evaluadores: float, presentacion: float}  $pesos
      * @return array<string, mixed>
@@ -243,29 +240,18 @@ final class ConsultaNotasService
         Collection $idsDeEsteProyecto,
         Collection $entregas,
         Collection $pivotes,
+        Collection $pivotesConVersiones,
         array $evaluaciones,
         array $pesos,
     ): array {
         // 1. Nota Entregas — desarrollo phase deliveries
-        $entregasDesarrollo = [];
-
-        foreach ($idsDeEsteProyecto as $entregaId) {
-            $entrega = $entregas->get($entregaId);
-
-            if ($entrega === null || $entrega->phase !== FaseProyecto::Desarrollo->value) {
-                continue;
-            }
-
-            $pivot = $pivotes->get($entregaId);
-            $nota = $this->notaDePivot($pivot, $entregas);
-            $peso = $entrega->grade_percentage !== null ? (float) $entrega->grade_percentage : null;
-
-            $entregasDesarrollo[] = [
-                'titulo' => $entrega->title,
-                'nota' => $nota,
-                'peso' => $peso,
-            ];
-        }
+        $entregasDesarrollo = $this->entregasDeFase(
+            $idsDeEsteProyecto,
+            $entregas,
+            $pivotes,
+            $pivotesConVersiones,
+            FaseProyecto::Desarrollo->value,
+        );
 
         $notaEntregasPonderada = $this->calcularNotaPonderada($entregasDesarrollo);
 
@@ -301,10 +287,154 @@ final class ConsultaNotasService
     // -------------------------------------------------------------------------
 
     /**
-     * Weighted average of deliveries. Each delivery has a grade (nota) and
-     * a percentage weight (peso). The sum of pesos should be 100%.
+     * Deliveries of one phase, each resolved to the state it has for THIS
+     * project plus its weight.
      *
-     * @param  list<array{titulo: string, nota: float|null, peso: float|null}>  $entregas
+     * `estado` and `es_no_entregada` are part of the payload on purpose: a
+     * bare NULL `nota` cannot tell the frontend whether the student scored
+     * zero for missing the deadline or simply has no grade yet.
+     *
+     * @param  Collection<int, int>  $idsDeEsteProyecto
+     * @param  Collection<int, Entrega>  $entregas
+     * @param  Collection<int, EntregaProyecto>  $pivotes
+     * @param  Collection<int, true>  $pivotesConVersiones
+     * @return list<array{titulo: string, nota: float|null, peso: float|null, estado: string, es_no_entregada: bool}>
+     */
+    private function entregasDeFase(
+        Collection $idsDeEsteProyecto,
+        Collection $entregas,
+        Collection $pivotes,
+        Collection $pivotesConVersiones,
+        string $fase,
+    ): array {
+        $items = [];
+
+        foreach ($idsDeEsteProyecto as $entregaId) {
+            $entrega = $entregas->get($entregaId);
+
+            if ($entrega === null || $entrega->phase !== $fase) {
+                continue;
+            }
+
+            $pivot = $pivotes->get($entregaId);
+            $nota = $this->notaDePivot($pivot, $entregas);
+            $estado = $this->estadoDeEntrega(
+                $entrega,
+                $nota,
+                $pivot instanceof EntregaProyecto && $pivotesConVersiones->has((int) $pivot->id),
+            );
+
+            $items[] = [
+                'titulo' => $entrega->title,
+                'nota' => $nota,
+                'peso' => $entrega->grade_percentage !== null ? (float) $entrega->grade_percentage : null,
+                'estado' => $estado->value,
+                'es_no_entregada' => $estado->penaliza(),
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
+     * Grade state of a delivery for this project, from facts on disk.
+     *
+     * Order matters: the director's verdict outranks everything, then the
+     * evidence of a submission, and only then the deadline.
+     */
+    private function estadoDeEntrega(Entrega $entrega, ?float $nota, bool $tieneVersiones): EstadoEntregaNota
+    {
+        if ($nota !== null) {
+            return EstadoEntregaNota::Calificada;
+        }
+
+        if ($tieneVersiones) {
+            return EstadoEntregaNota::EntregadaSinCalificar;
+        }
+
+        if (! $this->plazoVencido($entrega)) {
+            return EstadoEntregaNota::Pendiente;
+        }
+
+        // The deadline passed with nothing on this project's pivot. Whether
+        // that is a miss or a delivery nobody ever handed out depends on the
+        // habilitación — and habilitación lives on the semester-wide
+        // template (`entregas.status`), not per project: `solicitada` is the
+        // pre-habilitación state and HabilitarEntregaAction moves it to
+        // `pendiente`. A still-`solicitada` delivery reached no student at
+        // all (every upload path promotes it out of `solicitada` before
+        // writing a version), so scoring it as missed would punish a deadline
+        // that was never opened.
+        if ($entrega->status === EstadoEntrega::Solicitada) {
+            return EstadoEntregaNota::NoIniciada;
+        }
+
+        return EstadoEntregaNota::NoEntregada;
+    }
+
+    /**
+     * Has the deadline elapsed?
+     *
+     * `due_date` is cast to `date`, i.e. midnight. Comparing whole days keeps
+     * a delivery whose deadline is TODAY out of the "missed" bucket: scoring a
+     * deadline that has not elapsed yet would hand out a zero that nobody
+     * earned.
+     */
+    private function plazoVencido(Entrega $entrega): bool
+    {
+        if ($entrega->due_date === null) {
+            return false;
+        }
+
+        return $entrega->due_date->lt(now()->startOfDay());
+    }
+
+    /**
+     * Pivots that already carry at least one submitted version.
+     *
+     * `entrega_proyecto_id` is the only link between an uploaded document and
+     * the project that owns it, and it is cleared (ON DELETE SET NULL) when the
+     * pivot dies — so a version with a NULL pivot belongs to no project and is
+     * never counted. Unlike SeguimientoService, no `entrega_id` fallback is
+     * applied here: on purpose, because it would let one project's upload
+     * vouch for another's and hand out the very grade this rule protects.
+     *
+     * @param  Collection<int, EntregaProyecto>  $pivotes
+     * @return Collection<int, true>
+     */
+    private function pivotesConVersiones(Collection $pivotes): Collection
+    {
+        $ids = $pivotes
+            ->map(fn (EntregaProyecto $pivot): int => (int) $pivot->id)
+            ->values()
+            ->all();
+
+        if ($ids === []) {
+            return collect();
+        }
+
+        return VersionDocumento::query()
+            ->whereIn('entrega_proyecto_id', $ids)
+            ->distinct()
+            ->pluck('entrega_proyecto_id')
+            ->mapWithKeys(fn ($id): array => [(int) $id => true]);
+    }
+
+    /**
+     * Weighted average of the deliveries of a phase.
+     *
+     * The denominator is the weight of EVERY weighted delivery of the phase,
+     * graded or not, so a missed delivery cannot lift the average: it scores
+     * zero and keeps its share. The previous version `continue`d past any
+     * NULL grade, which removed it from the numerator AND the denominator and
+     * renormalised the rest — so skipping half the coursework returned a full
+     * mark for what was handed in.
+     *
+     * A NULL weight does not participate at all (RF-ENT-04, see
+     * EntregaPesoService), and a delivery in an "we cannot tell yet" state
+     * blocks the phase instead of shrinking the denominator.
+     *
+     * @param  list<array{titulo: string, nota: float|null, peso: float|null, estado: string, es_no_entregada: bool}>  $entregas
      */
     private function calcularNotaPonderada(array $entregas): ?float
     {
@@ -312,20 +442,41 @@ final class ConsultaNotasService
         $sumaPonderada = 0.0;
 
         foreach ($entregas as $item) {
-            if ($item['nota'] === null || $item['peso'] === null) {
+            $peso = $item['peso'];
+
+            if ($peso === null) {
                 continue;
             }
 
-            $sumaPonderada += $item['nota'] * ($item['peso'] / 100);
-            $totalPeso += $item['peso'];
+            $estado = EstadoEntregaNota::from($item['estado']);
+
+            if ($estado === EstadoEntregaNota::Calificada) {
+                $sumaPonderada += (float) $item['nota'] * ($peso / 100);
+                $totalPeso += $peso;
+
+                continue;
+            }
+
+            if ($estado === EstadoEntregaNota::NoEntregada) {
+                // Zero, but the weight stays in the denominator.
+                $totalPeso += $peso;
+
+                continue;
+            }
+
+            // pendiente / no_iniciada / entregada_sin_calificar: the grade is
+            // not knowable yet, so the phase does not compute at all.
+            return null;
         }
 
         if ($totalPeso <= 0.0) {
             return null;
         }
 
-        // Normalize if the total weight doesn't add to 100
-        return round($sumaPonderada * (100 / $totalPeso), 2);
+        // No renormalisation: EntregaPesoService validates that the non-null
+        // weights of a phase add up to 100% when the pair closes, so the
+        // weighted sum already IS the average.
+        return round($sumaPonderada, 2);
     }
 
     /**

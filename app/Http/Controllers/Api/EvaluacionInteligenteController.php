@@ -10,7 +10,9 @@ use App\Exceptions\AiException;
 use App\Exceptions\DocumentEvaluationException;
 use App\Http\Controllers\Controller;
 use App\Models\AiDocumentEvaluation;
+use App\Models\User;
 use App\Models\VersionDocumento;
+use App\Services\Entregas\VersionIsolationScope;
 use App\Services\Evaluation\Access\StudentProjectAccessResolver;
 use App\Services\Evaluation\AiFeedbackPresenter;
 use App\Services\Evaluation\DocumentEvaluationService;
@@ -30,6 +32,7 @@ class EvaluacionInteligenteController extends Controller
         private readonly PreSubmissionDeliveryStrategy $strategy,
         private readonly StudentProjectAccessResolver $access,
         private readonly PreSubmissionResultInterpreter $interpreter,
+        private readonly VersionIsolationScope $versionIsolation,
     ) {}
 
     /**
@@ -37,8 +40,10 @@ class EvaluacionInteligenteController extends Controller
      */
     public function index(Request $request, int $entrega): JsonResponse
     {
+        $user = $request->user();
+
         try {
-            $this->access->resolve($request->user(), $entrega);
+            $resolved = $this->access->resolve($user, $entrega);
         } catch (DocumentEvaluationException $exception) {
             return response()->json([
                 'error' => $exception->getMessage(),
@@ -49,9 +54,13 @@ class EvaluacionInteligenteController extends Controller
         $versionId = $this->optionalVersionId($request->query('version_id'));
 
         if ($versionId !== null) {
+            // Scoped to the student's own project: a version belonging to
+            // another project sharing this entrega template is 404, not 403,
+            // so its existence is never confirmed.
             $exists = VersionDocumento::query()
                 ->where('entrega_id', $entrega)
                 ->where('id', $versionId)
+                ->paraProyecto($resolved['proyecto']->id)
                 ->exists();
 
             if (! $exists) {
@@ -62,7 +71,7 @@ class EvaluacionInteligenteController extends Controller
             }
         }
 
-        return $this->historialResponse($entrega, $versionId);
+        return $this->historialResponse($entrega, $versionId, $user);
     }
 
     /**
@@ -145,9 +154,17 @@ class EvaluacionInteligenteController extends Controller
         }
     }
 
-    private function historialResponse(int $entregaId, ?int $versionId): JsonResponse
+    /**
+     * Completed analyses of an entrega as the actor may see them.
+     *
+     * Without `version_id` the entrega template is shared semester-wide, so
+     * an unfiltered query would hand the student the analyses produced from
+     * OTHER projects' documents (and their version ids).
+     */
+    private function historialResponse(int $entregaId, ?int $versionId, User $actor): JsonResponse
     {
-        $historial = AiDocumentEvaluation::query()
+        $historial = $this->versionIsolation
+            ->applyToAnalyses(AiDocumentEvaluation::query(), $actor)
             ->where('entrega_id', $entregaId)
             ->where('status', AiEvaluationStatus::Completed)
             ->when($versionId !== null, fn ($query) => $query->where('version_documento_id', $versionId))

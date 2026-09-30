@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AiDocumentEvaluation;
 use App\Models\Entrega;
 use App\Models\Proyecto;
+use App\Services\Entregas\VersionIsolationScope;
 use App\Services\Evaluation\AiFeedbackPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,6 +17,10 @@ use Illuminate\Support\Facades\Validator;
 
 class EstudianteController extends Controller
 {
+    public function __construct(
+        private readonly VersionIsolationScope $versionIsolation,
+    ) {}
+
     /**
      * GET /api/estudiante/proyecto
      *
@@ -108,8 +113,14 @@ class EstudianteController extends Controller
             ], 404);
         }
 
+        // The entrega is a shared template; only the versions uploaded by
+        // THIS project (through its entrega_proyecto pivots) belong to the
+        // student. `ruta_archivo` is dropped below — a public-disk path is
+        // downloadable without a session (issue #47).
         $entregas = Entrega::paraProyecto($proyecto->id)
-            ->with(['versiones' => fn ($q) => $q->orderBy('version_number')->with('analisisIa')])
+            ->with(['versiones' => fn ($q) => $this->versionIsolation->apply($q, $user)
+                ->orderBy('version_number')
+                ->with('analisisIa')])
             ->orderBy('due_date')
             ->get()
             ->map(function ($entrega) {
@@ -129,7 +140,6 @@ class EstudianteController extends Controller
                         'id' => $version->id,
                         'numero_version' => $version->version_number,
                         'nombre_archivo' => $version->original_name,
-                        'ruta_archivo' => $version->file_path,
                         'archivo_requerido_id' => $version->archivo_requerido_id,
                         'subido_en' => $uploadedAt
                             ? Carbon::parse($uploadedAt)->toIso8601String()

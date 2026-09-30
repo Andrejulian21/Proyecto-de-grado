@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\EstadoEntrega;
 use App\Enums\UserRole;
+use App\Services\Entregas\VersionIsolationScope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -92,6 +93,16 @@ class Entrega extends Model
         return $this->belongsTo(Semestre::class, 'semester_id');
     }
 
+    /**
+     * Every version uploaded against this entrega, across all linked projects.
+     *
+     * This is the TEMPLATE-wide relation and it is intentionally unscoped:
+     * a director, a coordinator or an external evaluator legitimately need
+     * every version of the entregas they supervise. Student-facing reads
+     * must constrain it with {@see VersionDocumento::scopeParaProyecto()}
+     * (applied through {@see VersionIsolationScope})
+     * so a project never sees another project's uploads.
+     */
     public function versiones(): HasMany
     {
         return $this->hasMany(VersionDocumento::class, 'entrega_id');

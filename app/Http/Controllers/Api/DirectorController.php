@@ -61,9 +61,11 @@ class DirectorController extends Controller
         // still restrict. whereIn with an empty set yields `0 = 1`, so the
         // filter never silently disappears (unlike building an OR-group via
         // foreach over an empty collection).
-        $entregasPendientes = Entrega::whereHas('proyectos', fn ($q) => $q->whereIn('proyectos.id', $proyectoIds))
-            ->where('status', 'enviada')
-            ->count();
+        // Same scope as the "Entregas pendientes" card, so the StatCard count and
+        // the list below it can never disagree. Counting `entregas.status =
+        // 'enviada'` here would keep a template-wide total that includes entregas
+        // this director has nothing to review.
+        $entregasPendientes = Entrega::pendientesDeRevision($proyectoIds)->count();
 
         $alertas = Proyecto::whereIn('id', $proyectoIds)
             ->where('status', 'en_riesgo')

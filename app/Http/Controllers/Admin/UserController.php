@@ -96,7 +96,19 @@ class UserController extends Controller
         }
 
         $oldRole = $user->role->value;
+        $oldEmail = $user->email;
         $user->role = $newRole;
+
+        if (array_key_exists('name', $payload)) {
+            $user->name = $payload['name'];
+        }
+
+        // Email is optional: role-only callers (DirectorDeletionTest,
+        // UsuarioAuditTest, useUnifiedUsers.updateRole) never send it. When it
+        // IS sent it is synchronized, and the whitelist row moves with it.
+        if (array_key_exists('email', $payload) && filled($payload['email'])) {
+            $user->email = $payload['email'];
+        }
 
         if (array_key_exists('codigo_estudiante', $payload)) {
             $user->codigo_estudiante = $payload['codigo_estudiante'];
@@ -113,7 +125,14 @@ class UserController extends Controller
 
         $user->save();
 
-        // Sync whitelist role if an entry exists
+        // Sync whitelist role if an entry exists. When the email changed the
+        // row has to MOVE to the new address first, otherwise the lookup below
+        // would match nothing and leave the whitelist pointing at a stale
+        // email with the old role.
+        if ($user->email !== $oldEmail) {
+            AuthorizedEmail::where('email', $oldEmail)->update(['email' => $user->email]);
+        }
+
         AuthorizedEmail::where('email', $user->email)
             ->update(['role' => $user->role->value]);
 
@@ -126,6 +145,8 @@ class UserController extends Controller
 
         return response()->json([
             'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
             'role' => $user->role->value,
             'codigo_estudiante' => $user->codigo_estudiante,
         ]);

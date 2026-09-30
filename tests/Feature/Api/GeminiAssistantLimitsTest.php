@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Contracts\Ai\AiProvider;
 use App\Enums\UserRole;
 use App\Exceptions\AiException;
-use App\Models\DirectorAcademicProfile;
 use App\Models\Entrega;
 use App\Models\Proyecto;
 use App\Models\Semestre;
@@ -16,9 +15,11 @@ use App\Services\Ai\DTO\AiRequest;
 use App\Services\Ai\DTO\AiResponse;
 use App\Services\Ai\Providers\NullAiProvider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpWord\IOFactory;
 use PhpOffice\PhpWord\PhpWord;
+use Tests\Support\ProjectDeliveryVersion;
 
 uses(RefreshDatabase::class);
 
@@ -108,7 +109,7 @@ it('allows 20 chat messages but blocks the 21st for single-use orientation', fun
         $this->actingAs($this->estudiante)
             ->postJson('/api/estudiante/asistente/mensajes', ['mensaje' => "Consulta {$i}"])
             ->assertOk();
-        Illuminate\Support\Facades\RateLimiter::clear('ai-chat:'.$this->estudiante->id);
+        RateLimiter::clear('ai-chat:'.$this->estudiante->id);
     }
 
     $response = $this->actingAs($this->estudiante)
@@ -171,17 +172,17 @@ it('returns cached evaluation without calling the provider twice', function () {
     $phpWord->addSection()->addText('Documento de prueba para cache.');
     $relative = 'entregas/'.$entrega->id.'/avance.docx';
     $absolute = Storage::disk('public')->path($relative);
+
     if (! is_dir(dirname($absolute))) {
         mkdir(dirname($absolute), 0777, true);
     }
     IOFactory::createWriter($phpWord, 'Word2007')->save($absolute);
-    $version = App\Models\VersionDocumento::create([
-        'entrega_id' => $entrega->id,
+    // Bound to the project delivery, exactly as the upload flow does.
+    $version = ProjectDeliveryVersion::create($entrega, $proyecto, [
         'version_number' => 1,
         'file_path' => $relative,
         'original_name' => 'avance.docx',
         'file_size' => filesize($absolute) ?: 0,
-        'uploaded_at' => now(),
         'archivo_requerido_id' => 'documento-proyecto',
     ]);
 

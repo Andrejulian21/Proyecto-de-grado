@@ -60,7 +60,13 @@ const getDeliveryColumns = (navigate: (to: string) => void): Column<DirectorEntr
         className: 'text-right',
         render: (row: DirectorEntrega) => (
             <button
-                onClick={() => navigate(`/entregas/${row.id}/revisar`)}
+                onClick={() =>
+                    navigate(
+                        row.proyecto_id != null
+                            ? `/entregas/${row.id}/revisar?proyecto=${row.proyecto_id}`
+                            : `/entregas/${row.id}/revisar`,
+                    )
+                }
                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-alt hover:text-primary"
                 aria-label="Revisar entrega"
             >

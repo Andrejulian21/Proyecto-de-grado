@@ -6,26 +6,44 @@ namespace App\Actions\Entrega;
 
 use App\Actions\Entrega\Exceptions\EntregaActionException;
 use App\Models\Entrega;
+use App\Models\EntregaProyecto;
 use App\Models\Notificacion;
 use App\Models\Proyecto;
 use App\Models\VersionDocumento;
+use App\Services\Entregas\NotaEntregaResolver;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Single-purpose use case: the director approves/rejects an entrega with a
  * grade and feedback, auto-advances the phase of the REVIEWED project and
  * notifies only the students of that project (issue #49).
+ *
+ * An entrega is a semester-wide TEMPLATE, so a verdict about one project's
+ * delivery must not be written onto it: that would mark the whole semester as
+ * approved/rejected and, through the terminal-status guard, block the review
+ * of every other project of that entrega. Callers that review ONE project
+ * therefore pass the resolved EntregaProyecto, and the verdict lands on the
+ * pivot (`estado`, `director_grade`, `observaciones_director`) — the columns
+ * that already exist per project. Legacy callers that pass null keep the
+ * original semester-wide behaviour.
  */
 final class ReviewEntregaAction
 {
+    public function __construct(
+        private readonly NotaEntregaResolver $notas,
+    ) {}
+
     /**
      * @param  array<string, mixed>  $data  validated review payload
+     * @param  EntregaProyecto|null  $entregaProyecto  project-scoped delivery; null = legacy global review
      */
-    public function handle(Entrega $entrega, array $data, int $senderId): Entrega
+    public function handle(Entrega $entrega, array $data, int $senderId, ?EntregaProyecto $entregaProyecto = null): Entrega
     {
+        $porProyecto = $entregaProyecto !== null;
+
         // RF-NOT-03: the director may only review/edit an entrega that is
         // still open (non-terminal status and due date not passed).
-        if (! $this->esEditable($entrega)) {
+        if (! $this->esEditable($entrega, $entregaProyecto)) {
             throw new EntregaActionException('La entrega está cerrada; la nota y las observaciones no pueden modificarse', 422);
         }
 
@@ -33,19 +51,30 @@ final class ReviewEntregaAction
         // entrega_proyecto, proyectos, notificaciones). A mid-process failure
         // must not leave the delivery marked approved without its phase
         // advance or notifications — the whole operation is atomic (#49).
-        return DB::transaction(function () use ($entrega, $data, $senderId): Entrega {
-            $updateData = [
-                'status' => $data['status'],
-                'consolidated_grade' => $data['consolidated_grade'] ?? null,
-                'evaluation_complete' => true,
-            ];
-
-            $entrega->update($updateData);
+        return DB::transaction(function () use ($entrega, $data, $senderId, $entregaProyecto, $porProyecto): Entrega {
+            // Shared template columns are ONLY written by the legacy global
+            // review. In a project-scoped review they would be a lie: the
+            // other projects of the semester have not been reviewed yet.
+            if (! $porProyecto) {
+                $entrega->update([
+                    'status' => $data['status'],
+                    'consolidated_grade' => $data['consolidated_grade'] ?? null,
+                    'evaluation_complete' => true,
+                ]);
+            }
 
             // Resolve the reviewed version (RF-NOT-02: notes are per version).
-            $version = VersionDocumento::where('entrega_id', $entrega->id)
-                ->where('id', $data['version_id'])
-                ->firstOrFail();
+            // Scoped to the requested pivot so a version of another project
+            // cannot be graded through this project's filter (404 when the
+            // version does not belong to the requested delivery).
+            $versionQuery = VersionDocumento::where('entrega_id', $entrega->id)
+                ->where('id', $data['version_id']);
+
+            if ($porProyecto) {
+                $versionQuery->where('entrega_proyecto_id', $entregaProyecto->id);
+            }
+
+            $version = $versionQuery->firstOrFail();
 
             // Observations belong to the selected version of any requested document.
             if (array_key_exists('director_notes', $data) && $data['director_notes'] !== null && $data['director_notes'] !== '') {
@@ -55,10 +84,17 @@ final class ReviewEntregaAction
             // D3-rev: the director grade and observations belong to the STUDENT
             // delivery (per project). The reviewed version resolves its
             // EntregaProyecto; legacy versions without a pivot are skipped.
-            $entregaProyecto = $version->entregaProyecto;
+            $pivot = $entregaProyecto ?? $version->entregaProyecto;
 
-            if ($entregaProyecto !== null) {
+            if ($pivot !== null) {
                 $pivotData = [];
+
+                // Per-project verdict. A project-scoped review never touches
+                // the semester template status, so `estado` on the pivot is
+                // the only place this decision can live.
+                if ($porProyecto) {
+                    $pivotData['estado'] = $data['status'];
+                }
 
                 // RF-NOT-02: the grade is only captured when the delivery is
                 // approved; it is never persisted on a non-approval review.
@@ -77,7 +113,7 @@ final class ReviewEntregaAction
                 }
 
                 if ($pivotData !== []) {
-                    $entregaProyecto->update($pivotData);
+                    $pivot->update($pivotData);
                 }
             }
 
@@ -86,7 +122,7 @@ final class ReviewEntregaAction
             // a pivot fall back to the entrega's first linked project. The
             // semester-wide collection is NEVER loaded (issue #49): the
             // fallback is a single LIMIT-1 query.
-            $proyectoRevisado = $entregaProyecto?->proyecto
+            $proyectoRevisado = $pivot?->proyecto
                 ?? $entrega->firstProyecto();
 
             // Auto-advance phase if all entregas in the current phase of the
@@ -146,17 +182,30 @@ final class ReviewEntregaAction
      * only restricts the STUDENT from uploading — it never blocks the
      * director, coordinator, or evaluator from reviewing, observing, or
      * grading.
+     *
+     * A project-scoped review reads the verdict from ITS pivot, because the
+     * semester template's status is shared by every project of the entrega.
+     * A pivot with no verdict yet (legacy data) falls back to the template
+     * status, preserving the previous behaviour.
      */
-    private function esEditable(Entrega $entrega): bool
+    private function esEditable(Entrega $entrega, ?EntregaProyecto $entregaProyecto = null): bool
     {
         $terminal = ['aprobada', 'rechazada'];
+        $estado = $entregaProyecto?->estado ?? $entrega->status?->value;
 
-        return ! in_array($entrega->status?->value, $terminal, true);
+        return ! in_array($estado, $terminal, true);
     }
 
     /**
      * Auto-advance the phase of the REVIEWED project only when all its
      * entregas in the current phase are approved.
+     *
+     * "Approved" is a PER-PROJECT verdict: a project-scoped review writes it
+     * on the pivot and leaves `entregas.status` (the shared semester
+     * template) untouched, so filtering this gate by the template column
+     * would find a non-approved delivery forever and the project would never
+     * advance. Pivots without a verdict still fall back to the template, the
+     * behaviour that applied before the pivot existed.
      */
     private function autoAdvancePhase(Entrega $entrega, ?Proyecto $proyectoRevisado): void
     {
@@ -164,12 +213,19 @@ final class ReviewEntregaAction
             return;
         }
 
-        // Check if there are any non-approved entregas in this phase for this
-        // project (scope only uses the pivot table).
-        $pendingInPhase = Entrega::paraProyecto($proyectoRevisado->id)
+        $entregasDeLaFase = Entrega::paraProyecto($proyectoRevisado->id)
             ->where('phase', $entrega->phase)
-            ->where('status', '!=', 'aprobada')
-            ->exists();
+            ->get(['id', 'status']);
+
+        $pivotes = EntregaProyecto::query()
+            ->where('proyecto_id', $proyectoRevisado->id)
+            ->whereIn('entrega_id', $entregasDeLaFase->pluck('id'))
+            ->get()
+            ->keyBy('entrega_id');
+
+        $pendingInPhase = $entregasDeLaFase->contains(
+            fn (Entrega $e) => ! $this->notas->estaAprobada($e, $pivotes->get($e->id))
+        );
 
         if (! $pendingInPhase) {
             $currentPhase = $proyectoRevisado->current_phase;

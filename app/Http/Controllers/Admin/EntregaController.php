@@ -17,6 +17,8 @@ use App\Http\Requests\StoreEntregaRequest;
 use App\Http\Requests\UpdateEntregaRequest;
 use App\Models\AiDocumentEvaluation;
 use App\Models\Entrega;
+use App\Models\EntregaProyecto;
+use App\Models\User;
 use App\Models\VersionDocumento;
 use App\Services\Entregas\VersionIsolationScope;
 use App\Services\Evaluation\AiFeedbackPresenter;
@@ -168,6 +170,19 @@ class EntregaController extends Controller
      * GET /api/admin/entregas/{id}
      *
      * T-013: Show a single entrega with project info for director's review.
+     *
+     * An entrega is a SEMESTER-WIDE template, so this detail has two modes:
+     *
+     * - `?proyecto=<id>` — the entrega resolved INSIDE one project. Only that
+     *   project's versions, grade, notes and AI analyses are loaded, and the
+     *   per-project delivery is published as the `entrega_proyecto` block.
+     *   This is what the director's review screen needs: without it the page
+     *   cannot know which project it is grading and silently shows the
+     *   documents and grades of every other project of the semester.
+     * - No `proyecto` — GLOBAL supervision. Deliberately preserved: the
+     *   coordinator, the review index, the semester reports and every other
+     *   existing caller read the entrega as a whole, and narrowing them by
+     *   default would remove data they legitimately need.
      */
     public function show(Request $request, int $id): JsonResponse
     {
@@ -180,6 +195,8 @@ class EntregaController extends Controller
         $this->authorize('view', $entrega);
 
         $actor = $request->user();
+        $proyectoId = $this->proyectoSolicitado($request);
+        $entregaProyecto = $this->resolverPivoteDeProyecto($entrega, $proyectoId, $actor);
 
         $entrega->load([
             'proyectos:id,code,title',
@@ -187,9 +204,17 @@ class EntregaController extends Controller
             'semestre:id,name',
             // A student only sees the versions uploaded by their own projects;
             // every other role supervises the whole entrega (see
-            // VersionIsolationScope).
-            'versiones' => fn ($q) => $this->versionIsolation->apply($q, $actor)
-                ->orderByDesc('version_number'),
+            // VersionIsolationScope). When a project is requested, the pivot
+            // narrows it further for EVERY role, including the supervisors.
+            'versiones' => function ($q) use ($actor, $proyectoId) {
+                $query = $this->versionIsolation->apply($q, $actor);
+
+                if ($proyectoId !== null) {
+                    $query->paraProyecto([$proyectoId]);
+                }
+
+                return $query->orderByDesc('version_number');
+            },
             'versiones.entregaProyecto',
             'versiones.analisisIa',
         ]);
@@ -226,13 +251,88 @@ class EntregaController extends Controller
             return $array;
         })->values()->toArray();
 
+        // Only present when the request named a project: without it there is
+        // no single per-project delivery to describe, and inventing one would
+        // reintroduce the ambiguity this filter exists to remove.
+        if ($entregaProyecto !== null) {
+            $data['entrega_proyecto'] = [
+                'id' => $entregaProyecto->id,
+                'proyecto_id' => $entregaProyecto->proyecto_id,
+                'estado' => $entregaProyecto->estado,
+                'director_grade' => $entregaProyecto->director_grade !== null
+                    ? (float) $entregaProyecto->director_grade
+                    : null,
+                // `observaciones_director` is the pivot's own copy of the
+                // director feedback; the version keeps its per-version note.
+                'director_notes' => $entregaProyecto->observaciones_director,
+                'versiones' => $data['versiones'],
+            ];
+        }
+
         return response()->json(['data' => $data]);
+    }
+
+    /**
+     * Read the optional `proyecto` filter (an integer project id).
+     */
+    private function proyectoSolicitado(Request $request): ?int
+    {
+        if (! $request->filled('proyecto')) {
+            return null;
+        }
+
+        $proyectoId = $request->integer('proyecto');
+
+        return $proyectoId > 0 ? $proyectoId : null;
+    }
+
+    /**
+     * Resolve the requested project's per-project delivery, enforcing that the
+     * actor is related to THAT project. Returns null when no project was
+     * requested (global supervision).
+     *
+     * The two rejections are deliberately ordered. An actor with no relation to
+     * the project at all gets a 403 that says nothing about this entrega; only
+     * once the relation holds does a missing pivot become a 404. Otherwise the
+     * status code would answer "is project X linked to this entrega?" for
+     * anybody who can guess an id.
+     */
+    private function resolverPivoteDeProyecto(Entrega $entrega, ?int $proyectoId, User $actor): ?EntregaProyecto
+    {
+        if ($proyectoId === null) {
+            return null;
+        }
+
+        if (! $this->versionIsolation->relacionadoConProyecto($actor, $proyectoId)) {
+            $this->jsonError(403, 'No autorizado.');
+        }
+
+        $entregaProyecto = $this->versionIsolation->resolverPivote($entrega, $proyectoId);
+
+        if ($entregaProyecto === null) {
+            $this->jsonError(404, 'No se encontró la entrega para el proyecto indicado.');
+        }
+
+        return $entregaProyecto;
+    }
+
+    /**
+     * Abort the request with a JSON error envelope instead of Laravel's
+     * English default page. `abort()` accepts a ready Response instance.
+     */
+    private function jsonError(int $status, string $message): never
+    {
+        abort(response()->json(['error' => $message], $status));
     }
 
     /**
      * PUT /api/admin/entregas/{id}/habilitar
      *
      * Director habilita la entrega para que el estudiante suba versiones.
+     *
+     * Pass `proyecto=<id>` to re-enable ONE project's delivery: only that
+     * pivot's grade is cleared. Without it the unfreeze stays semester-wide
+     * (legacy behaviour).
      */
     public function habilitar(Request $request, int $id): JsonResponse
     {
@@ -243,8 +343,20 @@ class EntregaController extends Controller
 
         $user = $request->user();
 
+        $entregaProyecto = $this->resolverPivoteDeProyecto(
+            $entrega,
+            $this->proyectoSolicitado($request),
+            $user,
+        );
+
         try {
-            $entrega = $this->habilitarEntregaAction->handle($entrega, $user->id, $request->ip(), $request->userAgent());
+            $entrega = $this->habilitarEntregaAction->handle(
+                $entrega,
+                $user->id,
+                $request->ip(),
+                $request->userAgent(),
+                $entregaProyecto,
+            );
         } catch (EntregaActionException $e) {
             return $this->actionError($e);
         }
@@ -369,6 +481,11 @@ class EntregaController extends Controller
      * PUT /api/admin/entregas/{id}/revisar
      *
      * Director aprueba/rechaza entrega con nota y feedback.
+     *
+     * Pass `proyecto=<id>` to grade the delivery of ONE project: the verdict
+     * and the grade are written to that project's EntregaProyecto pivot and the
+     * semester-wide template is left untouched. Without it the review keeps
+     * its legacy global behaviour.
      */
     public function revisar(Request $request, int $id): JsonResponse
     {
@@ -378,6 +495,7 @@ class EntregaController extends Controller
         $this->authorize('review', $entrega);
 
         $validator = Validator::make($request->all(), [
+            'proyecto' => 'nullable|integer',
             'status' => 'required|string|in:aprobada,rechazada,revisada',
             'consolidated_grade' => 'nullable|numeric|min:0|max:5',
             'director_notes' => 'nullable|string',
@@ -390,6 +508,18 @@ class EntregaController extends Controller
         }
 
         $data = $validator->validated();
+
+        // Resolve the project delivery BEFORE any write. Without this the
+        // review is applied to the semester template on behalf of every
+        // project, and a version belonging to a DIFFERENT project can be
+        // graded while the screen claims to be reviewing another one. 404
+        // (not 403) once the pivot exists: it must not confirm which other
+        // projects of this entrega own a version.
+        $entregaProyecto = $this->resolverPivoteDeProyecto(
+            $entrega,
+            $this->proyectoSolicitado($request),
+            $request->user(),
+        );
 
         // RF-NOT-01 / D7: director_grade range (0-5) and max 2 decimals,
         // validated only when the review approves (RF-NOT-02).
@@ -412,7 +542,12 @@ class EntregaController extends Controller
         }
 
         try {
-            $entrega = $this->reviewEntregaAction->handle($entrega, $data, $request->user()->id);
+            $entrega = $this->reviewEntregaAction->handle(
+                $entrega,
+                $data,
+                $request->user()->id,
+                $entregaProyecto,
+            );
         } catch (EntregaActionException $e) {
             return $this->errorEnvelope($e->status, $e->getMessage());
         }

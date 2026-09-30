@@ -21,6 +21,16 @@ interface Version {
     created_at: string;
 }
 
+interface EntregaProyectoPivot {
+    id: number;
+    proyecto_id: number;
+    estado: string;
+    director_grade: number | null;
+    director_notes: string | null;
+    /** Versions of THIS project only (already filtered by the backend). */
+    versiones: Version[];
+}
+
 interface EntregaDetail {
     id: number;
     title: string;
@@ -41,6 +51,16 @@ interface EntregaDetail {
         estudiantes?: { id: number; name: string }[];
     };
     proyectos?: { id: number; code: string; title: string }[];
+    /**
+     * Present ONLY when the request was scoped to one project
+     * (`?proyecto=<id>`). An entrega is a semester-wide template shared by
+     * several projects, so this pivot is the only trustworthy source of the
+     * delivery state, the grade and the document list for the project under
+     * inspection. The route already carries `:proyectoId`, so a missing pivot
+     * here means the delivery does not exist for that project — never a reason
+     * to fall back to the merged semester-wide list.
+     */
+    entrega_proyecto?: EntregaProyectoPivot;
     versiones: Version[];
 }
 
@@ -118,6 +138,17 @@ export default function DetalleEntregaCoordinador() {
     const [searchParams] = useSearchParams();
     const directorId = searchParams.get('directorId');
 
+    /* The route already scopes this screen to one project, so the fetch always
+       asks for that project's delivery. Without the filter the entrega is read
+       as a semester-wide template and this screen would display documents and
+       grades belonging to other projects. */
+    const proyectoIdNum = (() => {
+        if (!proyectoId) return null;
+        const parsed = Number(proyectoId);
+        return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+    })();
+    const proyectoQuery = proyectoIdNum != null ? `?proyecto=${proyectoIdNum}` : '';
+
     const [entrega, setEntrega] = useState<EntregaDetail | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -131,7 +162,7 @@ export default function DetalleEntregaCoordinador() {
             setLoading(true);
             setError(null);
             try {
-                const res = await apiFetch(`/api/admin/entregas/${entregaId}`);
+                const res = await apiFetch(`/api/admin/entregas/${entregaId}${proyectoQuery}`);
                 if (cancelled) return;
                 if (!res.ok) {
                     const body = await res.json().catch(() => null);
@@ -149,7 +180,7 @@ export default function DetalleEntregaCoordinador() {
         })();
 
         return () => { cancelled = true; };
-    }, [entregaId]);
+    }, [entregaId, proyectoQuery]);
 
     // Reset version index when entrega changes (e.g., new data load)
     useEffect(() => {
@@ -182,17 +213,47 @@ export default function DetalleEntregaCoordinador() {
         );
     }
 
-    const statusCfg = statusConfig(entrega.status);
-    // Use direct FK proyecto, or look up by proyectoId from the URL in the pivot list
-    const proyectoDesdeUrl = proyectoId
-        ? (entrega.proyectos ?? []).find((p) => String(p.id) === proyectoId)
-        : null;
-    const mainProyecto = entrega.proyecto ?? proyectoDesdeUrl ?? (entrega.proyectos?.[0] ?? null);
+    const entregaProyecto = entrega.entrega_proyecto ?? null;
+
+    /* Without a per-project delivery there is nothing trustworthy to show: the
+       semester-wide `versiones`/`status` mix every project, and presenting them
+       as if they belonged to this project is exactly the bug being fixed. Show
+       an explanatory empty state instead of a merged fallback. */
+    if (entregaProyecto === null) {
+        return (
+            <div className="flex flex-col items-center gap-4 py-20 text-center">
+                <AlertTriangle className="h-10 w-10 text-[#d97706]" />
+                <p className="text-sm font-semibold text-[#1c1917]">
+                    Esta entrega no está habilitada para el proyecto indicado.
+                </p>
+                <p className="max-w-md text-sm text-[#57534e]">
+                    La entrega es una plantilla compartida del semestre. Para
+                    revisarla hay que entrar desde el proyecto: cada proyecto
+                    tiene su propia entrega, con sus versiones y su calificación.
+                </p>
+                <button
+                    onClick={() => navigate(directorId ? `/directores?directorId=${directorId}&proyectoId=${proyectoId}` : '/directores') as unknown as number}
+                    className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-[#e5e5e5] bg-white px-4 py-2 text-sm font-semibold text-[#1c1917] transition-colors hover:bg-[#f5f5f4]"
+                >
+                    <ArrowLeft className="h-4 w-4" />
+                    Volver
+                </button>
+            </div>
+        );
+    }
+
+    const statusCfg = statusConfig(entregaProyecto.estado);
+    // The pivot is the resolved project for this request; the generic list is
+    // only used to read its code/title.
+    const mainProyecto =
+        (entrega.proyectos ?? []).find((p) => p.id === entregaProyecto.proyecto_id) ??
+        (entrega.proyecto?.id === entregaProyecto.proyecto_id ? entrega.proyecto : null) ??
+        null;
     const projectCode = mainProyecto?.code ?? '';
     const projectTitle = mainProyecto?.title ?? '';
 
-    // Sort versions descending by version_number (most recent first)
-    const sortedVersions = [...(entrega.versiones ?? [])].sort(
+    // Versions of THIS project only, descending by version_number.
+    const sortedVersions = [...(entregaProyecto.versiones ?? [])].sort(
         (a, b) => b.version_number - a.version_number,
     );
 
@@ -270,8 +331,13 @@ export default function DetalleEntregaCoordinador() {
                         {/* Proyecto */}
                         <div className="rounded-xl border border-[#e5e5e5] bg-white p-4 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                             <p className="text-xs text-[#78716c]">Proyecto</p>
+                            {projectCode && (
+                                <span className="mt-1.5 mr-2 inline-flex items-center rounded-md bg-[#f5f5f4] px-1.5 py-0.5 text-xs font-bold text-[#57534e] tabular-nums">
+                                    {projectCode}
+                                </span>
+                            )}
                             <p className="mt-1 text-sm font-semibold text-[#1c1917] truncate" title={projectTitle}>
-                                {projectTitle || projectCode}
+                                {projectTitle || projectCode || '—'}
                             </p>
                         </div>
                     </div>
@@ -374,8 +440,8 @@ export default function DetalleEntregaCoordinador() {
                                             <span className="text-sm font-bold text-[#1c1917]">
                                                 Versión {selectedVersion.version_number}
                                             </span>
-                                            <StatusBadge variant={getReviewStatus(selectedVersion, entrega.status).variant}>
-                                                {getReviewStatus(selectedVersion, entrega.status).label}
+                                            <StatusBadge variant={getReviewStatus(selectedVersion, entregaProyecto.estado).variant}>
+                                                {getReviewStatus(selectedVersion, entregaProyecto.estado).label}
                                             </StatusBadge>
                                         </div>
                                         <div className="mb-3 space-y-1">

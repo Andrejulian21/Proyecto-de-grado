@@ -88,8 +88,14 @@ class DirectorController extends Controller
     /**
      * GET /api/director/entregas
      *
-     * Returns the 20 most urgent pending deliveries (status = 'enviada')
-     * from the director's projects, ordered by due_date ASC.
+     * Returns the 20 most urgent deliveries still awaiting THIS director's
+     * review, ordered by due_date ASC.
+     *
+     * A delivery is pending here when one of the director's OWN projects has at
+     * least one uploaded version on that delivery and its per-project pivot is
+     * still ungraded — NOT when the shared template happens to be 'enviada'.
+     * See {@see Entrega::scopePendientesDeRevision()} for why that cannot be
+     * read from `entregas.status`.
      */
     public function entregas(Request $request): JsonResponse
     {
@@ -99,22 +105,25 @@ class DirectorController extends Controller
             ->enSemestresActivos()
             ->pluck('id');
 
-        // Issue #47 (hallazgo 2): whereIn over an empty $proyectoIds yields
-        // `0 = 1`, so a director with no projects gets zero deliveries
-        // instead of the whole system's (the filter must never disappear).
-        $entregas = Entrega::whereHas('proyectos', fn ($q) => $q->whereIn('proyectos.id', $proyectoIds))
-            ->where('status', 'enviada')
+        $entregas = Entrega::pendientesDeRevision($proyectoIds)
             ->with([
-                'proyectos:id,code,title,director_id',
+                // The `entregas` row is a semester-wide template: an unrestricted
+                // `proyectos` eager load returns EVERY project of the semester, so
+                // `$entrega->proyectos->first()` below would resolve to whichever
+                // project has the lowest PK — typically another director's — and
+                // leak its code, title and students. Constrain the load to the
+                // projects this director actually supervises, students included.
+                'proyectos' => fn ($q) => $q->whereIn('proyectos.id', $proyectoIds)
+                    ->with('estudiantes:id,name'),
             ])
             ->orderBy('due_date', 'asc')
             ->take(20)
             ->get();
 
-        // Load students for each linked project
-        $entregas->load('proyectos.estudiantes:id,name');
-
         $result = $entregas->map(function ($entrega) {
+            // Guaranteed non-null by the pending scope (it requires a pivot of a
+            // supervised project), but an inconsistent pivot must not 500 the
+            // dashboard: fall back to nulls instead of inventing data.
             $primerProyecto = $entrega->proyectos->first();
             $primerEstudiante = $primerProyecto?->estudiantes->first();
 

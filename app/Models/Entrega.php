@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 class Entrega extends Model
 {
@@ -207,6 +208,58 @@ class Entrega extends Model
     {
         return $query->whereHas('proyectos', function ($q2) use ($proyectoId) {
             $q2->where('proyectos.id', $proyectoId);
+        });
+    }
+
+    /**
+     * Entregas whose per-project delivery is still awaiting THIS director's
+     * review, for the given projects.
+     *
+     * An `entrega` is a semester-wide TEMPLATE: many projects link to the same
+     * row through the `entrega_proyecto` pivot. `entregas.status` therefore
+     * describes the template as a whole, and it is unusable as "what does this
+     * director still have to grade": when one student is granted habilitación
+     * the shared row becomes 'enviada' for every project of the semester.
+     *
+     * Why this is derived instead of read from a column: `SolicitarEntregaAction`
+     * only writes the global `entregas.status` — it records nothing per project,
+     * so no per-project "requested" state exists to read. The pivot `estado` is
+     * also not usable: `ReviewEntregaAction` writes it as the per-project
+     * VERDICT (aprobada/rechazada) after a review and `HabilitarEntregaAction`
+     * clears it again, so it is null both before and after review.
+     *
+     * The only facts already on disk that mean "this director has work queued"
+     * are: the pivot exists, at least one version was uploaded on THAT pivot
+     * (versions carry `entrega_proyecto_id`), and the pivot is still ungraded
+     * (`director_grade IS NULL`). Hence the correlated EXISTS below, which
+     * never reads or mutates `entregas.status`.
+     *
+     * @param  int|iterable<int>  $proyectoIds
+     */
+    public function scopePendientesDeRevision(Builder $query, int|iterable $proyectoIds): Builder
+    {
+        $ids = collect($proyectoIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->values()
+            ->all();
+
+        // Default-deny: with no supervised project there is nothing to grade.
+        if ($ids === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereExists(function ($sub) use ($ids) {
+            $sub->select(DB::raw(1))
+                ->from('entrega_proyecto')
+                ->whereColumn('entrega_proyecto.entrega_id', 'entregas.id')
+                ->whereIn('entrega_proyecto.proyecto_id', $ids)
+                ->whereNull('entrega_proyecto.director_grade')
+                ->whereExists(function ($versiones) {
+                    $versiones->select(DB::raw(1))
+                        ->from('versiones_documento')
+                        ->whereColumn('versiones_documento.entrega_proyecto_id', 'entrega_proyecto.id');
+                });
         });
     }
 

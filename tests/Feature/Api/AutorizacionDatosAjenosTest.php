@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\EstadoInvitacionEvaluador;
 use App\Enums\UserRole;
 use App\Models\Entrega;
+use App\Models\EntregaProyecto;
 use App\Models\EvaluadorProyecto;
 use App\Models\Proyecto;
 use App\Models\Semestre;
@@ -197,6 +198,24 @@ it('un estudiante ve entregas_pendientes en cero en /api/director/kpis', functio
 
 it('un director ve solo las entregas de sus proyectos', function () {
     $ctx = contextoDatosAjenos();
+
+    // A delivery only counts as "pending review" when the director's OWN project
+    // has an upload to grade on it, so this fixture has to include that upload.
+    // The authorization assertion below is unchanged: entregaA must appear,
+    // entregaB must not.
+    $pivotA = EntregaProyecto::query()
+        ->where('entrega_id', $ctx['entregaA']->id)
+        ->where('proyecto_id', $ctx['proyectoA']->id)
+        ->firstOrFail();
+
+    VersionDocumento::create([
+        'entrega_id' => $ctx['entregaA']->id,
+        'entrega_proyecto_id' => $pivotA->id,
+        'version_number' => 1,
+        'file_path' => 'entregas/privado/v1.pdf',
+        'file_size' => 1024,
+        'original_name' => 'v1.pdf',
+    ]);
 
     $response = $this->actingAs($ctx['directorA'])
         ->getJson('/api/director/entregas')

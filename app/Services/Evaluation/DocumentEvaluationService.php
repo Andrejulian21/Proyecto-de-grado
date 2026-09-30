@@ -82,7 +82,7 @@ final class DocumentEvaluationService
                 );
                 $versionDocumentoId = null;
             } else {
-                $version = $this->resolveAnalyzableVersion($entrega, $versionId);
+                $version = $this->resolveAnalyzableVersion($entrega, $proyecto, $versionId);
                 $this->assertVersionEsAnalizable($entrega, $version);
                 $absolutePath = Storage::disk('public')->path($version->file_path);
                 $documentHash = is_file($absolutePath) ? hash_file('sha256', $absolutePath) : null;
@@ -93,7 +93,7 @@ final class DocumentEvaluationService
 
             $this->assertSupportedDocument($absolutePath, $originalName);
 
-            $model = (string) config('ai.gemini.model', 'gemini-2.0-flash');
+            $model = (string) config('ai.gemini.model', 'gemini-3.8-flash');
             $promptVersion = $strategy->promptVersion();
 
             $cached = $this->findCachedEvaluation($entrega->id, $strategy->type()->value, (string) $documentHash, $promptVersion, $model);
@@ -222,27 +222,29 @@ final class DocumentEvaluationService
         return [$absolute, $originalName, hash_file('sha256', $absolute) ?: null, $relative];
     }
 
-    private function resolveAnalyzableVersion(Entrega $entrega, ?int $versionId): VersionDocumento
+    /**
+     * Pick the version to analyze.
+     *
+     * The entrega is a semester-wide template, so `entrega_id` alone spans
+     * every project using it. Both branches are therefore constrained to the
+     * caller's own project delivery (`entrega_proyecto`): an explicit
+     * `version_id` from another project is a 404, and without one the
+     * "latest version" is the latest of THIS project — never another
+     * project's document.
+     */
+    private function resolveAnalyzableVersion(Entrega $entrega, Proyecto $proyecto, ?int $versionId): VersionDocumento
     {
         $iaId = $entrega->idDocumentoAnalizableIa();
-        $query = VersionDocumento::query()->where('entrega_id', $entrega->id);
 
-        if ($iaId !== null) {
-            $query->where(function ($q) use ($entrega, $iaId) {
-                $q->where('archivo_requerido_id', $iaId);
-
-                $first = $entrega->documentosSolicitados()[0] ?? null;
-                $firstId = is_array($first) ? ($first['slug'] ?? $first['id'] ?? null) : null;
-
-                if ($firstId === $iaId) {
-                    $q->orWhereNull('archivo_requerido_id');
-                }
-            });
-        }
+        // Ownership is resolved first and independently of the analyzable
+        // filter: a version from another project must be a 404 even when it
+        // happens to be the AI-analyzable document.
+        $ownVersions = VersionDocumento::query()
+            ->where('entrega_id', $entrega->id)
+            ->paraProyecto($proyecto->id);
 
         if ($versionId !== null) {
-            $version = VersionDocumento::query()
-                ->where('entrega_id', $entrega->id)
+            $version = (clone $ownVersions)
                 ->where('id', $versionId)
                 ->first();
 
@@ -250,6 +252,21 @@ final class DocumentEvaluationService
                 throw DocumentEvaluationException::notFound('No se encontró la versión del documento.');
             }
         } else {
+            $query = clone $ownVersions;
+
+            if ($iaId !== null) {
+                $query->where(function ($q) use ($entrega, $iaId) {
+                    $q->where('archivo_requerido_id', $iaId);
+
+                    $first = $entrega->documentosSolicitados()[0] ?? null;
+                    $firstId = is_array($first) ? ($first['slug'] ?? $first['id'] ?? null) : null;
+
+                    if ($firstId === $iaId) {
+                        $q->orWhereNull('archivo_requerido_id');
+                    }
+                });
+            }
+
             $version = $query->orderByDesc('version_number')->first();
 
             if (! $version) {

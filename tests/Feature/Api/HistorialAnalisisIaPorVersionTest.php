@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpWord\IOFactory;
 use PhpOffice\PhpWord\PhpWord;
+use Tests\Support\ProjectDeliveryVersion;
 
 uses(RefreshDatabase::class);
 
@@ -147,8 +148,14 @@ function writeHistorialDocx(string $absolute, string $text): void
     IOFactory::createWriter($phpWord, 'Word2007')->save($absolute);
 }
 
+/**
+ * Versions are bound to the owning project delivery, exactly as the upload
+ * flow does. Without `entrega_proyecto_id` a version belongs to no project
+ * and every per-project check excludes it.
+ */
 function storeHistorialVersion(
     Entrega $entrega,
+    Proyecto $proyecto,
     string $slug,
     int $versionNumber,
     string $text,
@@ -158,13 +165,11 @@ function storeHistorialVersion(
     $absolute = Storage::disk('public')->path($relative);
     writeHistorialDocx($absolute, $text);
 
-    return VersionDocumento::create([
-        'entrega_id' => $entrega->id,
+    return ProjectDeliveryVersion::create($entrega, $proyecto, [
         'version_number' => $versionNumber,
         'file_path' => $relative,
         'original_name' => $name,
         'file_size' => filesize($absolute) ?: 0,
-        'uploaded_at' => now(),
         'archivo_requerido_id' => $slug,
         'director_notes' => null,
     ]);
@@ -189,7 +194,7 @@ it('persists the schema identity of the requested document on ai evaluations', f
 });
 
 it('asocia el analisis al documento y version correctos con fecha', function () {
-    $version = storeHistorialVersion($this->entrega, 'marco-teorico', 1, 'Marco teorico v1');
+    $version = storeHistorialVersion($this->entrega, $this->proyecto, 'marco-teorico', 1, 'Marco teorico v1');
     bindHistorialIaStub(historialIaPayload('Retroalimentación de la versión 1'));
 
     $response = $this->actingAs($this->estudiante)
@@ -216,7 +221,7 @@ it('asocia el analisis al documento y version correctos con fecha', function () 
 });
 
 it('rechaza analizar un documento no configurado para IA', function () {
-    $version = storeHistorialVersion($this->entrega, 'anexo', 1, 'Anexo no IA');
+    $version = storeHistorialVersion($this->entrega, $this->proyecto, 'anexo', 1, 'Anexo no IA');
     $stub = bindHistorialIaStub(historialIaPayload('No debería ejecutarse'));
 
     $this->actingAs($this->estudiante)
@@ -231,7 +236,7 @@ it('rechaza analizar un documento no configurado para IA', function () {
 });
 
 it('reutiliza la evaluacion cacheada cuando se analiza de nuevo la misma version', function () {
-    $version = storeHistorialVersion($this->entrega, 'marco-teorico', 1, 'Marco teorico v1');
+    $version = storeHistorialVersion($this->entrega, $this->proyecto, 'marco-teorico', 1, 'Marco teorico v1');
 
     $stub = bindHistorialIaStub(historialIaPayload('Primer análisis'));
     $this->actingAs($this->estudiante)
@@ -361,8 +366,8 @@ it('no inventa la relacion si el archivo subido no coincide con el analisis temp
 });
 
 it('el estudiante no puede re-analizar el grupo y el historial conserva el unico analisis', function () {
-    $v1 = storeHistorialVersion($this->entrega, 'marco-teorico', 1, 'Version uno');
-    $v2 = storeHistorialVersion($this->entrega, 'marco-teorico', 2, 'Version dos');
+    $v1 = storeHistorialVersion($this->entrega, $this->proyecto, 'marco-teorico', 1, 'Version uno');
+    $v2 = storeHistorialVersion($this->entrega, $this->proyecto, 'marco-teorico', 2, 'Version dos');
 
     $stub = bindHistorialIaStub(historialIaPayload('IA de v1'));
     $this->actingAs($this->estudiante)
@@ -405,8 +410,8 @@ it('el estudiante no puede re-analizar el grupo y el historial conserva el unico
 });
 
 it('el director ve el unico analisis del grupo sin importar la version consultada', function () {
-    $v1 = storeHistorialVersion($this->entrega, 'marco-teorico', 1, 'Director v1');
-    $v2 = storeHistorialVersion($this->entrega, 'marco-teorico', 2, 'Director v2');
+    $v1 = storeHistorialVersion($this->entrega, $this->proyecto, 'marco-teorico', 1, 'Director v1');
+    $v2 = storeHistorialVersion($this->entrega, $this->proyecto, 'marco-teorico', 2, 'Director v2');
 
     // The student requests the analysis; the director only reads it.
     $stub = bindHistorialIaStub(historialIaPayload('Estudiante IA v1'));
@@ -446,7 +451,7 @@ it('el director ve el unico analisis del grupo sin importar la version consultad
 });
 
 it('el detalle de entrega separa observacion del director y retroalimentacion IA', function () {
-    $version = storeHistorialVersion($this->entrega, 'marco-teorico', 1, 'Documento con ambos');
+    $version = storeHistorialVersion($this->entrega, $this->proyecto, 'marco-teorico', 1, 'Documento con ambos');
     $version->update(['director_notes' => 'Es necesario fortalecer el marco teórico.']);
 
     bindHistorialIaStub(historialIaPayload('El documento presenta una estructura coherente.'));
@@ -469,7 +474,7 @@ it('el detalle de entrega separa observacion del director y retroalimentacion IA
         ->and($vista['analisis_ia'][0]['analizado_en'])->not->toBeNull()
         ->and($vista['analisis_ia'][0]['documento_id'])->toBe('marco-teorico');
 
-    $anexo = storeHistorialVersion($this->entrega, 'anexo', 1, 'Anexo sin IA');
+    $anexo = storeHistorialVersion($this->entrega, $this->proyecto, 'anexo', 1, 'Anexo sin IA');
     $asDirector = $this->actingAs($this->director)
         ->getJson("/api/admin/entregas/{$this->entrega->id}")
         ->assertOk();
@@ -479,7 +484,7 @@ it('el detalle de entrega separa observacion del director y retroalimentacion IA
 });
 
 it('niega consultar o analizar a usuarios de otro proyecto', function () {
-    $version = storeHistorialVersion($this->entrega, 'marco-teorico', 1, 'Privado');
+    $version = storeHistorialVersion($this->entrega, $this->proyecto, 'marco-teorico', 1, 'Privado');
 
     $this->actingAs($this->otroEstudiante)
         ->postJson("/api/estudiante/entregas/{$this->entrega->id}/evaluacion-inteligente", [

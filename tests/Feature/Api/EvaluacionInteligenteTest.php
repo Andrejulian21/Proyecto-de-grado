@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpWord\IOFactory;
 use PhpOffice\PhpWord\PhpWord;
 use Tests\Support\PdfDocumentFactory;
+use Tests\Support\ProjectDeliveryVersion;
 
 uses(RefreshDatabase::class);
 
@@ -80,7 +81,12 @@ function samplePreliminaryPayload(): string
     ], JSON_THROW_ON_ERROR);
 }
 
-function storeDocxVersion(Entrega $entrega, string $name = 'avance.docx'): VersionDocumento
+/**
+ * Versions are bound to the owning project delivery, exactly as the upload
+ * flow does. A version with no `entrega_proyecto_id` belongs to no project,
+ * so every per-project check would exclude it.
+ */
+function storeDocxVersion(Entrega $entrega, Proyecto $proyecto, string $name = 'avance.docx'): VersionDocumento
 {
     $phpWord = new PhpWord;
     $section = $phpWord->addSection();
@@ -95,13 +101,11 @@ function storeDocxVersion(Entrega $entrega, string $name = 'avance.docx'): Versi
     }
     IOFactory::createWriter($phpWord, 'Word2007')->save($absolute);
 
-    return VersionDocumento::create([
-        'entrega_id' => $entrega->id,
+    return ProjectDeliveryVersion::create($entrega, $proyecto, [
         'version_number' => 1,
         'file_path' => $relative,
         'original_name' => $name,
         'file_size' => filesize($absolute) ?: 0,
-        'uploaded_at' => now(),
         'archivo_requerido_id' => 'documento-proyecto',
     ]);
 }
@@ -139,7 +143,7 @@ function bindStubAiProvider(string $json): object
 }
 
 it('completa analisis preliminar con proveedor stub y persiste observaciones sin calificacion', function () {
-    $version = storeDocxVersion($this->entrega);
+    $version = storeDocxVersion($this->entrega, $this->proyecto);
     $stub = bindStubAiProvider(samplePreliminaryPayload());
 
     $response = $this->actingAs($this->estudiante)
@@ -170,7 +174,7 @@ it('completa analisis preliminar con proveedor stub y persiste observaciones sin
 });
 
 it('ignora un puntaje si el proveedor lo incluye en el JSON', function () {
-    $version = storeDocxVersion($this->entrega);
+    $version = storeDocxVersion($this->entrega, $this->proyecto);
     $payload = json_decode(samplePreliminaryPayload(), true, 512, JSON_THROW_ON_ERROR);
     $payload['puntaje_orientativo'] = 95;
 
@@ -186,7 +190,7 @@ it('ignora un puntaje si el proveedor lo incluye en el JSON', function () {
 });
 
 it('responde 503 amigable cuando el proveedor no esta configurado', function () {
-    $version = storeDocxVersion($this->entrega);
+    $version = storeDocxVersion($this->entrega, $this->proyecto);
 
     $response = $this->actingAs($this->estudiante)
         ->postJson("/api/estudiante/entregas/{$this->entrega->id}/evaluacion-inteligente", [
@@ -207,13 +211,11 @@ it('rechaza versiones cuyo contenido no es DOCX ni PDF', function () {
     $relative = 'entregas/'.$this->entrega->id.'/notas.txt';
     Storage::disk('public')->put($relative, 'texto plano no convertible');
 
-    $version = VersionDocumento::create([
-        'entrega_id' => $this->entrega->id,
+    $version = ProjectDeliveryVersion::create($this->entrega, $this->proyecto, [
         'version_number' => 1,
         'file_path' => $relative,
         'original_name' => 'notas.txt',
         'file_size' => 10,
-        'uploaded_at' => now(),
         'archivo_requerido_id' => 'documento-proyecto',
     ]);
 
@@ -240,13 +242,11 @@ it('completa analisis preliminar del estudiante a partir de un PDF', function ()
     }
     file_put_contents($absolute, PdfDocumentFactory::bytes('Borrador PDF del estudiante para analisis preliminar.'));
 
-    $version = VersionDocumento::create([
-        'entrega_id' => $this->entrega->id,
+    $version = ProjectDeliveryVersion::create($this->entrega, $this->proyecto, [
         'version_number' => 1,
         'file_path' => $relative,
         'original_name' => 'avance.pdf',
         'file_size' => filesize($absolute) ?: 0,
-        'uploaded_at' => now(),
         'archivo_requerido_id' => 'documento-proyecto',
     ]);
 
@@ -267,7 +267,7 @@ it('completa analisis preliminar del estudiante a partir de un PDF', function ()
 });
 
 it('niega acceso a estudiantes de otro proyecto', function () {
-    $version = storeDocxVersion($this->entrega);
+    $version = storeDocxVersion($this->entrega, $this->proyecto);
 
     $response = $this->actingAs($this->otro)
         ->postJson("/api/estudiante/entregas/{$this->entrega->id}/evaluacion-inteligente", [
@@ -278,7 +278,7 @@ it('niega acceso a estudiantes de otro proyecto', function () {
 });
 
 it('lista de entregas incluye descripcion y no metricas', function () {
-    $version = storeDocxVersion($this->entrega);
+    $version = storeDocxVersion($this->entrega, $this->proyecto);
 
     $response = $this->actingAs($this->estudiante)
         ->getJson('/api/estudiante/entregas');
@@ -354,13 +354,11 @@ it('rechaza el analisis de una version que no es el documento analizable', funct
     }
     IOFactory::createWriter($phpWord, 'Word2007')->save($absolute);
 
-    $version = VersionDocumento::create([
-        'entrega_id' => $this->entrega->id,
+    $version = ProjectDeliveryVersion::create($this->entrega, $this->proyecto, [
         'version_number' => 1,
         'file_path' => $relative,
         'original_name' => 'anexo.docx',
         'file_size' => filesize($absolute) ?: 0,
-        'uploaded_at' => now(),
         'archivo_requerido_id' => 'anexo',
     ]);
 
@@ -376,7 +374,7 @@ it('rechaza el analisis de una version que no es el documento analizable', funct
     expect(AiDocumentEvaluation::query()->count())->toBe(0);
 });
 
-function storeGrupoDocxVersion(Entrega $entrega, string $name, string $text): VersionDocumento
+function storeGrupoDocxVersion(Entrega $entrega, Proyecto $proyecto, string $name, string $text): VersionDocumento
 {
     $phpWord = new PhpWord;
     $phpWord->addSection()->addText($text);
@@ -389,19 +387,17 @@ function storeGrupoDocxVersion(Entrega $entrega, string $name, string $text): Ve
     }
     IOFactory::createWriter($phpWord, 'Word2007')->save($absolute);
 
-    return VersionDocumento::create([
-        'entrega_id' => $entrega->id,
+    return ProjectDeliveryVersion::create($entrega, $proyecto, [
         'version_number' => 2,
         'file_path' => $relative,
         'original_name' => $name,
         'file_size' => filesize($absolute) ?: 0,
-        'uploaded_at' => now(),
         'archivo_requerido_id' => 'documento-proyecto',
     ]);
 }
 
 it('rechaza con 422 un segundo analisis cuando el grupo ya tiene uno completado', function () {
-    $version = storeDocxVersion($this->entrega);
+    $version = storeDocxVersion($this->entrega, $this->proyecto);
     bindStubAiProvider(samplePreliminaryPayload());
 
     $this->actingAs($this->estudiante)
@@ -410,7 +406,7 @@ it('rechaza con 422 un segundo analisis cuando el grupo ya tiene uno completado'
         ])
         ->assertOk();
 
-    $otraVersion = storeGrupoDocxVersion($this->entrega, 'avance2.docx', 'Segundo documento con contenido distinto del mismo grupo.');
+    $otraVersion = storeGrupoDocxVersion($this->entrega, $this->proyecto, 'avance2.docx', 'Segundo documento con contenido distinto del mismo grupo.');
 
     $companero = User::factory()->create(['role' => UserRole::Estudiante->value]);
     $this->proyecto->estudiantes()->attach($companero);
@@ -427,7 +423,7 @@ it('rechaza con 422 un segundo analisis cuando el grupo ya tiene uno completado'
 });
 
 it('permite reintentar el analisis tras un intento fallido', function () {
-    $version = storeDocxVersion($this->entrega);
+    $version = storeDocxVersion($this->entrega, $this->proyecto);
 
     AiDocumentEvaluation::create([
         'user_id' => $this->estudiante->id,
@@ -457,7 +453,7 @@ it('permite reintentar el analisis tras un intento fallido', function () {
 });
 
 it('permite el analisis a otro proyecto sobre la misma entrega', function () {
-    $version = storeDocxVersion($this->entrega);
+    $version = storeDocxVersion($this->entrega, $this->proyecto);
     bindStubAiProvider(samplePreliminaryPayload());
 
     $this->actingAs($this->estudiante)
@@ -475,7 +471,10 @@ it('permite el analisis a otro proyecto sobre la misma entrega', function () {
     $estudianteOtro = User::factory()->create(['role' => UserRole::Estudiante->value]);
     $otroProyecto->estudiantes()->attach($estudianteOtro);
 
-    $otraVersion = storeGrupoDocxVersion($this->entrega, 'avance-otro.docx', 'Documento de otro proyecto con contenido propio.');
+    // Each project analyzes its OWN uploaded document: this version belongs to
+    // the second project's delivery, which is what allows two independent
+    // analyses on a single shared entrega template.
+    $otraVersion = storeGrupoDocxVersion($this->entrega, $otroProyecto, 'avance-otro.docx', 'Documento de otro proyecto con contenido propio.');
 
     $this->actingAs($estudianteOtro)
         ->postJson("/api/estudiante/entregas/{$this->entrega->id}/evaluacion-inteligente", [

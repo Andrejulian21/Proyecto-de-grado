@@ -93,7 +93,7 @@ final class DocumentEvaluationService
 
             $this->assertSupportedDocument($absolutePath, $originalName);
 
-            $model = (string) config('ai.gemini.model', 'gemini-2.0-flash');
+            $model = (string) config('ai.gemini.model', 'gemini-3.8-flash');
             $promptVersion = $strategy->promptVersion();
 
             $cached = $this->findCachedEvaluation($entrega->id, $strategy->type()->value, (string) $documentHash, $promptVersion, $model);

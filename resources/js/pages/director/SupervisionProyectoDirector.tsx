@@ -544,7 +544,7 @@ function ProjectDetailView({ proyectoId }: { proyectoId: number }) {
                                                 </p>
                                                 <div className="flex items-center gap-2">
                                                     <button
-                                                        onClick={() => navigate(`/entregas/${d.id}/revisar`)}
+                                                        onClick={() => navigate(`/entregas/${d.id}/revisar?proyecto=${proyectoId}`)}
                                                         className="inline-flex min-h-[36px] items-center gap-2 rounded-lg bg-[#c2410c] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#9a330a] active:scale-[0.98]"
                                                     >
                                                         Revisar

@@ -5,14 +5,21 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Entrega;
+use App\Models\EntregaProyecto;
 use App\Models\Evaluacion;
 use App\Models\Proyecto;
+use App\Services\Entregas\NotaEntregaResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class ReporteController extends Controller
 {
+    public function __construct(
+        private readonly NotaEntregaResolver $notas,
+    ) {}
+
     public function consolidado(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
@@ -27,7 +34,18 @@ class ReporteController extends Controller
             $request->integer('proyecto_id')
         );
 
-        $entregas = $proyecto->entregasPivot->map(function ($entrega) {
+        // The director grade and the verdict live on the project's own
+        // entrega_proyecto pivot; the semester template is only the legacy
+        // fallback (see NotaEntregaResolver). Aggregating the template row
+        // would either report nothing or report another project's grade.
+        $pivotes = EntregaProyecto::query()
+            ->where('proyecto_id', $proyecto->id)
+            ->get()
+            ->keyBy('entrega_id');
+
+        $entregas = $proyecto->entregasPivot->map(function (Entrega $entrega) use ($pivotes) {
+            $pivot = $pivotes->get($entrega->id);
+
             $evaluaciones = Evaluacion::where('entrega_id', $entrega->id)
                 ->whereNotNull('grade')
                 ->get();
@@ -49,7 +67,9 @@ class ReporteController extends Controller
                 'id' => $entrega->id,
                 'title' => $entrega->title,
                 'phase' => $entrega->phase,
-                'status' => $entrega->status,
+                'status' => $this->notas->estado($entrega, $pivot),
+                'nota' => $this->notas->nota($entrega, $pivot),
+                'evaluacion_completa' => $this->notas->evaluacionCompleta($entrega, $pivot),
                 'promedio_ponderado' => $promedio,
             ];
         });
@@ -60,6 +80,17 @@ class ReporteController extends Controller
         if ($notas->isNotEmpty()) {
             $promedioGeneral = round($notas->avg(), 2);
         }
+
+        // Average of the director grades of THIS project's deliveries.
+        // `promedio_general` above is the weighted average of the external
+        // evaluator criteria and keeps its own meaning; the two are not
+        // interchangeable, so the director-grade aggregate is reported apart
+        // instead of silently replacing it.
+        $notasDirector = $entregas->pluck('nota')->filter(fn ($nota) => $nota !== null);
+
+        $promedioNotas = $notasDirector->isNotEmpty()
+            ? round($notasDirector->avg(), 2)
+            : null;
 
         return response()->json([
             'data' => [
@@ -81,6 +112,7 @@ class ReporteController extends Controller
                 ] : null,
                 'entregas' => $entregas,
                 'promedio_general' => $promedioGeneral,
+                'promedio_notas' => $promedioNotas,
                 'estado' => $proyecto->status,
             ],
         ]);

@@ -13,6 +13,7 @@ use App\Models\EvaluadorProyecto;
 use App\Models\Proyecto;
 use App\Models\Semestre;
 use App\Models\User;
+use App\Services\Entregas\NotaEntregaResolver;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -24,6 +25,10 @@ final class ConsultaNotasService
         'evaluadores' => 30,
         'presentacion' => 30,
     ];
+
+    public function __construct(
+        private readonly NotaEntregaResolver $notas,
+    ) {}
 
     /**
      * @param  array{semestre_id?: mixed, proyecto_id?: mixed, entrega_id?: mixed, estado_nota?: mixed, q?: mixed, tipo?: mixed}  $filters
@@ -185,7 +190,7 @@ final class ConsultaNotasService
             }
 
             $pivot = $pivotes->get($entregaId);
-            $nota = $this->notaDePivot($pivot);
+            $nota = $this->notaDePivot($pivot, $entregas);
             $peso = $entrega->grade_percentage !== null ? (float) $entrega->grade_percentage : null;
 
             $entregasAnteproyecto[] = [
@@ -252,7 +257,7 @@ final class ConsultaNotasService
             }
 
             $pivot = $pivotes->get($entregaId);
-            $nota = $this->notaDePivot($pivot);
+            $nota = $this->notaDePivot($pivot, $entregas);
             $peso = $entrega->grade_percentage !== null ? (float) $entrega->grade_percentage : null;
 
             $entregasDesarrollo[] = [
@@ -366,7 +371,7 @@ final class ConsultaNotasService
             }
 
             $pivot = $pivotes->get($entregaId);
-            $nota = $this->notaDePivot($pivot);
+            $nota = $this->notaDePivot($pivot, $entregas);
 
             if ($nota !== null) {
                 return $nota;
@@ -623,7 +628,7 @@ final class ConsultaNotasService
                     continue;
                 }
 
-                $nota = $this->notaDePivot($pivotes->get($entregaId));
+                $nota = $this->notaDePivot($pivotes->get($entregaId), $entregas);
                 $estadoNota = $nota === null ? 'sin_calificar' : 'calificada';
 
                 if ($estadoFiltro === 'calificada' && $estadoNota !== 'calificada') {
@@ -744,18 +749,21 @@ final class ConsultaNotasService
         ])->values()->all();
     }
 
-    private function notaDePivot(mixed $pivot): ?float
+    /**
+     * Grade of a delivery for THIS project: the pivot first, the semester
+     * template as legacy fallback. The rule lives in one place — see
+     * {@see NotaEntregaResolver}.
+     *
+     * @param  Collection<int, Entrega>  $entregas  entregas of the project, keyed by id
+     */
+    private function notaDePivot(mixed $pivot, Collection $entregas = new Collection): ?float
     {
         if (! $pivot instanceof EntregaProyecto) {
             return null;
         }
 
-        $raw = $pivot->getRawOriginal('director_grade');
+        $entrega = $entregas->get($pivot->entrega_id);
 
-        if ($raw === null || $raw === '') {
-            return null;
-        }
-
-        return (float) $raw;
+        return $this->notas->nota($entrega, $pivot);
     }
 }

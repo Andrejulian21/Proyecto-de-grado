@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import {
@@ -37,6 +37,16 @@ interface Version {
     analisis_ia?: AnalisisIa[];
 }
 
+interface EntregaProyectoPivot {
+    id: number;
+    proyecto_id: number;
+    estado: string;
+    director_grade: number | null;
+    director_notes: string | null;
+    /** Versions of THIS project only (already filtered by the backend). */
+    versiones: Version[];
+}
+
 interface EntregaDetail {
     id: number;
     title: string;
@@ -54,6 +64,14 @@ interface EntregaDetail {
     evaluation_complete: boolean;
     proyecto?: { id: number; code: string; title: string };
     proyectos?: { id: number; code: string; title: string }[];
+    /**
+     * Present ONLY when the request was scoped to one project
+     * (`?proyecto=<id>`). An entrega is a semester-wide template shared by
+     * several projects, so this pivot is the only trustworthy source of the
+     * grade, the delivery state and the document list for the project being
+     * reviewed. Absent it, the top-level `versiones` stay semester-wide.
+     */
+    entrega_proyecto?: EntregaProyectoPivot;
     versiones: Version[];
 }
 
@@ -113,6 +131,19 @@ const phaseLabels: Record<string, string> = {
 export default function RevisionEntregaDirector() {
     const { id: entregaId } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+
+    /* An entrega is a semester-wide template shared by several projects, so a
+       review is only meaningful when the project it belongs to travels with the
+       URL. Without it the screen would show documents and grades of every
+       project at once (issue: supervision without project context). */
+    const proyectoIdSolicitado = (() => {
+        const raw = searchParams.get('proyecto');
+        if (!raw) return null;
+        const parsed = Number(raw);
+        return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+    })();
+    const proyectoQuery = proyectoIdSolicitado != null ? `?proyecto=${proyectoIdSolicitado}` : '';
 
     const [entrega, setEntrega] = useState<EntregaDetail | null>(null);
     const [loading, setLoading] = useState(true);
@@ -141,7 +172,7 @@ export default function RevisionEntregaDirector() {
             setLoading(true);
             setError(null);
             try {
-                const res = await apiFetch(`/api/admin/entregas/${entregaId}`);
+                const res = await apiFetch(`/api/admin/entregas/${entregaId}${proyectoQuery}`);
                 if (cancelled) return;
                 if (!res.ok) {
                     const body = await res.json().catch(() => null);
@@ -160,7 +191,7 @@ export default function RevisionEntregaDirector() {
         })();
 
         return () => { cancelled = true; };
-    }, [entregaId]);
+    }, [entregaId, proyectoQuery]);
 
     /* ── Reset version index on data change ── */
     useEffect(() => {
@@ -196,7 +227,7 @@ export default function RevisionEntregaDirector() {
         setSubmitError(null);
 
         try {
-            const res = await apiFetch(`/api/admin/entregas/${entregaId}/revisar`, {
+            const res = await apiFetch(`/api/admin/entregas/${entregaId}/revisar${proyectoQuery}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -247,7 +278,7 @@ export default function RevisionEntregaDirector() {
         setHabilitando(true);
         setHabilitarMsg(null);
         try {
-            const res = await apiFetch(`/api/admin/entregas/${entregaId}/habilitar`, {
+            const res = await apiFetch(`/api/admin/entregas/${entregaId}/habilitar${proyectoQuery}`, {
                 method: 'PUT',
             });
             if (!res.ok) {
@@ -255,12 +286,16 @@ export default function RevisionEntregaDirector() {
                 const raw = body?.error ?? body?.message ?? null;
                 throw new Error(typeof raw === 'string' ? raw : `Error ${res.status}`);
             }
-            const refreshRes = await apiFetch(`/api/admin/entregas/${entregaId}`);
+            const refreshRes = await apiFetch(`/api/admin/entregas/${entregaId}${proyectoQuery}`);
             if (refreshRes.ok) {
                 const json = await refreshRes.json();
                 setEntrega(json.data ?? json);
             }
-            setHabilitarMsg('Entrega habilitada: la nota se limpió y el estudiante puede subir nuevas versiones.');
+            setHabilitarMsg(
+                enContextoProyecto
+                    ? `Entrega habilitada para ${projectCode || 'este proyecto'}: la nota se limpió y el estudiante puede subir nuevas versiones.`
+                    : 'Entrega habilitada: la nota se limpió y el estudiante puede subir nuevas versiones.',
+            );
         } catch (err) {
             setHabilitarMsg(err instanceof Error ? err.message : 'Error al habilitar la entrega.');
         } finally {
@@ -268,17 +303,41 @@ export default function RevisionEntregaDirector() {
         }
     }
 
-    /* ── Derived data ── */
-    const mainProyecto = entrega?.proyecto ?? entrega?.proyectos?.[0] ?? null;
+    /* ── Derived data ──
+       `entrega_proyecto` exists only when the request was scoped to a project.
+       It is the single source of truth for the delivery state, the grade and
+       the documents of the project under review: the top-level `status` and
+       `versiones` describe the semester-wide template and would merge every
+       project into one screen. */
+    const entregaProyecto = entrega?.entrega_proyecto ?? null;
+    const enContextoProyecto = entregaProyecto !== null;
+
+    const proyectoDesdePivote = enContextoProyecto
+        ? (entrega?.proyectos ?? []).find((p) => p.id === entregaProyecto.proyecto_id) ?? null
+        : null;
+    const mainProyecto =
+        proyectoDesdePivote ??
+        entrega?.proyecto ??
+        (enContextoProyecto && proyectoIdSolicitado != null
+            ? { id: proyectoIdSolicitado, code: '', title: '' }
+            : null) ??
+        entrega?.proyectos?.[0] ??
+        null;
     const proyectoId = mainProyecto?.id;
     const projectCode = mainProyecto?.code ?? '';
     const projectTitle = mainProyecto?.title ?? '';
     const backPath = proyectoId ? `/supervision/${proyectoId}` : '/supervision';
 
+    /* Versioning: the project's own documents when scoped, otherwise the
+       semester-wide list (global supervision mode, preserved on purpose). */
+    const versionesEnContexto = enContextoProyecto
+        ? (entregaProyecto.versiones ?? [])
+        : (entrega?.versiones ?? []);
+
     /* ── Group versions by archivo_requerido_id (slug→id normalization) ── */
     const archivosConVersiones: DocumentoConVersiones<Version>[] = agruparVersionesPorArchivo(
         entrega?.archivos_requeridos ?? [],
-        entrega?.versiones ?? [],
+        versionesEnContexto,
     );
     const safeArchivoIdx = Math.min(selectedArchivoIdx, Math.max(0, archivosConVersiones.length - 1));
     const activeArchivo = archivosConVersiones[safeArchivoIdx] ?? null;
@@ -287,18 +346,27 @@ export default function RevisionEntregaDirector() {
     const safeVersionIdx = Math.min(selectedVersionIdx, Math.max(0, sortedVersions.length - 1));
     const selectedVersion: Version | null = sortedVersions[safeVersionIdx] ?? null;
 
+    /* Grade and delivery state of the project under review. The pivot wins:
+       a per-version grade belongs to the project that uploaded THAT version,
+       so reading it from a merged list shows another project's note as if it
+       were this project's (reported bug: "Entrega calificada (nota 4.2)" for
+       a project nobody graded). */
+    const notaContexto = enContextoProyecto
+        ? (entregaProyecto.director_grade ?? null)
+        : (selectedVersion?.director_grade ?? null);
+    const observacionesContexto = enContextoProyecto
+        ? (entregaProyecto.director_notes ?? selectedVersion?.director_notes ?? '')
+        : (selectedVersion?.director_notes ?? '');
+    const estadoContexto = enContextoProyecto ? entregaProyecto.estado : (entrega?.status ?? '');
+
     const analizableIa = activeArchivo ? esDocumentoAnalizableIa(activeArchivo.config) : false;
 
     /* ── D3-rev: the grade input follows the selected version's project
        delivery (entrega_proyecto), never the shared template grade. ── */
     useEffect(() => {
-        setDirectorGrade(
-            selectedVersion?.director_grade != null
-                ? String(selectedVersion.director_grade)
-                : '',
-        );
-        setDirectorNotes(selectedVersion?.director_notes ?? '');
-    }, [selectedVersion?.id]);
+        setDirectorGrade(notaContexto != null ? String(notaContexto) : '');
+        setDirectorNotes(observacionesContexto);
+    }, [selectedVersion?.id, notaContexto, observacionesContexto]);
 
     /* ══════════════════════════════════════════════════
        Loading state
@@ -330,13 +398,13 @@ export default function RevisionEntregaDirector() {
         );
     }
 
-    const statusCfg = statusConfig(entrega.status);
+    const statusCfg = statusConfig(estadoContexto);
 
     /* ── RF-NOT-03: the director can review at any time while the delivery
        is not in a terminal state. Due date only blocks the student from
        uploading — the director, coordinator, and evaluator are never
        locked out by the calendar. */
-    const cerrada = entrega.status === 'aprobada' || entrega.status === 'rechazada';
+    const cerrada = estadoContexto === 'aprobada' || estadoContexto === 'rechazada';
 
     /* ══════════════════════════════════════════════════
        Submitted (success screen)
@@ -451,8 +519,8 @@ export default function RevisionEntregaDirector() {
                     <div className="rounded-xl border border-[#e5e5e5] bg-white p-4 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                         <p className="text-xs text-[#78716c]">Nota del director</p>
                         <p className="mt-1 text-sm font-semibold text-[#1c1917]">
-                            {selectedVersion?.director_grade != null
-                                ? String(selectedVersion.director_grade).replace('.', ',')
+                            {notaContexto != null
+                                ? String(notaContexto).replace('.', ',')
                                 : 'Sin calificar'}
                         </p>
                     </div>
@@ -460,9 +528,19 @@ export default function RevisionEntregaDirector() {
                     {/* Proyecto */}
                     <div className="rounded-xl border border-[#e5e5e5] bg-white p-4 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                         <p className="text-xs text-[#78716c]">Proyecto</p>
+                        {projectCode && (
+                            <span className="mt-1.5 mr-2 inline-flex items-center rounded-md bg-[#f5f5f4] px-1.5 py-0.5 text-xs font-bold text-[#57534e] tabular-nums">
+                                {projectCode}
+                            </span>
+                        )}
                         <p className="mt-1 text-sm font-semibold text-[#1c1917] truncate" title={projectTitle}>
-                            {projectTitle || projectCode}
+                            {projectTitle || projectCode || '—'}
                         </p>
+                        {enContextoProyecto && (
+                            <p className="mt-1 text-xs text-[#78716c]">
+                                Califications y versiones de este proyecto
+                            </p>
+                        )}
                     </div>
                 </div>
 
@@ -491,10 +569,13 @@ export default function RevisionEntregaDirector() {
                 )}
 
                 {/* ── RF-FREEZE-01: frozen banner + habilitar path ── */}
-                {selectedVersion?.director_grade != null && (
+                {notaContexto != null && (
                     <div className="flex flex-col gap-3 rounded-xl border border-[#c7d2fe] bg-[#eef2ff] p-4 sm:flex-row sm:items-center sm:justify-between" role="status">
                         <p className="text-sm text-[#3730a3]">
-                            Entrega calificada (nota {String(selectedVersion.director_grade).replace('.', ',')}). Las subidas del estudiante están bloqueadas.
+                            Entrega calificada (nota {String(notaContexto).replace('.', ',')}). Las subidas del estudiante están bloqueadas.
+                            {enContextoProyecto && projectCode
+                                ? ` Esta nota corresponde únicamente a ${projectCode}.`
+                                : ''}
                         </p>
                         <button
                             type="button"
@@ -616,8 +697,8 @@ export default function RevisionEntregaDirector() {
                                             <span className="text-sm font-bold text-[#1c1917]">
                                                 {activeArchivo.config.nombre} · Versión {selectedVersion.version_number}
                                             </span>
-                                            <StatusBadge variant={getReviewStatus(selectedVersion, entrega.status).variant}>
-                                                {getReviewStatus(selectedVersion, entrega.status).label}
+                                            <StatusBadge variant={getReviewStatus(selectedVersion, estadoContexto).variant}>
+                                                {getReviewStatus(selectedVersion, estadoContexto).label}
                                             </StatusBadge>
                                         </div>
                                         <div className="mb-3 space-y-1">
@@ -828,14 +909,14 @@ export default function RevisionEntregaDirector() {
                 )}
 
                 {/* ── G. Nota del director (RF-NOT-04 / D3-rev) ── */}
-                {selectedVersion?.director_grade != null && (
+                {notaContexto != null && (
                     <div className="rounded-xl border border-[#e5e5e5] bg-white p-5 shadow-[0_1px_2px_rgba(28,25,23,0.05)]">
                         <div className="flex items-center gap-2">
                             <Star className="h-4 w-4 text-[#d97706]" aria-hidden="true" />
                             <p className="text-xs text-[#78716c]">Nota del director (este proyecto)</p>
                         </div>
                         <p className="mt-1 text-2xl font-bold text-[#1c1917]">
-                            {Number(selectedVersion.director_grade).toFixed(2)}
+                            {Number(notaContexto).toFixed(2)}
                             <span className="text-sm font-normal text-[#78716c]"> / 5.00</span>
                         </p>
                     </div>

@@ -36,9 +36,13 @@ export function Header({ onMenuClick, title }: HeaderProps) {
     return (
         <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border bg-surface px-4 shadow-warm-sm lg:px-6">
             <div className="flex items-center gap-3 min-w-0">
+                {/* shrink-0: the identity chip on the right never shrinks, so without
+                    this the menu button is the flex item that gets squeezed to zero
+                    and disappears on narrow screens. */}
                 <button
                     onClick={onMenuClick}
-                    className="rounded-lg p-2 text-text-muted hover:bg-surface-alt hover:text-text transition-colors lg:hidden"
+                    aria-label="Abrir menú de navegación"
+                    className="shrink-0 rounded-lg p-2 text-text-muted hover:bg-surface-alt hover:text-text transition-colors lg:hidden"
                 >
                     <Menu className="h-5 w-5" />
                 </button>
@@ -50,15 +54,19 @@ export function Header({ onMenuClick, title }: HeaderProps) {
                 <div className="flex items-center gap-3 rounded-lg bg-surface-alt px-3 py-1.5">
                     <div
                         className={cn(
-                            'flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold',
+                            'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold',
                             roleBadgeStyles[user.role] ?? 'bg-primary/10 text-primary',
                         )}
                     >
                         {initials}
                     </div>
-                    <div className="text-right">
-                        <p className="text-sm font-medium leading-tight text-text">{user.name || 'Usuario'}</p>
-                        <p className="text-xs leading-tight text-text-muted">
+                    {/* A long full name must truncate, not push the menu button off
+                        the viewport. The chip stays readable down to ~1 char. */}
+                    <div className="min-w-0 text-right">
+                        <p className="truncate text-sm font-medium leading-tight text-text max-w-[7.5rem] sm:max-w-none">
+                            {user.name || 'Usuario'}
+                        </p>
+                        <p className="truncate text-xs leading-tight text-text-muted max-w-[7.5rem] sm:max-w-none">
                             {roleLabels[user.role] ?? user.role}
                         </p>
                     </div>

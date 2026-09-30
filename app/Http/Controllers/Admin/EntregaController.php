@@ -10,6 +10,7 @@ use App\Actions\Entrega\ReviewEntregaAction;
 use App\Actions\Entrega\SolicitarEntregaAction;
 use App\Actions\Entrega\StoreEntregaAction;
 use App\Actions\Entrega\UpdateEntregaAction;
+use App\Enums\UserRole;
 use App\Events\AuditEvent;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreEntregaRequest;
@@ -17,6 +18,7 @@ use App\Http\Requests\UpdateEntregaRequest;
 use App\Models\AiDocumentEvaluation;
 use App\Models\Entrega;
 use App\Models\VersionDocumento;
+use App\Services\Entregas\VersionIsolationScope;
 use App\Services\Evaluation\AiFeedbackPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -32,6 +34,7 @@ class EntregaController extends Controller
         private readonly ReviewEntregaAction $reviewEntregaAction,
         private readonly SolicitarEntregaAction $solicitarEntregaAction,
         private readonly HabilitarEntregaAction $habilitarEntregaAction,
+        private readonly VersionIsolationScope $versionIsolation,
     ) {}
 
     /**
@@ -168,30 +171,50 @@ class EntregaController extends Controller
      */
     public function show(Request $request, int $id): JsonResponse
     {
-        $entrega = Entrega::with([
-            'proyectos:id,code,title',
-            'proyectos.estudiantes:id,name',
-            'semestre:id,name',
-            'versiones' => fn ($q) => $q->orderByDesc('version_number'),
-            'versiones.entregaProyecto',
-            'versiones.analisisIa',
-        ])->findOrFail($id);
+        $entrega = Entrega::findOrFail($id);
 
         // Issue #38: central rule — coordinator, director of a linked
         // project, student of a linked project, or assigned evaluator.
+        // Authorization runs BEFORE the eager load so an unauthorized actor
+        // never triggers the version/analysis queries.
         $this->authorize('view', $entrega);
+
+        $actor = $request->user();
+
+        $entrega->load([
+            'proyectos:id,code,title',
+            'proyectos.estudiantes:id,name',
+            'semestre:id,name',
+            // A student only sees the versions uploaded by their own projects;
+            // every other role supervises the whole entrega (see
+            // VersionIsolationScope).
+            'versiones' => fn ($q) => $this->versionIsolation->apply($q, $actor)
+                ->orderByDesc('version_number'),
+            'versiones.entregaProyecto',
+            'versiones.analisisIa',
+        ]);
 
         $data = $entrega->toArray();
         $data['proyectos_count'] = $entrega->proyectos->count();
         $data['versiones_count'] = $entrega->versiones->count();
 
+        // Issue #47: a public-disk path is downloadable without a session,
+        // so it never leaves the API for a student (the supervisor roles keep
+        // it to locate the file they must review).
+        $exposeFilePath = $actor->role !== UserRole::Estudiante;
+
         // D3-rev: each version exposes the director_grade of ITS per-project
         // delivery (EntregaProyecto). The review UI shows the note of the
         // selected version's project, never a shared template grade.
-        $data['versiones'] = $entrega->versiones->map(function (VersionDocumento $version) {
+        $data['versiones'] = $entrega->versiones->map(function (VersionDocumento $version) use ($exposeFilePath) {
             $pivot = $version->entregaProyecto;
             $array = $version->toArray();
             unset($array['analisis_ia']);
+
+            if (! $exposeFilePath) {
+                unset($array['file_path']);
+            }
+
             $array['director_grade'] = $pivot?->director_grade !== null
                 ? (float) $pivot->director_grade
                 : null;
@@ -242,7 +265,10 @@ class EntregaController extends Controller
         // version list was only checked for the Estudiante role.
         $this->authorize('view', $entrega);
 
-        $versiones = VersionDocumento::where('entrega_id', $id)
+        $versiones = $this->versionIsolation->apply(
+            VersionDocumento::where('entrega_id', $id),
+            $request->user(),
+        )
             ->orderByDesc('version_number')
             ->get();
 

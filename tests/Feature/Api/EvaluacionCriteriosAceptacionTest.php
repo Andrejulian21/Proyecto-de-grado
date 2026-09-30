@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpWord\IOFactory;
 use PhpOffice\PhpWord\PhpWord;
+use Tests\Support\ProjectDeliveryVersion;
 
 uses(RefreshDatabase::class);
 
@@ -124,7 +125,12 @@ function bindCriteriosStub(string $json): object
     return $stub;
 }
 
-function storeCriteriosVersion(Entrega $entrega, string $text): VersionDocumento
+/**
+ * Versions are bound to the owning project delivery, exactly as the upload
+ * flow does. Without `entrega_proyecto_id` a version belongs to no project
+ * and every per-project check excludes it.
+ */
+function storeCriteriosVersion(Entrega $entrega, Proyecto $proyecto, string $text): VersionDocumento
 {
     $phpWord = new PhpWord;
     $phpWord->addSection()->addText($text);
@@ -138,13 +144,11 @@ function storeCriteriosVersion(Entrega $entrega, string $text): VersionDocumento
 
     IOFactory::createWriter($phpWord, 'Word2007')->save($absolute);
 
-    return VersionDocumento::create([
-        'entrega_id' => $entrega->id,
+    return ProjectDeliveryVersion::create($entrega, $proyecto, [
         'version_number' => 1,
         'file_path' => $relative,
         'original_name' => 'planteamiento_v1.docx',
         'file_size' => filesize($absolute) ?: 0,
-        'uploaded_at' => now(),
         'archivo_requerido_id' => 'planteamiento',
         'director_notes' => null,
     ]);
@@ -160,7 +164,7 @@ function criteriosPromptText(object $stub): string
 it('envía los criterios de aceptación en el prompt y guarda la versión v2', function () {
     $criterios = "1. El documento incluye el planteamiento del problema.\n2. El documento incluye los objetivos.";
     $entrega = criteriosEntrega($criterios, $this->semestre, $this->proyecto);
-    $version = storeCriteriosVersion($entrega, 'Planteamiento con criterios');
+    $version = storeCriteriosVersion($entrega, $this->proyecto, 'Planteamiento con criterios');
     $stub = bindCriteriosStub(criteriosPayload('Análisis con criterios'));
 
     $this->actingAs($this->estudiante)
@@ -182,7 +186,7 @@ it('envía los criterios de aceptación en el prompt y guarda la versión v2', f
 
 it('usa el texto de respaldo cuando la entrega no define criterios', function () {
     $entrega = criteriosEntrega(null, $this->semestre, $this->proyecto);
-    $version = storeCriteriosVersion($entrega, 'Planteamiento sin criterios');
+    $version = storeCriteriosVersion($entrega, $this->proyecto, 'Planteamiento sin criterios');
     $stub = bindCriteriosStub(criteriosPayload('Análisis sin criterios'));
 
     $this->actingAs($this->estudiante)
@@ -196,7 +200,7 @@ it('usa el texto de respaldo cuando la entrega no define criterios', function ()
 
 it('no permite un segundo analisis aunque cambie la version del prompt', function () {
     $entrega = criteriosEntrega('1. El documento incluye el planteamiento del problema.', $this->semestre, $this->proyecto);
-    $version = storeCriteriosVersion($entrega, 'Planteamiento caché v1');
+    $version = storeCriteriosVersion($entrega, $this->proyecto, 'Planteamiento caché v1');
     $model = (string) config('ai.gemini.model', 'gemini-2.0-flash');
     $hash = hash_file('sha256', Storage::disk('public')->path($version->file_path));
 

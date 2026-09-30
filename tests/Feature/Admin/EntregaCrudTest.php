@@ -10,6 +10,7 @@ use App\Models\Semestre;
 use App\Models\User;
 use App\Models\VersionDocumento;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\ProjectDeliveryVersion;
 
 uses(RefreshDatabase::class);
 
@@ -149,8 +150,7 @@ it('estudiante puede ver historial de versiones', function () {
         'due_date' => '2026-03-01',
     ]);
     $entrega->proyectos()->attach($this->proyecto->id);
-    VersionDocumento::create([
-        'entrega_id' => $entrega->id,
+    ProjectDeliveryVersion::create($entrega, $this->proyecto, [
         'version_number' => 1,
         'file_path' => 'path/v1.pdf',
         'original_name' => 'v1.pdf',

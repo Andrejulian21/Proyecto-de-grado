@@ -30,7 +30,7 @@ final class GeminiProvider implements AiProvider
 
     public function complete(AiRequest $request): AiResponse
     {
-        $model = (string) config('ai.gemini.model', 'gemini-2.0-flash');
+        $model = (string) config('ai.gemini.model', 'gemini-3.8-flash');
         $feature = (string) ($request->options['feature'] ?? 'chat');
         $timeout = $feature === 'analysis'
             ? (int) config('ai.gemini.analysis_timeout', 60)

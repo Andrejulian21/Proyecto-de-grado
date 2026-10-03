@@ -13,6 +13,7 @@ import {
     CheckCircle2,
     Search,
     Users,
+    User,
 } from 'lucide-react';
 import {
     DirectorAcademicFields,
@@ -1039,10 +1040,7 @@ export default function GestionUsuarios() {
                     <form onSubmit={handleAgregarDirector} className="flex flex-col rounded-2xl bg-[#e7e5e4] p-[2px]">
                         <div className="flex flex-col rounded-[22px] bg-white p-5" style={{ borderRadius: 'calc(24px - 2px)' }}>
                             <div className="mb-4 flex items-center gap-2">
-                                <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#c2410c]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
-                                    <path d="M6 12v5c0 1.1 2.7 3 6 3s6-1.9 6-3v-5" />
-                                </svg>
+                                <User className="h-5 w-5 text-[#4f46e5]" />
                                 <h3 className="text-md font-bold text-text m-0">Directores</h3>
                             </div>
                             <div className="flex flex-col gap-1.5 mb-3">

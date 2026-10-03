@@ -8,7 +8,6 @@ import {
     Shield,
     ChevronRight,
     BookOpen,
-    Loader2,
     Fingerprint,
     FileUp,
     Sparkles,
@@ -290,14 +289,10 @@ export default function LandingPage() {
         }
     }, [isAuthenticated, isLoading, role, navigate]);
 
-    if (isLoading) {
-        return (
-            <div className="flex min-h-screen items-center justify-center bg-[#fafaf9]">
-                <Loader2 className="h-8 w-8 animate-spin text-[#c2410c]" />
-            </div>
-        );
-    }
-
+    // The landing is public: it must render as soon as the bundle parses. Gating
+    // it on the session check made every anonymous visitor stare at a spinner
+    // while useAuth retried /api/auth/user with 600ms sleeps. The redirect for an
+    // already-authenticated visitor still happens in the effect above.
     if (isAuthenticated) return null;
 
     return (

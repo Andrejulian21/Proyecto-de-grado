@@ -88,11 +88,10 @@ export function LoginExterno() {
                 <div className="rounded-2xl bg-[#e7e5e4] p-[2px]">
                     <div className="rounded-[22px] bg-white px-8 py-10 text-center" style={{ borderRadius: 'calc(24px - 2px)' }}>
                         <div className="mb-5 flex flex-col items-center gap-2">
-                            <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-[#4f46e5] text-white">
+                            <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-[#c2410c] text-white">
                                 <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M6 9a6 6 0 0 1 12 0v6a6 6 0 0 1-12 0V9Z" />
-                                    <path d="M12 3v3" />
-                                    <path d="M8 21h8" />
+                                    <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+                                    <path d="M6 12v5c0 1.1 2.7 3 6 3s6-1.9 6-3v-5" />
                                 </svg>
                             </div>
                             <div className="text-[13px] font-bold uppercase tracking-[0.15em] text-[#c2410c]">
@@ -103,7 +102,7 @@ export function LoginExterno() {
                             </div>
                         </div>
 
-                        <div className="mx-auto mb-4 h-[3px] w-12 rounded-full bg-[#4f46e5]" aria-hidden="true" />
+                        <div className="mx-auto mb-4 h-[3px] w-12 rounded-full bg-[#c2410c]" aria-hidden="true" />
 
                         <h1 className="mb-1 text-xl font-extrabold tracking-tight text-[#1c1917]" style={{ lineHeight: 1.2, textWrap: 'balance' }}>
                             Evaluadores Externos
@@ -210,6 +209,17 @@ export function LoginExterno() {
                                 <path d="m12 19-7-7 7-7" />
                             </svg>
                             <span>Volver al inicio de sesión institucional</span>
+                        </Link>
+
+                        <Link
+                            to="/"
+                            className="mt-3 inline-flex min-h-[40px] items-center justify-center gap-2 text-[12px] font-bold uppercase tracking-[0.03em] text-[#57534e] no-underline transition-colors hover:text-[#1c1917]"
+                        >
+                            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                                <polyline points="9 22 9 12 15 12 15 22" />
+                            </svg>
+                            <span>Volver al inicio</span>
                         </Link>
                     </div>
                 </div>

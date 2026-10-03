@@ -66,6 +66,17 @@ export function LoginInstitucional({ error = null }: LoginInstitucionalProps) {
                                 <path d="m12 5 7 7-7 7" />
                             </svg>
                         </a>
+
+                        <a
+                            href="/"
+                            className="mt-3 inline-flex min-h-[40px] items-center justify-center gap-2 text-[12px] font-bold uppercase tracking-[0.03em] text-[#57534e] no-underline transition-colors hover:text-[#1c1917]"
+                        >
+                            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                                <polyline points="9 22 9 12 15 12 15 22" />
+                            </svg>
+                            <span>Volver al inicio</span>
+                        </a>
                     </div>
                 </div>
 

@@ -7,20 +7,9 @@ interface LoginInstitucionalProps {
 export function LoginInstitucional({ error = null }: LoginInstitucionalProps) {
     return (
         <div
-            className="relative flex min-h-screen flex-col items-center justify-center bg-[#fafaf9] px-4 py-8"
+            className="flex min-h-screen flex-col items-center justify-center bg-[#fafaf9] px-4 py-8"
             style={{ fontFamily: "'Open Sans', system-ui, -apple-system, 'Segoe UI', sans-serif" }}
         >
-            <a
-                href="/"
-                className="absolute left-4 top-4 inline-flex min-h-[40px] items-center gap-2 text-[12px] font-bold uppercase tracking-[0.03em] text-[#57534e] no-underline transition-colors hover:text-[#1c1917] sm:left-6 sm:top-6"
-            >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                    <polyline points="9 22 9 12 15 12 15 22" />
-                </svg>
-                <span>Volver al inicio</span>
-            </a>
-
             <div className="w-full max-w-[460px]">
                 <div className="rounded-2xl bg-[#e7e5e4] p-[2px]">
                     <div className="rounded-[22px] bg-white px-8 py-10 text-center" style={{ borderRadius: 'calc(24px - 2px)' }}>
@@ -76,6 +65,17 @@ export function LoginInstitucional({ error = null }: LoginInstitucionalProps) {
                                 <path d="M5 12h14" />
                                 <path d="m12 5 7 7-7 7" />
                             </svg>
+                        </a>
+
+                        <a
+                            href="/"
+                            className="mt-3 inline-flex min-h-[40px] items-center justify-center gap-2 text-[12px] font-bold uppercase tracking-[0.03em] text-[#57534e] no-underline transition-colors hover:text-[#1c1917]"
+                        >
+                            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                                <polyline points="9 22 9 12 15 12 15 22" />
+                            </svg>
+                            <span>Volver al inicio</span>
                         </a>
                     </div>
                 </div>

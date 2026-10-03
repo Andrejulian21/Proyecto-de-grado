@@ -20,9 +20,52 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+/* Render hint, NOT an identity source.
+   The server stays authoritative: every data call goes to the API and a revoked
+   session still 401s. This only exists so a refresh inside an active session
+   paints the right screen on the first frame instead of flashing the landing
+   page while /api/auth/user is retried. Bounded by CACHE_TTL_MS, cleared on
+   logout, and always overwritten by the real response in sessionCheck(). */
+const CACHE_KEY = 'auth_user';
+const CACHE_TS_KEY = 'auth_user_ts';
+const CACHE_TTL_MS = 2 * 60 * 1000;
+
+function readCachedUser(): User | null {
+    try {
+        const raw = sessionStorage.getItem(CACHE_KEY);
+        const ts = Number(sessionStorage.getItem(CACHE_TS_KEY) ?? '0');
+        if (!raw || !ts) return null;
+        if (Date.now() - ts > CACHE_TTL_MS) {
+            clearCachedUser();
+            return null;
+        }
+        return JSON.parse(raw) as User;
+    } catch {
+        return null;
+    }
+}
+
+function cacheUser(user: User): void {
+    try {
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify(user));
+        sessionStorage.setItem(CACHE_TS_KEY, String(Date.now()));
+    } catch {
+        /* storage unavailable — the app still works, it just flashes */
+    }
+}
+
+function clearCachedUser(): void {
+    try {
+        sessionStorage.removeItem(CACHE_KEY);
+        sessionStorage.removeItem(CACHE_TS_KEY);
+    } catch {
+        /* ignore */
+    }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-    const [user, setUser] = useState<User | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const [user, setUser] = useState<User | null>(() => readCachedUser());
+    const [isLoading, setIsLoading] = useState<boolean>(() => readCachedUser() === null);
 
     const isAuthenticated = user !== null;
     const role = user?.role ?? null;
@@ -55,13 +98,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 const data = await fetchUser();
                 if (data) {
                     setUser(data);
+                    cacheUser(data);
                     setIsLoading(false);
                     return;
                 }
                 await new Promise(r => setTimeout(r, 600));
             }
 
-            // API failed — never fall back to browser storage as an identity source.
+            // API failed — the server is the only authority on who the user is,
+            // so a failed check always drops the session and the render hint.
+            clearCachedUser();
             setUser(null);
         } catch {
             setUser(null);
@@ -94,7 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             /* best-effort: still wipe local identity below */
         } finally {
             setUser(null);
-            sessionStorage.removeItem('auth_user');
+            clearCachedUser();
             localStorage.removeItem('user_role');
             window.location.href = '/login';
         }

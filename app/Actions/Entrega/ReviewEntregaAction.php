@@ -197,15 +197,20 @@ final class ReviewEntregaAction
     }
 
     /**
-     * Auto-advance the phase of the REVIEWED project only when all its
-     * entregas in the current phase are approved.
+     * Auto-advance the phase of the REVIEWED project only when none of its
+     * entregas in the current phase is still BLOCKING.
      *
-     * "Approved" is a PER-PROJECT verdict: a project-scoped review writes it
+     * "Blocking" is a PER-PROJECT verdict: a project-scoped review writes it
      * on the pivot and leaves `entregas.status` (the shared semester
      * template) untouched, so filtering this gate by the template column
      * would find a non-approved delivery forever and the project would never
      * advance. Pivots without a verdict still fall back to the template, the
      * behaviour that applied before the pivot existed.
+     *
+     * It is deliberately NOT "approved": a delivery whose deadline expired with
+     * nothing uploaded is not approved, but it is not actionable either, and
+     * keeping it in this gate froze the project forever while the final grade
+     * had already closed. See `NotaEntregaResolver::bloqueaAvanceDeFase`.
      */
     private function autoAdvancePhase(Entrega $entrega, ?Proyecto $proyectoRevisado): void
     {
@@ -213,9 +218,21 @@ final class ReviewEntregaAction
             return;
         }
 
+        // `due_date` and `hora_maxima` are read by the gate: a delivery past
+        // its window with nothing uploaded must not hold the phase.
         $entregasDeLaFase = Entrega::paraProyecto($proyectoRevisado->id)
             ->where('phase', $entrega->phase)
-            ->get(['id', 'status']);
+            ->get(['id', 'status', 'due_date', 'hora_maxima']);
+
+        // No entrega of this phase means the gate has nothing to measure, and
+        // `contains()` over an empty collection is false — which read as
+        // "nothing pending" and advanced a project that has no entrega in this
+        // phase at all. Reachable through the legacy fallback in handle(),
+        // where the reviewed project comes from the version's pivot and need
+        // not match the reviewed entrega's project.
+        if ($entregasDeLaFase->isEmpty()) {
+            return;
+        }
 
         $pivotes = EntregaProyecto::query()
             ->where('proyecto_id', $proyectoRevisado->id)
@@ -224,7 +241,7 @@ final class ReviewEntregaAction
             ->keyBy('entrega_id');
 
         $pendingInPhase = $entregasDeLaFase->contains(
-            fn (Entrega $e) => ! $this->notas->estaAprobada($e, $pivotes->get($e->id))
+            fn (Entrega $e) => $this->notas->bloqueaAvanceDeFase($e, $pivotes->get($e->id))
         );
 
         if (! $pendingInPhase) {

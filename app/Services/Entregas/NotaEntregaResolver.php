@@ -6,6 +6,7 @@ namespace App\Services\Entregas;
 
 use App\Models\Entrega;
 use App\Models\EntregaProyecto;
+use App\Models\VersionDocumento;
 
 /**
  * Resuelve la calificación de una entrega en el contexto de UN proyecto.
@@ -100,6 +101,103 @@ final class NotaEntregaResolver
     public function estaAprobada(?Entrega $entrega, ?EntregaProyecto $pivot): bool
     {
         return $this->estado($entrega, $pivot) === 'aprobada';
+    }
+
+    /**
+     * Does this delivery still BLOCK the phase advance of its project?
+     *
+     * `estaAprobada()` is the wrong question for a gate. A delivery whose
+     * deadline expired with nothing uploaded is not approved, but it is also not
+     * actionable: the window is closed and the student has nothing left to do,
+     * so it must stop blocking. Otherwise the final grade closes (it scores 0
+     * through `EstadoEntregaNota::NoEntregada`) while the phase stays frozen
+     * forever — two gates with opposite semantics for the same state.
+     *
+     * Precedence, mirroring `ConsultaNotasService::estadoDeEntrega`:
+     *
+     *   1. approved → does not block;
+     *   2. an explicit director verdict that is not approval → blocks
+     *      (`rechazada` reopens the pivot for corrections, so the phase waits);
+     *   3. no pivot → blocks (no per-project evidence to judge, safe default);
+     *   4. deadline elapsed AND nothing ever uploaded on that project's pivot →
+     *      does not block;
+     *   5. anything else (uploaded ungraded, deadline still open) → blocks.
+     */
+    public function bloqueaAvanceDeFase(?Entrega $entrega, ?EntregaProyecto $pivot): bool
+    {
+        if ($entrega === null) {
+            return true;
+        }
+
+        if ($this->estaAprobada($entrega, $pivot)) {
+            return false;
+        }
+
+        if ($pivot === null) {
+            return true;
+        }
+
+        if ($this->aTexto($pivot->estado) !== null) {
+            return true;
+        }
+
+        return ! ($this->plazoVencido($entrega) && ! $this->tieneVersiones($pivot));
+    }
+
+    /**
+     * Has this project uploaded anything for this delivery?
+     *
+     * The boundary is the PIVOT, not the project and not the entrega template:
+     * `VersionDocumento::scopeParaProyecto()` filters by project, so it would
+     * count uploads made on OTHER entregas of the same project, and
+     * `Entrega::versiones()` is the semester-wide relation across every linked
+     * project. Only `entrega_proyecto_id` answers "did THIS project submit
+     * THIS delivery". Versions whose pivot was cleared belong to no project and
+     * are excluded for free.
+     */
+    private function tieneVersiones(EntregaProyecto $pivot): bool
+    {
+        return VersionDocumento::query()
+            ->where('entrega_proyecto_id', $pivot->id)
+            ->exists();
+    }
+
+    /**
+     * Has the submission window closed?
+     *
+     * Without `hora_maxima` this replicates `ConsultaNotasService::plazoVencido`
+     * exactly: `due_date` is cast to date (midnight), so the comparison is on
+     * whole days and `isPast()` is never used — a delivery due TODAY is not a
+     * miss yet, and handing out a zero before the window closed would grade
+     * something nobody failed.
+     *
+     * With `hora_maxima` the window ends at `due_date + hora_maxima`, so the
+     * exact timestamp is the only correct comparison: a whole-day test would
+     * wrongly keep `hora_maxima = '00:00'` open for the whole due date. The
+     * value is a free-form string column, so it is parsed by hand instead of
+     * handed to a date parser that would throw mid-transaction.
+     */
+    private function plazoVencido(Entrega $entrega): bool
+    {
+        if ($entrega->due_date === null) {
+            return false;
+        }
+
+        $horaMaxima = $this->aTexto($entrega->hora_maxima);
+
+        if ($horaMaxima === null) {
+            return $entrega->due_date->lt(now()->startOfDay());
+        }
+
+        $partes = explode(':', $horaMaxima);
+
+        return $entrega->due_date->copy()
+            ->setTime(
+                (int) ($partes[0] ?? 0),
+                (int) ($partes[1] ?? 0),
+                (int) ($partes[2] ?? 0),
+            )
+            ->isPast();
     }
 
     /**

@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Enums\EstadoFirma;
 use App\Enums\EstadoProyecto;
 use App\Enums\FaseProyecto;
 use App\Enums\UserRole;
+use App\Models\Bitacora;
 use App\Models\Proyecto;
 use App\Models\Semestre;
 use App\Models\User;
@@ -148,8 +150,16 @@ it('kpis reflejan proyectos creados', function () {
         'semester_id' => $this->semestre->id,
         'status' => EstadoProyecto::EnRiesgo->value,
     ]);
-    $enRiesgo->alert_count = 3;
-    $enRiesgo->save();
+
+    // `alertas_sin_revisar` ya no lee `proyectos.alert_count` (que no tenía
+    // escritor en toda la app y por eso valía siempre 0): cuenta las alertas
+    // reales sin revisar. Este test siembra una para conservar la cobertura
+    // del KPI; la cobertura completa vive en tests/Feature/AlertasTest.php.
+    $bitacora = Bitacora::factory()->create([
+        'proyecto_id' => $enRiesgo->id,
+        'signature_status' => EstadoFirma::Pendiente->value,
+    ]);
+    $bitacora->forceFill(['created_at' => now()->subHours(2)])->save();
 
     $response = $this->actingAs($this->coordinador)
         ->getJson('/api/admin/proyectos/kpis');

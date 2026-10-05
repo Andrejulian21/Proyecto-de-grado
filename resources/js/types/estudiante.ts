@@ -16,9 +16,3 @@ export interface VersionData {
     fileName: string;
     observaciones?: string | null;
 }
-
-export interface PhaseStep {
-    id: string;
-    label: string;
-    status: 'done' | 'current' | 'future';
-}

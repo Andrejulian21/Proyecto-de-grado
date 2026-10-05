@@ -10,7 +10,6 @@ import {
     ClipboardList,
     TrendingDown,
     Bell,
-    TrendingUp,
     Eye,
     AlertTriangle,
     RefreshCw,
@@ -121,7 +120,7 @@ const projectColumns: Column<ProjectRow>[] = [
 function KpiSkeleton() {
     return (
         <>
-            {Array.from({ length: 4 }).map((_, i) => (
+            {Array.from({ length: 3 }).map((_, i) => (
                 <div
                     key={i}
                     className="animate-pulse rounded-xl border border-[#e5e5e5] bg-white p-5 shadow-[0_1px_2px_rgba(28,25,23,0.05)]"
@@ -248,7 +247,7 @@ export default function CoordinadorDashboard() {
             />
 
             {/* KPI row */}
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
                 {kpiLoading ? (
                     <KpiSkeleton />
                 ) : kpiError ? (
@@ -272,12 +271,6 @@ export default function CoordinadorDashboard() {
                             label="Alertas sin revisar"
                             value={kpis?.alertas_sin_revisar ?? '—'}
                             variant="warning"
-                        />
-                        <StatCard
-                            icon={TrendingUp}
-                            label="Tasa de cumplimiento"
-                            value={kpis?.tasa_cumplimiento != null ? `${kpis.tasa_cumplimiento}%` : '—'}
-                            variant="success"
                         />
                     </>
                 )}

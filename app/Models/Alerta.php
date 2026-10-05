@@ -77,11 +77,6 @@ class Alerta extends Model
         return $query->whereNotNull('reviewed_at');
     }
 
-    public function scopePorTipo(Builder $query, TipoAlerta $tipo): Builder
-    {
-        return $query->where('tipo', $tipo->value);
-    }
-
     public function estaRevisada(): bool
     {
         return $this->reviewed_at !== null;

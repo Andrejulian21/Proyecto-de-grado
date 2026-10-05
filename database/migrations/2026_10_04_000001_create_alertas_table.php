@@ -55,11 +55,10 @@ return new class extends Migration
 
             $table->timestamps();
 
-            // Composite: the panel filters by tipo and unreviewed at once.
-            $table->index(['tipo', 'reviewed_at'], 'alertas_tipo_reviewed_at_index');
-
-            // Leading-column-alone: the KPI counts `WHERE reviewed_at IS NULL`
-            // with no tipo predicate, so the composite cannot serve it.
+            // No composite (tipo, reviewed_at): the panel stopped filtering by tipo when
+            // the unused porTipo() scope was dropped, so nothing queries that
+            // combination and the index would only cost write amplification on
+            // every upsert.
             $table->index('reviewed_at', 'alertas_reviewed_at_index');
 
             // PostgreSQL does not index foreign keys automatically; this keeps

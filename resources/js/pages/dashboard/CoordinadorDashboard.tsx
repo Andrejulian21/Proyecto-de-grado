@@ -33,6 +33,25 @@ interface ProjectRow {
     _navigate: (id: number) => void;
 }
 
+/* Mirrors App\Enums\EstadoProyecto (en_curso | en_riesgo | incumplimiento |
+   completado). The previous inline comparisons tested English literals
+   ('active', 'inscribed', 'at-risk', 'completed') that no column ever held, so
+   every row fell through to the "Inscrito" default. */
+const PROJECT_STATUS: Record<string, { label: string; variant: 'success' | 'warning' | 'riesgo' | 'inactivo' }> = {
+    en_curso: { label: 'En Curso', variant: 'success' },
+    en_riesgo: { label: 'En Riesgo', variant: 'riesgo' },
+    incumplimiento: { label: 'Incumplimiento', variant: 'warning' },
+    completado: { label: 'Completado', variant: 'inactivo' },
+};
+
+/* Mirrors App\Enums\FaseProyecto values, which are snake_case. */
+const PHASE_STATUS: Record<string, 'success' | 'en-curso' | 'warning'> = {
+    presentacion_final: 'success',
+    desarrollo: 'en-curso',
+    anteproyecto: 'warning',
+    presentacion_anteproyecto: 'warning',
+};
+
 const projectColumns: Column<ProjectRow>[] = [
     {
         key: 'code',
@@ -58,7 +77,7 @@ const projectColumns: Column<ProjectRow>[] = [
         key: 'phase',
         label: 'Fase',
         render: (row: ProjectRow) => (
-            <StatusBadge variant={row.phase === 'Final' ? 'success' : row.phase === 'Desarrollo' ? 'en-curso' : 'warning'}>
+            <StatusBadge variant={PHASE_STATUS[row.phase] ?? 'warning'}>
                 {row.phase}
             </StatusBadge>
         ),
@@ -67,8 +86,8 @@ const projectColumns: Column<ProjectRow>[] = [
         key: 'status',
         label: 'Estado',
         render: (row: ProjectRow) => (
-            <StatusBadge variant={row.status === 'active' || row.status === 'inscribed' ? 'success' : row.status === 'at-risk' ? 'riesgo' : 'inactivo'}>
-                {row.status === 'active' ? 'Activo' : row.status === 'at-risk' ? 'En Riesgo' : row.status === 'completed' ? 'Completado' : 'Inscrito'}
+            <StatusBadge variant={PROJECT_STATUS[row.status]?.variant ?? 'inactivo'}>
+                {PROJECT_STATUS[row.status]?.label ?? row.status}
             </StatusBadge>
         ),
     },
@@ -191,6 +210,20 @@ export default function CoordinadorDashboard() {
     const { data: proyectos, loading: projLoading, error: projError } = useProyectos();
     const { data: alertas, loading: alertasLoading, error: alertasError, refetch: refetchAlertas } = useAlertas();
 
+    /* Pending alerts grouped by project, so the "Alertas" column stops
+       showing a hardcoded 0. Alerts with `proyecto_id === null`
+       (`firmas_sospechosas`) belong to a director, not to a project, so they
+       are excluded here and stay visible in the alert cards below. */
+    const alertasPorProyecto = alertas.reduce<Record<number, number>>(
+        (acc, alert) => {
+            if (alert.proyecto_id !== null) {
+                acc[alert.proyecto_id] = (acc[alert.proyecto_id] ?? 0) + 1;
+            }
+            return acc;
+        },
+        {},
+    );
+
     const mapProyectoToRow = (p: Proyecto): ProjectRow => ({
         id: p.id,
         code: p.code,
@@ -199,7 +232,7 @@ export default function CoordinadorDashboard() {
         director: p.director?.name ?? '—',
         phase: p.current_phase ?? '—',
         status: p.status,
-        alertCount: 0,
+        alertCount: alertasPorProyecto[p.id] ?? 0,
         _navigate: (id: number) => navigate(`/dashboard/coordinador/proyecto/${id}`),
     });
 

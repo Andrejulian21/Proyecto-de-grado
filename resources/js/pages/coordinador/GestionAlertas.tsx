@@ -2,11 +2,17 @@ import { useState } from 'react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatCard } from '@/components/ui/StatCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { useAlertas, type Alerta } from '@/hooks/useAlertas';
+import { EmptyState } from '@/components/ui/EmptyState';
+import {
+    estaRevisada,
+    useAlertas,
+    type Alerta,
+} from '@/hooks/useAlertas';
 import SeguimientoSemestre from '@/pages/coordinador/SeguimientoSemestre';
 import {
     AlertTriangle,
     Clock,
+    Check,
     CheckCircle2,
     ChevronDown,
     ChevronRight,
@@ -40,17 +46,37 @@ const tipoLabel: Record<string, string> = {
     firmas_sospechosas: 'Firmas sospechosas',
 };
 
+/** Secondary line under the alert title. `firmas_sospechosas` has no project. */
+function subtituloAlerta(alert: Alerta): string {
+    if (alert.proyecto_id !== null) {
+        return `Proyecto #${alert.proyecto_id}`;
+    }
+    if (alert.tipo === 'firmas_sospechosas') {
+        return `Director #${alert.datos.director_id} — sin proyecto asociado`;
+    }
+    return 'Sin proyecto asociado';
+}
+
 export default function GestionAlertas() {
     const [outerTab, setOuterTab] = useState<OuterTab>('seguimiento');
     const [activeTab, setActiveTab] = useState<
         'all' | 'active' | 'resolved'
     >('active');
-    const [expandedAlert, setExpandedAlert] = useState<string | null>(null);
-    const { data: alertas, loading, error, refetch } = useAlertas();
+    const [expandedAlert, setExpandedAlert] = useState<number | null>(null);
+    // A single `todas` request feeds every bucket below: review state lives on
+    // the persisted row, so the stat cards and the tabs can no longer disagree
+    // the way they did when it only existed in the browser.
+    const {
+        data: alertas,
+        loading,
+        error,
+        refetch,
+        revisar,
+        revisandoId,
+    } = useAlertas('todas');
 
-    // For now, all derived alerts are active (no resolve mechanism yet)
-    const resolved: Alerta[] = [];
-    const activeAlerts = alertas;
+    const activeAlerts = alertas.filter((a) => !estaRevisada(a));
+    const resolved = alertas.filter((a) => estaRevisada(a));
 
     const filtered =
         activeTab === 'all'
@@ -190,18 +216,23 @@ export default function GestionAlertas() {
                     {!loading && !error && (
                         <div className="flex flex-col gap-3">
                             {filtered.length === 0 ? (
-                                <div className="flex flex-col items-center gap-3 py-16 text-center">
-                                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#f5f5f4]">
-                                        <CheckCircle2 className="h-6 w-6 text-[#16a34a]" />
-                                    </div>
-                                    <h3 className="text-base font-semibold text-[#1c1917]">
-                                        Sin alertas activas
-                                    </h3>
-                                    <p className="text-sm text-[#57534e]">
-                                        No se detectaron incidencias en este
-                                        momento.
-                                    </p>
-                                </div>
+                                <EmptyState
+                                    icon={CheckCircle2}
+                                    title={
+                                        activeTab === 'resolved'
+                                            ? 'Sin alertas revisadas'
+                                            : activeTab === 'all'
+                                              ? 'Sin alertas registradas'
+                                              : 'Sin alertas activas'
+                                    }
+                                    description={
+                                        activeTab === 'resolved'
+                                            ? 'Todavía no se ha marcado ninguna alerta como revisada.'
+                                            : activeTab === 'all'
+                                              ? 'No hay alertas activas ni revisadas por el momento.'
+                                              : 'No se detectaron incidencias pendientes de revisión.'
+                                    }
+                                />
                             ) : (
                                 filtered.map((alert) => {
                                     const sevConfig =
@@ -210,27 +241,37 @@ export default function GestionAlertas() {
                                     const SeverityIcon = sevConfig.icon;
                                     const isExpanded =
                                         expandedAlert === alert.id;
+                                    const reviewed = estaRevisada(alert);
+                                    const isReviewing =
+                                        revisandoId === alert.id;
 
                                     return (
                                         <div
                                             key={alert.id}
                                             className={`rounded-xl border border-[#e5e5e5] bg-white shadow-[0_1px_2px_rgba(28,25,23,0.05)] ${
-                                                alert.severidad === 'alta'
+                                                alert.severidad === 'alta' &&
+                                                !reviewed
                                                     ? 'border-l-4 border-l-[#dc2626]'
                                                     : ''
                                             }`}
                                         >
-                                            <button
-                                                onClick={() =>
-                                                    setExpandedAlert(
-                                                        isExpanded
-                                                            ? null
-                                                            : alert.id,
-                                                    )
-                                                }
-                                                className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition-colors hover:bg-[#fafaf9]"
-                                            >
-                                                <div className="flex items-center gap-3 min-w-0">
+                                            {/* Header row: the expander and the
+                                                dismiss action are siblings, not
+                                                nested, so both stay valid
+                                                buttons for assistive tech. */}
+                                            <div className="flex w-full items-center justify-between gap-4 px-5 py-4">
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setExpandedAlert(
+                                                            isExpanded
+                                                                ? null
+                                                                : alert.id,
+                                                        )
+                                                    }
+                                                    aria-expanded={isExpanded}
+                                                    className="flex min-w-0 flex-1 items-center gap-3 text-left transition-colors"
+                                                >
                                                     {isExpanded ? (
                                                         <ChevronDown className="h-4 w-4 shrink-0 text-[#78716c]" />
                                                     ) : (
@@ -253,10 +294,12 @@ export default function GestionAlertas() {
                                                             </h3>
                                                         </div>
                                                         <p className="text-xs text-[#57534e] mt-0.5">
-                                                            {alert.proyecto}
+                                                            {subtituloAlerta(
+                                                                alert,
+                                                            )}
                                                         </p>
                                                     </div>
-                                                </div>
+                                                </button>
                                                 <div className="flex items-center gap-2 shrink-0">
                                                     <StatusBadge
                                                         variant={
@@ -268,20 +311,59 @@ export default function GestionAlertas() {
                                                     >
                                                         {sevConfig.label}
                                                     </StatusBadge>
-                                                    <div className="flex h-2 w-2 rounded-full bg-[#dc2626] animate-pulse" />
+                                                    {reviewed ? (
+                                                        <StatusBadge variant="success">
+                                                            Revisada
+                                                        </StatusBadge>
+                                                    ) : (
+                                                        <div className="flex h-2 w-2 rounded-full bg-[#dc2626] animate-pulse" />
+                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            void revisar(
+                                                                alert,
+                                                            )
+                                                        }
+                                                        disabled={
+                                                            reviewed ||
+                                                            isReviewing
+                                                        }
+                                                        aria-label={`Marcar la alerta ${tipoLabel[alert.tipo] ?? alert.tipo} de ${subtituloAlerta(alert)} como revisada`}
+                                                        className="inline-flex min-h-[32px] items-center gap-1.5 rounded-lg border border-[#e5e5e5] bg-white px-2.5 py-1 text-xs font-semibold text-[#1c1917] transition-colors hover:border-[#c2410c] hover:bg-[#fed7aa] hover:text-[#c2410c] disabled:cursor-not-allowed disabled:opacity-60"
+                                                    >
+                                                        <Check
+                                                            className={`h-3.5 w-3.5 ${isReviewing ? 'animate-pulse' : ''}`}
+                                                        />
+                                                        Descartar
+                                                    </button>
                                                 </div>
-                                            </button>
+                                            </div>
                                             {isExpanded && (
                                                 <div className="border-t border-[#e5e5e5] px-5 py-4 bg-[#fafaf9]">
                                                     <p className="text-sm text-[#57534e] mb-3">
                                                         {alert.mensaje}
                                                     </p>
-                                                    <div className="flex items-center text-xs text-[#78716c]">
-                                                        <Clock className="mr-1.5 h-3.5 w-3.5" />
-                                                        {new Date(
-                                                            alert.timestamp,
-                                                        ).toLocaleString(
-                                                            'es-CO',
+                                                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#78716c]">
+                                                        <span className="flex items-center">
+                                                            <Clock className="mr-1.5 h-3.5 w-3.5" />
+                                                            Detectada{' '}
+                                                            {new Date(
+                                                                alert.created_at,
+                                                            ).toLocaleString(
+                                                                'es-CO',
+                                                            )}
+                                                        </span>
+                                                        {reviewed && (
+                                                            <span className="flex items-center">
+                                                                <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                                                                Revisada{' '}
+                                                                {new Date(
+                                                                    alert.reviewed_at as string,
+                                                                ).toLocaleString(
+                                                                    'es-CO',
+                                                                )}
+                                                            </span>
                                                         )}
                                                     </div>
                                                 </div>

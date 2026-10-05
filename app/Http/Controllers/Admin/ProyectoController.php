@@ -8,9 +8,11 @@ use App\Enums\EstadoProyecto;
 use App\Events\AuditEvent;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\UpdateProyectoRequest;
+use App\Models\Alerta;
 use App\Models\Proyecto;
 use App\Models\Semestre;
 use App\Models\User;
+use App\Services\Alertas\AlertaGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +20,10 @@ use Illuminate\Support\Facades\Validator;
 
 class ProyectoController extends Controller
 {
+    public function __construct(
+        private readonly AlertaGenerator $alertas,
+    ) {}
+
     public function index(Request $request): JsonResponse
     {
         $query = Proyecto::query()
@@ -172,9 +178,14 @@ class ProyectoController extends Controller
             ->where('status', EstadoProyecto::EnRiesgo->value)
             ->count();
 
-        $alertas = Proyecto::enSemestresActivos()
-            ->where('alert_count', '>', 0)
-            ->count();
+        // `proyectos.alert_count` has no writer anywhere in the app, so this
+        // used to be permanently 0 while the dashboard card derived alerts
+        // client-side from a different source — two contradicting numbers on
+        // one screen. Count the real unreviewed alerts instead, and reconcile
+        // first so this KPI and `GET /admin/alertas` can never disagree.
+        $this->alertas->generar();
+
+        $alertas = Alerta::query()->noRevisadas()->count();
 
         $total = Proyecto::enSemestresActivos()->count();
         $completados = Proyecto::enSemestresActivos()

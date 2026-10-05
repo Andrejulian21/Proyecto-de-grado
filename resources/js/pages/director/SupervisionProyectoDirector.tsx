@@ -9,7 +9,7 @@ import { apiFetch } from '@/lib/utils';
 import { formatFecha } from '@/lib/fechas';
 import {
     ArrowLeft, Search, BookOpen, FileText,
-    Calendar, Clock, User, Award, ChevronDown, ChevronRight,
+    User, Award, ChevronDown, ChevronRight,
     Eye, RefreshCw, Loader2, AlertCircle, Users,
 } from 'lucide-react';
 
@@ -415,8 +415,8 @@ function ProjectDetailView({ proyectoId }: { proyectoId: number }) {
                                 {project.period && (
                                     <StatusBadge variant="info">{project.period}</StatusBadge>
                                 )}
-                                <StatusBadge variant={project.status === 'active' ? 'success' : 'inactivo'}>
-                                    {project.status === 'active' ? 'Activo' : 'Completado'}
+                                <StatusBadge variant={projectStatusConfig[project.status]?.variant ?? 'info'}>
+                                    {projectStatusConfig[project.status]?.label ?? 'En curso'}
                                 </StatusBadge>
                             </div>
                             <h2 className="mt-1 text-xl font-bold text-[#1c1917]">{project.title}</h2>
@@ -426,45 +426,19 @@ function ProjectDetailView({ proyectoId }: { proyectoId: number }) {
 
                 <hr className="my-5 border-t border-[#e5e5e5]" />
 
-                {/* Info grid */}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <div className="flex items-center gap-3 rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-3.5">
-                        <User className="h-5 w-5 text-[#c2410c]" />
-                        <div>
-                            <p className="text-xs text-[#78716c]">Estudiante</p>
-                            <p className="text-sm font-semibold text-[#1c1917]">{estudianteName}</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3 rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-3.5">
-                        <FileText className="h-5 w-5 text-[#4f46e5]" />
-                        <div>
-                            <p className="text-xs text-[#78716c]">Tipo</p>
-                            <p className="text-sm font-semibold text-[#1c1917]">{project.tipo ?? '—'}</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3 rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-3.5">
-                        <Calendar className="h-5 w-5 text-[#16a34a]" />
-                        <div>
-                            <p className="text-xs text-[#78716c]">Inicio</p>
-                            <p className="text-sm font-semibold text-[#1c1917]">
-                                {project.start_date
-                                    ? formatFecha(project.start_date)
-                                    : '—'}
-                            </p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3 rounded-lg border border-[#e5e5e5] bg-[#fafaf9] p-3.5">
-                        <Clock className="h-5 w-5 text-[#d97706]" />
-                        <div>
-                            <p className="text-xs text-[#78716c]">Fin</p>
-                            <p className="text-sm font-semibold text-[#1c1917]">
-                                {project.end_date
-                                    ? formatFecha(project.end_date)
-                                    : '—'}
-                            </p>
-                        </div>
-                    </div>
-                </div>
+                {/* The Tipo / Inicio / Fin tiles were removed: the director
+                    endpoint never returned those values, so they rendered a bare
+                    em dash on every project. Students are the only fact here
+                    that actually exists. */}
+                {estudianteName && (
+                    <p className="flex items-center gap-2 text-sm text-[#57534e]">
+                        <User className="h-4 w-4 shrink-0 text-[#c2410c]" aria-hidden="true" />
+                        <span>
+                            <span className="font-semibold text-[#1c1917]">Estudiantes:</span>{' '}
+                            {estudianteName}
+                        </span>
+                    </p>
+                )}
 
                 {/* Phase */}
                 {project.current_phase && (

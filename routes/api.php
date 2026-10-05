@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Admin\AlertaController;
 use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\DirectorAcademicProfileController;
 use App\Http\Controllers\Admin\DirectorCupoController;
@@ -269,6 +270,13 @@ Route::middleware(['auth:sanctum', 'single_session', 'activity', 'role:Coordinad
         // Proyectos KPIs (T-006). Must be before apiResource to avoid wildcard collision.
         Route::get('/proyectos/kpis', [ProyectoController::class, 'kpis'])
             ->name('proyectos.kpis');
+
+        // Alertas operativas (R1/R2/R3) — solo coordinador.
+        // `?revisadas=0|1|todas`; regenera antes de responder.
+        Route::get('/alertas', [AlertaController::class, 'index'])
+            ->name('alertas.index');
+        Route::patch('/alertas/{alerta}/revisar', [AlertaController::class, 'revisar'])
+            ->name('alertas.revisar');
 
         // Proyectos CRUD (T-002).
         Route::apiResource('proyectos', ProyectoController::class)

@@ -1,174 +1,197 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/utils';
 
-export interface Alerta {
-    id: string;
-    tipo: 'bitacora_sin_firmar' | 'entrega_vencida' | 'firmas_sospechosas';
+/**
+ * Alerts are owned by the backend. `App\Services\Alertas\AlertaGenerator`
+ * upserts rows by `clave` on every read and deletes the ones that stopped
+ * applying, so this hook never derives alerts from raw bitacora/entrega
+ * payloads — it only renders what the server decided.
+ */
+
+export type TipoAlerta =
+    | 'bitacora_sin_firmar'
+    | 'entrega_vencida'
+    | 'firmas_sospechosas';
+
+export type SeveridadAlerta = 'alta' | 'media';
+
+/** Values accepted by the `?revisadas=` query parameter. */
+export type FiltroRevisadas = '0' | '1' | 'todas';
+
+export interface AlertaDatosBitacoraSinFirmar {
+    bitacora_id: number;
+    proyecto_id: number;
+    creada_at: string;
+    minutos_sin_firmar: number;
+}
+
+export interface AlertaDatosEntregaVencida {
+    entrega_id: number;
+    entrega_proyecto_id: number;
+    proyecto_id: number;
+    titulo_entrega: string;
+    due_date: string | null;
+    hora_maxima: string | null;
+}
+
+export interface AlertaDatosFirmasSospechosas {
+    director_id: number;
+    ventana_minutos: number;
+    firmas: number;
+    bitacora_ids: number[];
+    ventana_inicio: string;
+    ventana_fin: string;
+}
+
+interface AlertaBase<Tipo extends TipoAlerta, Datos> {
+    id: number;
+    /** Stable identity used by the generator to upsert instead of duplicate. */
+    clave: string;
+    tipo: Tipo;
     mensaje: string;
-    proyecto: string;
-    timestamp: string;
-    severidad: 'alta' | 'media';
-}
-
-interface BitacoraEntry {
-    id: number;
-    proyecto_id?: number;
-    proyecto?: { code: string; title: string };
-    project_code?: string;
-    director_id?: number;
-    director_name?: string;
+    /** `null` for director-scoped alerts (`firmas_sospechosas`). */
+    proyecto_id: number | null;
+    severidad: SeveridadAlerta;
+    datos: Datos;
+    reviewed_at: string | null;
+    reviewed_by: number | null;
     created_at: string;
-    signed_at?: string | null;
-    fecha_firma?: string | null;
-    status?: string;
+    updated_at: string;
 }
 
-interface EntregaEntry {
-    id: number;
-    grupo_id: number;
-    fase: string;
-    descripcion?: string;
-    fecha_limite: string;
-    project?: { code: string; title: string };
-    project_code?: string;
-    submission?: { id: number } | null;
-    status?: string;
+export type AlertaBitacoraSinFirmar = AlertaBase<
+    'bitacora_sin_firmar',
+    AlertaDatosBitacoraSinFirmar
+>;
+export type AlertaEntregaVencida = AlertaBase<
+    'entrega_vencida',
+    AlertaDatosEntregaVencida
+>;
+export type AlertaFirmasSospechosas = AlertaBase<
+    'firmas_sospechosas',
+    AlertaDatosFirmasSospechosas
+>;
+
+/**
+ * Modelled as a discriminated union on `tipo` so `datos` narrows alongside the
+ * alert kind instead of being an untyped bag.
+ */
+export type Alerta =
+    | AlertaBitacoraSinFirmar
+    | AlertaEntregaVencida
+    | AlertaFirmasSospechosas;
+
+/** True once a human marked the alert as reviewed. */
+export function estaRevisada(alerta: Alerta): boolean {
+    return alerta.reviewed_at !== null;
 }
+
+const FORBIDDEN_MESSAGE =
+    'No tiene permisos para gestionar las alertas.';
+const LOAD_FAILED_MESSAGE =
+    'No se pudieron cargar las alertas. Intente nuevamente.';
+const REVIEW_FAILED_MESSAGE =
+    'No se pudo marcar la alerta como revisada. Intente nuevamente.';
 
 interface UseAlertasResult {
     data: Alerta[];
     loading: boolean;
     error: string | null;
     refetch: () => void;
+    /** Marks one alert as reviewed, then reconciles the list. */
+    revisar: (alerta: Alerta) => Promise<void>;
+    /** Id of the alert currently being reviewed, or `null`. */
+    revisandoId: number | null;
 }
 
-export function useAlertas(): UseAlertasResult {
+export function useAlertas(
+    filtroRevisadas: FiltroRevisadas = '0',
+): UseAlertasResult {
     const [data, setData] = useState<Alerta[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [revisandoId, setRevisandoId] = useState<number | null>(null);
 
-    const deriveAlertas = useCallback(async () => {
-        setLoading(true);
-        setError(null);
+    const fetchAlertas = useCallback(
+        async (options?: { silent?: boolean }) => {
+            if (!options?.silent) setLoading(true);
+            setError(null);
 
-        try {
-            // Fetch source data from existing endpoints
-            const [bitacorasRes, entregasRes] = await Promise.all([
-                apiFetch('/api/admin/bitacoras?limit=200'),
-                apiFetch('/api/admin/entregas?limit=200'),
-            ]);
+            try {
+                const res = await apiFetch(
+                    `/api/admin/alertas?revisadas=${filtroRevisadas}`,
+                );
 
-            const bitacoras: BitacoraEntry[] = bitacorasRes.ok
-                ? (await bitacorasRes.json()).data ?? []
-                : [];
-            const entregas: EntregaEntry[] = entregasRes.ok
-                ? (await entregasRes.json()).data ?? []
-                : [];
-
-            const alertas: Alerta[] = [];
-            const now = new Date();
-
-            // Regla 1: Bitácoras sin firmar > 1h desde creación
-            for (const bit of bitacoras) {
-                if (!bit.created_at) continue;
-                const createdAt = new Date(bit.created_at);
-                if (isNaN(createdAt.getTime())) continue;
-                const diffMs = now.getTime() - createdAt.getTime();
-                const diffHours = diffMs / (1000 * 60 * 60);
-
-                const isUnsigned =
-                    bit.signed_at === null ||
-                    bit.signed_at === undefined ||
-                    bit.fecha_firma === null ||
-                    bit.fecha_firma === undefined ||
-                    bit.status === 'pendiente';
-
-                if (isUnsigned && diffHours > 1) {
-                    const projectRef = bit.project_code ?? bit.proyecto?.code ?? '—';
-                    alertas.push({
-                        id: `bitacora-sin-firmar-${bit.id}`,
-                        tipo: 'bitacora_sin_firmar',
-                        mensaje: `Bitácora #${bit.id} del proyecto ${projectRef} sin firmar desde hace ${Math.round(diffHours)}h`,
-                        proyecto: projectRef,
-                        timestamp: createdAt.toISOString(),
-                        severidad: diffHours > 24 ? 'alta' : 'media',
-                    });
-                }
-            }
-
-            // Regla 2: Entregas con deadline pasado y sin submission
-            for (const ent of entregas) {
-                if (!ent.fecha_limite) continue;
-                const deadline = new Date(ent.fecha_limite);
-                if (isNaN(deadline.getTime()) || deadline >= now) continue;
-
-                const hasSubmission =
-                    ent.submission != null ||
-                    ent.status === 'submitted' ||
-                    ent.status === 'approved';
-
-                if (!hasSubmission) {
-                    const projectRef = ent.project_code ?? '—';
-                    const diffDays = Math.round(
-                        (now.getTime() - deadline.getTime()) / (1000 * 60 * 60 * 24),
+                if (!res.ok) {
+                    setError(
+                        res.status === 403
+                            ? FORBIDDEN_MESSAGE
+                            : LOAD_FAILED_MESSAGE,
                     );
-                    alertas.push({
-                        id: `entrega-vencida-${ent.id}`,
-                        tipo: 'entrega_vencida',
-                        mensaje: `Entrega "${ent.descripcion ?? ent.fase}" del proyecto ${projectRef} venció hace ${diffDays} día(s) sin entrega`,
-                        proyecto: projectRef,
-                        timestamp: deadline.toISOString(),
-                        severidad: diffDays > 7 ? 'alta' : 'media',
-                    });
+                    return;
                 }
+
+                const body = (await res.json()) as { data?: unknown };
+                setData(
+                    Array.isArray(body.data)
+                        ? (body.data as Alerta[])
+                        : [],
+                );
+            } catch {
+                setError(LOAD_FAILED_MESSAGE);
+            } finally {
+                setLoading(false);
             }
-
-            // Regla 3: Directores con >2 firmas de bitácora en ventana de 1h
-            const signWindow: Record<string, { count: number; project: string; director: string }> = {};
-            for (const bit of bitacoras) {
-                const signTime = bit.fecha_firma ?? bit.signed_at;
-                if (!signTime) continue;
-
-                const signDate = new Date(signTime);
-                if (isNaN(signDate.getTime())) continue;
-                const diffMs = now.getTime() - signDate.getTime();
-                if (diffMs > 60 * 60 * 1000) continue; // Only last 1h
-
-                // Group by director
-                const dirKey = bit.director_name ?? `dir_${bit.director_id}`;
-                if (!signWindow[dirKey]) {
-                    signWindow[dirKey] = { count: 0, project: '', director: dirKey };
-                }
-                signWindow[dirKey].count++;
-                signWindow[dirKey].project =
-                    bit.project_code ?? bit.proyecto?.code ?? '—';
-            }
-
-            for (const [dirKey, info] of Object.entries(signWindow)) {
-                if (info.count > 2) {
-                    alertas.push({
-                        id: `firmas-sospechosas-${dirKey}`,
-                        tipo: 'firmas_sospechosas',
-                        mensaje: `Director "${info.director}" registró ${info.count} firmas de bitácora en la última hora (proyecto: ${info.project})`,
-                        proyecto: info.project,
-                        timestamp: now.toISOString(),
-                        severidad: 'media',
-                    });
-                }
-            }
-
-            setData(alertas);
-        } catch (err) {
-            const message = err instanceof Error ? err.message : 'Error desconocido';
-            setError(message);
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+        },
+        [filtroRevisadas],
+    );
 
     useEffect(() => {
-        deriveAlertas();
-    }, [deriveAlertas]);
+        void fetchAlertas();
+    }, [fetchAlertas]);
 
-    return { data, loading, error, refetch: deriveAlertas };
+    const refetch = useCallback(() => {
+        void fetchAlertas();
+    }, [fetchAlertas]);
+
+    const revisar = useCallback(
+        async (alerta: Alerta) => {
+            setRevisandoId(alerta.id);
+
+            try {
+                const res = await apiFetch(
+                    `/api/admin/alertas/${alerta.id}/revisar`,
+                    { method: 'PATCH' },
+                );
+
+                if (!res.ok) {
+                    setError(
+                        res.status === 403
+                            ? FORBIDDEN_MESSAGE
+                            : REVIEW_FAILED_MESSAGE,
+                    );
+                    return;
+                }
+
+                // Silent refetch on purpose: the alert drops out of the pending
+                // list, and a loading skeleton here would blank the whole panel
+                // on every dismissal.
+                await fetchAlertas({ silent: true });
+            } catch {
+                setError(REVIEW_FAILED_MESSAGE);
+            } finally {
+                setRevisandoId(null);
+            }
+        },
+        [fetchAlertas],
+    );
+
+    return {
+        data,
+        loading,
+        error,
+        refetch,
+        revisar,
+        revisandoId,
+    };
 }

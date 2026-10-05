@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\EstadoProyecto;
+use App\Enums\TipoAlerta;
 use App\Events\AuditEvent;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\UpdateProyectoRequest;
@@ -13,6 +14,7 @@ use App\Models\Proyecto;
 use App\Models\Semestre;
 use App\Models\User;
 use App\Services\Alertas\AlertaGenerator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -174,10 +176,6 @@ class ProyectoController extends Controller
             ->where('status', '!=', EstadoProyecto::Completado->value)
             ->count();
 
-        $enRiesgo = Proyecto::enSemestresActivos()
-            ->where('status', EstadoProyecto::EnRiesgo->value)
-            ->count();
-
         // `proyectos.alert_count` has no writer anywhere in the app, so this
         // used to be permanently 0 while the dashboard card derived alerts
         // client-side from a different source — two contradicting numbers on
@@ -187,18 +185,37 @@ class ProyectoController extends Controller
 
         $alertas = Alerta::query()->noRevisadas()->count();
 
-        $total = Proyecto::enSemestresActivos()->count();
-        $completados = Proyecto::enSemestresActivos()
-            ->where('status', EstadoProyecto::Completado->value)
-            ->count();
-
-        $tasa = $total > 0 ? round(($completados / $total) * 100, 1) : 100.0;
+        // "En riesgo" means a delivery window closed and the project submitted
+        // nothing. It used to read `proyectos.status`, which no code in the app
+        // ever writes, so the card was permanently 0.
+        //
+        // Only `entrega_vencida` counts. `bitacora_sin_firmar` is a missing
+        // SIGNATURE, not a missing delivery, and `firmas_sospechosas` belongs to
+        // a director (its `proyecto_id` is null) rather than to a project.
+        //
+        // Reviewed alerts DO count: dismissing one means "already seen", not
+        // "already fixed". The project stays at risk until the alert is gone,
+        // and the generator only drops it once the document is uploaded. Both
+        // filters are product decisions and will be asked about again.
+        //
+        // Restricted to active semesters so the card agrees with
+        // `proyectos_activos`: a closed semester's backlog is history, not a
+        // current risk. `count('proyecto_id')` with `distinct()` counts distinct
+        // projects in the database without loading any model.
+        $enRiesgo = Alerta::query()
+            ->where('tipo', TipoAlerta::EntregaVencida->value)
+            ->whereNotNull('proyecto_id')
+            ->whereHas(
+                'proyecto',
+                fn (Builder $query) => $query->enSemestresActivos()
+            )
+            ->distinct()
+            ->count('proyecto_id');
 
         return response()->json([
             'proyectos_activos' => $activos,
             'en_riesgo' => $enRiesgo,
             'alertas_sin_revisar' => $alertas,
-            'tasa_cumplimiento' => $tasa,
         ]);
     }
 

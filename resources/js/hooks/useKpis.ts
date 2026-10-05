@@ -5,7 +5,6 @@ export interface KpiResponse {
     proyectos_activos: number;
     en_riesgo: number;
     alertas_sin_revisar: number;
-    tasa_cumplimiento: number;
 }
 
 interface UseKpisResult {
@@ -37,7 +36,6 @@ export function useKpis(): UseKpisResult {
                 proyectos_activos: json.proyectos_activos ?? 0,
                 en_riesgo: json.en_riesgo ?? 0,
                 alertas_sin_revisar: json.alertas_sin_revisar ?? 0,
-                tasa_cumplimiento: json.tasa_cumplimiento ?? 0,
             });
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Error desconocido';

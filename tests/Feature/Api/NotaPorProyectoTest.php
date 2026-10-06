@@ -146,9 +146,11 @@ it('el estado de la entrega se resuelve por proyecto y no por la plantilla', fun
 
     expect(entregaEnPayload($payloadA, $titulo)['estado'])->toBe('aprobada');
 
-    // Sin veredicto propio, el pivote cae al estado legacy de la plantilla
-    // ('enviada'), nunca al veredicto del otro proyecto.
-    expect(entregaEnPayload($payloadB, $titulo)['estado'])->toBe('enviada');
+    // Sin veredicto propio NO se hereda el estado de la plantilla: B no subió
+    // nada a SU pivote, así que su entrega está 'pendiente'. Heredar 'enviada'
+    // reportaba como entregada una entrega que este proyecto nunca hizo, solo
+    // porque la plantilla la tenía en ese estado. Ver NotaEntregaResolver::estado.
+    expect(entregaEnPayload($payloadB, $titulo)['estado'])->toBe('pendiente');
 });
 
 it('sin nota en el pivote cae al valor legacy consolidated_grade', function () {

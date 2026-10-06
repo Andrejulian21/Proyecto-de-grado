@@ -7,10 +7,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Bitacora;
 use App\Models\Entrega;
+use App\Models\EntregaProyecto;
 use App\Models\EvaluadorProyecto;
 use App\Models\Proyecto;
 use App\Models\User;
 use App\Services\CartaAvalService;
+use App\Services\Entregas\NotaEntregaResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use RuntimeException;
@@ -18,7 +20,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DirectorController extends Controller
 {
-    public function __construct(private readonly CartaAvalService $cartasService) {}
+    public function __construct(
+        private readonly CartaAvalService $cartasService,
+        private readonly NotaEntregaResolver $notas,
+    ) {}
 
     /**
      * GET /api/director/proyectos
@@ -175,6 +180,21 @@ class DirectorController extends Controller
      * GET /api/director/proyectos/{id}
      *
      * T-011: Single project detail for the director's supervision view.
+     *
+     * The `entregas` relation is built PER PROJECT instead of being serialized
+     * off the `Entrega` model. An `entrega` is a semester-wide template shared by
+     * every project, so `entregas.status` and `entregas.consolidated_grade`
+     * answer for whichever project reached the shared row first — another
+     * project's outcome. Returning the raw model made the director see a verdict
+     * and a grade that belonged to someone else, while the student and
+     * coordinator screens (both of which read the `entrega_proyecto` pivot)
+     * showed the truth for the same delivery.
+     *
+     * Status and grade are therefore resolved through NotaEntregaResolver against
+     * THIS project's pivot, mirroring Api\EstudianteController::entregas: same
+     * scope, same pivot query, same resolver, so the three views cannot disagree.
+     * `nota()` keeps its deliberate template fallback (legacy historical grade);
+     * `estado()` never does. See {@see NotaEntregaResolver}.
      */
     public function proyectoDetalle(Request $request, int $id): JsonResponse
     {
@@ -191,9 +211,35 @@ class DirectorController extends Controller
             ->orderByDesc('due_date')
             ->get();
 
-        $proyecto->setRelation('entregas', $entregas);
+        // Keyed by entrega_id so each entrega resolves to its OWN pivot. Loading
+        // them in one query keeps this endpoint at two queries instead of N+1.
+        $pivotes = EntregaProyecto::query()
+            ->where('proyecto_id', $proyecto->id)
+            ->whereIn('entrega_id', $entregas->pluck('id'))
+            ->get()
+            ->keyBy('entrega_id');
 
-        return response()->json(['data' => $proyecto]);
+        $entregasPayload = $entregas->map(function (Entrega $entrega) use ($pivotes) {
+            $pivot = $pivotes->get($entrega->id);
+
+            return [
+                'id' => $entrega->id,
+                'title' => $entrega->title,
+                'description' => $entrega->description,
+                'due_date' => $entrega->due_date?->toDateString(),
+                'phase' => $entrega->phase,
+                'status' => $this->notas->estado($entrega, $pivot),
+                'grade' => $this->notas->nota($entrega, $pivot),
+            ];
+        })->values()->all();
+
+        // Assigned on the serialized array rather than through setRelation(): the
+        // relation now holds payload arrays, not Entrega models, and the rest of
+        // the project (semestre, estudiantes) still serializes as before.
+        $data = $proyecto->toArray();
+        $data['entregas'] = $entregasPayload;
+
+        return response()->json(['data' => $data]);
     }
 
     /**

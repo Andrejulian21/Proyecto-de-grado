@@ -9,31 +9,47 @@ use App\Models\EntregaProyecto;
 use App\Models\VersionDocumento;
 
 /**
- * Resuelve la calificación de una entrega en el contexto de UN proyecto.
+ * Resolves a delivery's grade and verdict within the context of ONE project.
  *
- * Una `entrega` es una PLANTILLA compartida por todos los proyectos del
- * semestre: `entregas.status`, `entregas.consolidated_grade` y
- * `entregas.evaluation_complete` describen a la plantilla, no a la entrega de
- * un proyecto. Desde el fix `0c96202` el veredicto del director se escribe en
- * el pivote `entrega_proyecto` (`estado`, `director_grade`,
- * `observaciones_director`), porque escribirlo en la fila compartida
- * calificaría a todos los proyectos de una vez.
+ * An `entrega` is a SEMESTER-WIDE TEMPLATE shared by every project:
+ * `entregas.status`, `entregas.consolidated_grade` and
+ * `entregas.evaluation_complete` describe the TEMPLATE, not the delivery of any
+ * single project. Since fix `0c96202` the director's verdict is written to the
+ * `entrega_proyecto` pivot (`estado`, `director_grade`,
+ * `observaciones_director`), because writing it to the shared row would grade
+ * every project at once.
  *
- * Toda LECTURA de nota, estado u observaciones pasa por acá. La regla es una
- * sola, en un solo lugar:
+ * Every READ of grade, state or observations goes through here — but the two
+ * readings answer DIFFERENT questions and therefore do NOT share one rule:
  *
- *   1. el valor del pivote de ESE proyecto, si existe;
- *   2. si no, el valor legacy de la fila plantilla.
+ *   - A GRADE (`nota()`) falls back to the template on purpose. Grades were
+ *     recorded in `entregas.consolidated_grade` before the pivot existed, and
+ *     without the fallback they would vanish from student screens and reports.
+ *     A legacy grade is a HISTORICAL VALUE about a real submission.
  *
- * El fallback no es cosmético: en producción hay notas escritas en
- * `entregas.consolidated_grade` antes del fix, y sin él desaparecerían de la
- * pantalla del estudiante y de los reportes.
+ *   - A STATE (`estado()`) must NEVER fall back to the template. A template
+ *     verdict describes ANOTHER PROJECT's outcome, not a missing historical
+ *     value, so inheriting it reports a delivery the project never made. In
+ *     production a student whose project never submitted saw delivery 2 as
+ *     "Enviada" purely because a different project had submitted it, while the
+ *     director supervision views (which scope correctly) showed the truth.
+ *
+ * The state rule is not cosmetic either: it feeds `estaAprobada()`, so a
+ * template saying `aprobada` made `bloqueaAvanceDeFase()` report the phase of
+ * EVERY project as unlocked.
  */
 final class NotaEntregaResolver
 {
     /**
-     * Nota del director para el proyecto dado, o el valor legacy si el pivote
-     * todavía no tiene veredicto.
+     * The director's grade for the given project, or the legacy value when the
+     * pivot still carries no grade.
+     *
+     * The template fallback here is INTENTIONAL and must not be "symmetric"
+     * with `estado()`, which no longer reads the template. Grades recorded in
+     * `entregas.consolidated_grade` predate the pivot, so dropping the fallback
+     * would make existing grades disappear from student screens and reports —
+     * a silent loss of real data. A legacy grade is a historical value about a
+     * real submission; a legacy template state is another project's outcome.
      */
     public function nota(?Entrega $entrega, ?EntregaProyecto $pivot): ?float
     {
@@ -47,24 +63,45 @@ final class NotaEntregaResolver
     }
 
     /**
-     * Estado de la entrega para el proyecto dado. Sin veredicto propio, el
-     * pivote cae al estado de la plantilla (comportamiento previo al fix).
+     * The delivery's state FOR THIS PROJECT, never for the template.
+     *
+     * Precedence, in this order:
+     *
+     *   1. the pivot's own verdict (`entrega_proyecto.estado`) when non-empty —
+     *      authoritative, already per project, returned verbatim so a
+     *      `rechazada` is not laundered into `enviada` by the presence of a
+     *      version row;
+     *   2. otherwise, if THIS project uploaded a version onto THIS project's
+     *      pivot → `enviada`, because that version row is the only evidence
+     *      that this project submitted this delivery;
+     *   3. otherwise → `pendiente`.
+     *
+     * `entregas.status` is deliberately unread here. It is the verdict of
+     * whichever project happened to reach the shared row first, so reading it
+     * would both display another project's submission and — through
+     * `estaAprobada()` — unlock this project's phase gate.
+     *
+     * Only the three states the student UI understands are produced:
+     * `aprobada`, `enviada`, `pendiente`, plus whatever verdict the director
+     * actually wrote. A `null` entrega yields `null`: without a delivery there
+     * is nothing to state, and inventing `pendiente` would report a delivery
+     * that does not exist.
      */
     public function estado(?Entrega $entrega, ?EntregaProyecto $pivot): ?string
     {
+        if ($entrega === null) {
+            return null;
+        }
+
         $estadoPivot = $this->aTexto($pivot?->estado);
 
         if ($estadoPivot !== null) {
             return $estadoPivot;
         }
 
-        $status = $entrega?->status;
-
-        if ($status === null) {
-            return null;
-        }
-
-        return is_string($status) ? $status : $status->value;
+        return $pivot !== null && $this->tieneVersiones($pivot)
+            ? 'enviada'
+            : 'pendiente';
     }
 
     /**
@@ -94,9 +131,18 @@ final class NotaEntregaResolver
     }
 
     /**
-     * ¿La entrega está aprobada para ESE proyecto? Es el predicado de los
-     * gates (avance de fase, habilitación): con la fila plantilla el resultado
-     * sería el mismo para todos los proyectos de la entrega.
+     * Is the delivery approved FOR THIS PROJECT? It is the predicate behind the
+     * gates (phase advance, enablement).
+     *
+     * This delegates to `estado()` and adds NO template fallback of its own,
+     * which is now correct rather than merely convenient: with the template
+     * unread by `estado()`, the ONLY value that can compare equal to `aprobada`
+     * is a verdict this project actually received. The predicate is therefore
+     * project-scoped by construction — there is no longer a code path in which
+     * the shared row answers it.
+     *
+     * A `null` entrega resolves to `null` and compares false, so a missing
+     * delivery is never approved.
      */
     public function estaAprobada(?Entrega $entrega, ?EntregaProyecto $pivot): bool
     {

@@ -257,17 +257,20 @@ it('al aprobar ultima entrega de fase avanza proyecto a siguiente fase', functio
     ]);
     $entrega->proyectos()->attach($this->proyecto->id);
 
-    $version = VersionDocumento::create([
-        'entrega_id' => $entrega->id,
+    // Production shape: an uploaded version always carries the project pivot
+    // (ProjectDeliveryVersion::create resolves it), and the verdict is written
+    // PER PROJECT on that pivot. A legacy global review (no `?proyecto=`) only
+    // stamps `entregas.status` on the shared semester template, which is not a
+    // per-project verdict anymore — see NotaEntregaResolver::estado.
+    $version = ProjectDeliveryVersion::create($entrega, $this->proyecto, [
         'version_number' => 1,
         'file_path' => 'entregas/test.pdf',
         'file_size' => 1024,
         'original_name' => 'test.pdf',
-        'uploaded_at' => now(),
     ]);
 
     $this->actingAs($this->director)
-        ->putJson("/api/admin/entregas/{$entrega->id}/revisar", [
+        ->putJson("/api/admin/entregas/{$entrega->id}/revisar?proyecto={$this->proyecto->id}", [
             'status' => 'aprobada',
             'consolidated_grade' => 4.5,
             'director_notes' => 'Aprobado',

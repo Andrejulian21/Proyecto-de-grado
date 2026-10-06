@@ -65,7 +65,11 @@ export function agruparVersionesPorArchivo<T extends VersionAgrupable>(
 
 /**
  * Canonical entrega status mapping shared by every view that renders a
- * delivery state (student detail, director dashboard, coordinator detail).
+ * delivery state: the read-only delivery list (student dashboard, director
+ * supervision, coordinator supervision), the student delivery detail, the
+ * director dashboard table and the delivery review screens. No view may keep
+ * its own copy — that duplication is what let the same delivery read
+ * differently depending on who was looking at it.
  */
 export const ENTREGA_STATUS_MAP: Record<
     string,
@@ -82,8 +86,52 @@ export const ENTREGA_STATUS_MAP: Record<
     creacion: { label: 'Sin entregar', variant: 'inactivo' },
 };
 
-/** Resolve the config for a status, falling back to the raw value. */
+/**
+ * Resolve the config for a status, falling back to the raw value.
+ *
+ * The lookup is case-insensitive because this map is the only place that
+ * decides what a delivery status reads like: a display-cased value that missed
+ * the map would leak through as an unstyled badge with an unmapped variant.
+ */
 export function entregaStatusConfig(status: string | null) {
     if (!status) return { label: 'Sin revisar', variant: 'warning' as const };
-    return ENTREGA_STATUS_MAP[status] ?? { label: status, variant: 'inactivo' as const };
+    return ENTREGA_STATUS_MAP[status.trim().toLowerCase()] ?? { label: status, variant: 'inactivo' as const };
+}
+
+/* ── Entrega status → read-only list layout state ── */
+
+/**
+ * Layout state of a row in the read-only delivery list.
+ *
+ * It is deliberately coarser than the API status: the list only needs it to
+ * pick the contextual sentence shown when a row expands, while the badge label
+ * comes from ENTREGA_STATUS_MAP. Keeping the two concerns apart is what lets a
+ * submitted-but-ungraded delivery share supervision's "pending" row behaviour
+ * without inheriting supervision's label for it.
+ */
+export type ReadOnlyDeliveryStatus = 'approved' | 'pending' | 'corrections' | 'rejected';
+
+/**
+ * The single API-status → layout-state mapping behind every read-only delivery
+ * list (student dashboard, director supervision, coordinator supervision).
+ *
+ * 'enviada' — submitted, not yet graded — lands on the default 'pending'
+ * branch on purpose: all three views must agree on the row behaviour. Its badge
+ * still reads "En revisión", because the label is resolved from the raw value
+ * and never from the layout state.
+ */
+export function entregaLayoutStatus(status: string | null | undefined): ReadOnlyDeliveryStatus {
+    switch (status?.trim().toLowerCase()) {
+        case 'aprobada':
+        case 'aprobado':
+            return 'approved';
+        case 'rechazada':
+        case 'rechazado':
+            return 'rejected';
+        case 'revisada':
+        case 'revisado':
+            return 'corrections';
+        default:
+            return 'pending';
+    }
 }

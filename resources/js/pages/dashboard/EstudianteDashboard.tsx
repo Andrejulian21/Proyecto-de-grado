@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GraduationCap, User, AlertTriangle, Loader2, FileText, Eye, Pencil, Check, X } from 'lucide-react';
+import { GraduationCap, User, AlertTriangle, Loader2, Pencil, Check, X } from 'lucide-react';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { PageHeader } from '@/components/ui/PageHeader';
-import DeliveryAccordion from '@/components/DeliveryAccordion';
+import ReadOnlyDeliveryList, { type ReadOnlyDelivery } from '@/components/supervision/ReadOnlyDeliveryList';
 import { PhaseStepper, type PhaseStep } from '@/components/project/PhaseStepper';
 import { apiFetch } from '@/lib/utils';
-import type { EntregaData } from '@/types/estudiante';
+import { entregaLayoutStatus } from '@/lib/entregas';
 
 const PHASES = [
     { id: 'anteproyecto', label: 'Anteproyecto' },
@@ -14,13 +14,6 @@ const PHASES = [
     { id: 'desarrollo', label: 'Desarrollo del proyecto' },
     { id: 'presentacion_final', label: 'Presentación Final' },
 ] as const;
-
-const LABELS: Record<string, string> = {
-    anteproyecto: 'Documento de Anteproyecto',
-    presentacion_anteproyecto: 'Presentación Anteproyecto',
-    desarrollo: 'Informe de Avance',
-    presentacion_final: 'Informe Final',
-};
 
 function buildPhases(current: string): PhaseStep[] {
     const idx = PHASES.findIndex((p) => p.id === current);
@@ -31,19 +24,10 @@ function toDate(d: string | undefined) {
     return d ? new Date(d).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 }
 
-function mapStatus(s: string | undefined): EntregaData['status'] {
-    if (s === 'aprobada' || s === 'Aprobada') return 'approved';
-    if (s === 'enviada' || s === 'Enviada') return 'enviada';
-    if (s === 'pendiente' || s === 'Pendiente') return 'pending';
-    // Any other status (creacion, solicitada, etc.) → pending, not locked
-    // Locked is determined by start_date in the detail view, not by status
-    return 'pending';
-}
-
 export default function EstudianteDashboard() {
     const navigate = useNavigate();
     const [proyecto, setProyecto] = useState<any>(null);
-    const [entregas, setEntregas] = useState<EntregaData[]>([]);
+    const [entregas, setEntregas] = useState<ReadOnlyDelivery[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null);
@@ -60,21 +44,23 @@ export default function EstudianteDashboard() {
                 if (!pr.ok || !er.ok) { setError('Error al cargar los datos.'); setLoading(false); return; }
                 const pd = await pr.json(), ed = await er.json();
                 setProyecto(pd.data);
-                setEntregas((ed.data || []).map((e: any) => ({
-                    id: e.id, fase: e.fase,
-                    title: e.titulo || e.title || `Entrega #${e.id}`,
-                    status: mapStatus(e.estado || e.status),
-                    deadline: toDate(e.fecha_limite || e.due_date),
-                    startDate: toDate(e.fecha_inicio || e.start_date),
-                    grade: e.nota ?? e.consolidated_grade ?? null,
-                    versions: (e.versiones || []).map((v: any) => ({
-                        version: v.numero_version ?? 0,
-                        date: toDate(v.subido_en || v.created_at),
-                        status: (v.estado || v.status) === 'aprobado' ? 'approved' : (v.estado || v.status) === 'rechazado' ? 'rejected' : 'pending',
-                        fileName: (v.ruta_archivo || '').split('/').pop() || 'documento.pdf',
-                        observaciones: v.observaciones || null,
-                    })),
-                })));
+                setEntregas((ed.data || []).map((e: any) => {
+                    const apiStatus = e.estado ?? e.status ?? null;
+                    const grade = e.nota ?? e.consolidated_grade ?? null;
+                    return {
+                        id: e.id,
+                        name: e.titulo || e.title || `Entrega #${e.id}`,
+                        date: toDate(e.fecha_limite || e.due_date),
+                        phase: e.fase ?? '',
+                        // The raw status decides the badge label through the
+                        // canonical map; the layout state only picks the
+                        // contextual sentence. Keeping both is what stops a
+                        // never-submitted delivery from reading as submitted.
+                        apiStatus,
+                        status: entregaLayoutStatus(apiStatus),
+                        grade: grade != null ? String(grade) : '—',
+                    };
+                }));
             } catch { if (!cancel) setError('Error de conexion.'); }
             finally { if (!cancel) setLoading(false); }
         })();
@@ -90,7 +76,11 @@ export default function EstudianteDashboard() {
     const activePhaseId = selectedPhaseId ?? proyecto.current_phase;
 
     const deliveryCountByPhase = (phaseId: string) =>
-        entregas.filter((e) => e.fase === phaseId).length;
+        entregas.filter((e) => e.phase === phaseId).length;
+
+    // The list renders already-filtered rows: phase scoping belongs to the
+    // caller so the shared component stays a pure read-only renderer.
+    const visibleDeliveries = entregas.filter((e) => e.phase === activePhaseId);
 
     return (
         <div className="flex flex-col gap-6">
@@ -174,30 +164,12 @@ export default function EstudianteDashboard() {
                 onSelectPhase={setSelectedPhaseId}
                 deliveryCountByPhase={deliveryCountByPhase}
             />
-            <div className="flex flex-col gap-3">
-                    {(() => {
-                        const filtered = entregas.filter((e) => e.fase === activePhaseId);
-                        return <>
-                            <h3 className="text-sm font-bold uppercase tracking-[0.05em] text-[#57534e]">Entregas ({filtered.length})</h3>
-                            {filtered.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-[#e5e5e5] bg-white py-12 text-sm text-[#78716c]"><FileText className="h-8 w-8 text-[#d6d3d1]" />No hay entregas para esta fase.</div>
-                            ) : filtered.map((d) => (
-                                <div key={d.id} className="flex flex-col">
-                                    <DeliveryAccordion delivery={d} faseLabel={LABELS[d.fase] || d.fase} />
-                                    <div className="flex justify-end border-x border-b border-[#e5e5e5] rounded-b-xl bg-white px-4 pb-3 pt-0">
-                                        <button
-                                            onClick={() => navigate(`/estudiante/entregas/${d.id}`)}
-                                            className="inline-flex items-center gap-1.5 rounded-lg bg-[#c2410c] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#9a330a] active:scale-[0.98]"
-                                        >
-                                            <Eye className="h-3.5 w-3.5" />
-                                            Ver detalle
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </>;
-                    })()}
-                </div>
+            <ReadOnlyDeliveryList
+                deliveries={visibleDeliveries}
+                hasAnyDeliveries={entregas.length > 0}
+                openLabel="Ver detalle"
+                onOpen={(deliveryId) => navigate(`/estudiante/entregas/${deliveryId}`)}
+            />
         </div>
     );
 }

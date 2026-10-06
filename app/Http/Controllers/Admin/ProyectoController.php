@@ -10,10 +10,13 @@ use App\Events\AuditEvent;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\UpdateProyectoRequest;
 use App\Models\Alerta;
+use App\Models\Entrega;
+use App\Models\EntregaProyecto;
 use App\Models\Proyecto;
 use App\Models\Semestre;
 use App\Models\User;
 use App\Services\Alertas\AlertaGenerator;
+use App\Services\Entregas\NotaEntregaResolver;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,6 +27,7 @@ class ProyectoController extends Controller
 {
     public function __construct(
         private readonly AlertaGenerator $alertas,
+        private readonly NotaEntregaResolver $notas,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -62,19 +66,59 @@ class ProyectoController extends Controller
         return response()->json($proyectos);
     }
 
+    /**
+     * GET /api/admin/proyectos/{id}
+     *
+     * The supervisor's read-only view. `entregas` is returned PER PROJECT, not
+     * per template: an `entrega` is a semester-wide row shared by every project
+     * of that semester, so serializing the raw model made the coordinator see
+     * whichever verdict and grade had reached the shared row first — another
+     * project's state. The per-project verdict and grade are resolved through
+     * NotaEntregaResolver, the same rule the director and student endpoints use,
+     * so all three supervision surfaces agree.
+     */
     public function show(Proyecto $proyecto): JsonResponse
     {
         $proyecto->load([
             'semestre',
             'director:id,name',
             'estudiantes:id,name',
-            'entregasPivot',
         ]);
 
-        // The pivot is the single source of truth for entregas.
-        $proyecto->setRelation('entregas', $proyecto->entregasPivot);
+        $entregas = Entrega::paraProyecto($proyecto->id)
+            ->orderByDesc('due_date')
+            ->get();
 
-        return response()->json(['data' => $proyecto]);
+        // Keyed by entrega_id so each entrega resolves to its OWN pivot. One
+        // query keeps this endpoint at two queries instead of N+1.
+        $pivotes = EntregaProyecto::query()
+            ->where('proyecto_id', $proyecto->id)
+            ->whereIn('entrega_id', $entregas->pluck('id'))
+            ->get()
+            ->keyBy('entrega_id');
+
+        $entregasPayload = $entregas->map(function (Entrega $entrega) use ($pivotes) {
+            $pivot = $pivotes->get($entrega->id);
+
+            return [
+                'id' => $entrega->id,
+                'title' => $entrega->title,
+                'description' => $entrega->description,
+                'due_date' => $entrega->due_date?->toDateString(),
+                'phase' => $entrega->phase,
+                'status' => $this->notas->estado($entrega, $pivot),
+                'grade' => $this->notas->nota($entrega, $pivot),
+            ];
+        })->values()->all();
+
+        // Assigned on the serialized array rather than through setRelation():
+        // the relation now holds payload arrays, not Entrega models, and the
+        // rest of the project (semestre, director, estudiantes) still
+        // serializes exactly as before.
+        $data = $proyecto->toArray();
+        $data['entregas'] = $entregasPayload;
+
+        return response()->json(['data' => $data]);
     }
 
     public function store(Request $request): JsonResponse

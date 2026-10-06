@@ -118,8 +118,21 @@ class Proyecto extends Model
                 ]);
             }
 
-            $count = static::where('semester_id', $proyecto->semester_id)->count() + 1;
-            $proyecto->code = 'PG-'.$semestreCode.str_pad((string) $count, 3, '0', STR_PAD_LEFT);
+            // The suffix comes from the HIGHEST code ever issued in this
+            // semester, never from COUNT(*). `proyectos` has no `deleted_at` and
+            // this model does not use SoftDeletes, so `destroy()` performs a hard
+            // delete: any removed row leaves a permanent hole in the sequence.
+            // COUNT() + 1 cannot see that hole — it returns a number lower than
+            // the maximum already issued, so the next creation re-generates an
+            // occupied code and dies on the `code` UNIQUE index with a 500.
+            // MAX() ignores gaps and always yields a strictly greater number.
+            $ultimo = static::where('semester_id', $proyecto->semester_id)
+                ->pluck('code')
+                ->filter(fn ($code) => str_contains((string) $code, $semestreCode))
+                ->map(fn ($code) => (int) substr((string) $code, -3))
+                ->max() ?? 0;
+
+            $proyecto->code = 'PG-'.$semestreCode.str_pad((string) ($ultimo + 1), 3, '0', STR_PAD_LEFT);
         });
 
         // Auto-vincular proyecto a todas las entregas existentes del semestre

@@ -10,7 +10,7 @@ COPY . .
 RUN pnpm run build
 
 # ----------------------------------------------------------------- vendor ----
-FROM php:8.4-fpm-alpine AS vendor
+FROM php:8.4.27-fpm-alpine AS vendor
 RUN apk add --no-cache $PHPIZE_DEPS \
         postgresql-dev libzip-dev oniguruma-dev icu-dev libxml2-dev \
         libpng-dev freetype-dev libjpeg-turbo-dev \
@@ -27,7 +27,7 @@ RUN composer dump-autoload --no-dev --optimize --classmap-authoritative --no-scr
     && php artisan package:discover --ansi
 
 # --------------------------------------------------------------- runtime -----
-FROM php:8.4-fpm-alpine AS runtime
+FROM php:8.4.27-fpm-alpine AS runtime
 
 RUN apk add --no-cache $PHPIZE_DEPS \
         postgresql-dev libzip-dev oniguruma-dev icu-dev libxml2-dev \
@@ -49,6 +49,7 @@ RUN { \
         echo 'upload_max_filesize=64M'; \
         echo 'post_max_size=64M'; \
         echo 'memory_limit=256M'; \
+        echo 'session.upload_progress.enabled=0'; \
     } > /usr/local/etc/php/conf.d/99-production.ini
 
 # Configure PHP-FPM to listen on TCP port 9000 (not Unix socket)

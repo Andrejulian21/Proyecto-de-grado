@@ -61,9 +61,6 @@ WORKDIR /var/www/html
 # Copy app from vendor stage
 COPY --from=vendor --chown=www-data:www-data /app /var/www/html
 
-# Create storage symlink at BUILD TIME (so it exists in the image)
-RUN php artisan storage:link --force
-
 # Nginx config
 RUN rm -f /etc/nginx/http.d/default.conf /etc/nginx/http.d/default.conf.bak
 COPY nginx.conf /etc/nginx/http.d/default.conf

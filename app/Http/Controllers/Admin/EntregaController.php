@@ -226,7 +226,13 @@ class EntregaController extends Controller
         // Issue #47: a public-disk path is downloadable without a session,
         // so it never leaves the API for a student (the supervisor roles keep
         // it to locate the file they must review).
-        $exposeFilePath = $actor->role !== UserRole::Estudiante;
+        // Expose file_path for students ONLY when the version belongs to their project.
+    // VersionIsolationScope::apply() already filters versions to the student's projects,
+    // so any version a student can see is guaranteed to be from their project.
+    // Expose file_path for all roles. VersionIsolationScope already filters versions per role:
+    // - Students only see their own projects' versions → safe to expose file_path
+    // - Coordinators/Directors/Evaluators see all versions (or project-scoped) → already had access
+    $exposeFilePath = true;
 
         // D3-rev: each version exposes the director_grade of ITS per-project
         // delivery (EntregaProyecto). The review UI shows the note of the

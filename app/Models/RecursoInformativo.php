@@ -44,17 +44,26 @@ class RecursoInformativo extends Model
             return null;
         }
 
-        $bytes = Storage::disk('public')->size($this->file_path);
+        try {
+            $disk = Storage::disk('public');
+            if (! $disk->exists($this->file_path)) {
+                return null;
+            }
 
-        $units = ['B', 'KB', 'MB', 'GB'];
-        $i = 0;
+            $bytes = $disk->size($this->file_path);
 
-        while ($bytes >= 1024 && $i < count($units) - 1) {
-            $bytes /= 1024;
-            $i++;
+            $units = ['B', 'KB', 'MB', 'GB'];
+            $i = 0;
+
+            while ($bytes >= 1024 && $i < count($units) - 1) {
+                $bytes /= 1024;
+                $i++;
+            }
+
+            return round($bytes, max(0, $i - 1)).' '.$units[$i];
+        } catch (\Throwable) {
+            return null;
         }
-
-        return round($bytes, max(0, $i - 1)).' '.$units[$i];
     }
 
     public function author(): BelongsTo

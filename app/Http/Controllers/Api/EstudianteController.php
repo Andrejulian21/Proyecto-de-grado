@@ -157,6 +157,7 @@ class EstudianteController extends Controller
                         'id' => $version->id,
                         'numero_version' => $version->version_number,
                         'nombre_archivo' => $version->original_name,
+                        'file_path' => $version->file_path,
                         'archivo_requerido_id' => $version->archivo_requerido_id,
                         'subido_en' => $uploadedAt
                             ? Carbon::parse($uploadedAt)->toIso8601String()
